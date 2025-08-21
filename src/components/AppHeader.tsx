@@ -66,15 +66,19 @@ export const AppHeader = () => {
       <div className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-primary/10 text-primary">
-                <Zap className="h-6 w-6" />
-              </div>
+            <div className="flex flex-col items-center gap-2">
+                <div className="p-2 rounded-lg text-primary">
+                <img
+                  src="/logo.png"
+                  alt="Logo"
+                  className="h-6 w-24"
+                  style={{
+                  filter: 'drop-shadow(0 0 12px #ffff) drop-shadow(0 0 16px #ffffff)',
+                  }}
+                />
+                </div>
               <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
-                  Vibe Sheet
-                </h1>
-                <p className="text-xs text-muted-foreground">Data Enrichment Tool</p>
+                <p className="text-xs text-muted-foreground">Free Lite-Weight Clay Alternative</p>
               </div>
             </div>
             
@@ -115,22 +119,7 @@ export const AppHeader = () => {
                 </Button>
               </>
             )}
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              asChild
-              className="hidden sm:flex"
-            >
-              <a 
-                href="https://github.com" 
-                target="_blank" 
-                rel="noopener noreferrer"
-              >
-                <Github className="h-4 w-4 mr-2" />
-                GitHub
-              </a>
-            </Button>
+         
           </div>
         </div>
       </div>
