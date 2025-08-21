@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Code, Save, X, Info } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Code, Save, X, Info, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { useDataStore } from '@/stores/useDataStore';
 import { toast } from '@/hooks/use-toast';
+import { SlashMenu } from './SlashMenu';
+import { FormulaValidator, validateFormula } from './FormulaValidator';
 
 interface FormulaEditorProps {
   open: boolean;
@@ -46,6 +48,9 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   const { activeColumn, getFormula, setFormula, headers } = useDataStore();
   const [formula, setFormulaText] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
+  const [showSlashMenu, setShowSlashMenu] = useState(false);
+  const [slashMenuPosition, setSlashMenuPosition] = useState({ top: 0, left: 0 });
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (activeColumn) {
@@ -57,6 +62,16 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
 
   const handleSave = () => {
     if (activeColumn) {
+      const validation = validateFormula(formula, headers);
+      if (!validation.isValid) {
+        toast({
+          title: "Validation Error",
+          description: "Please fix the formula errors before saving.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       setFormula(activeColumn, formula);
       setHasChanges(false);
       toast({
@@ -70,11 +85,43 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   const handleFormulaChange = (value: string) => {
     setFormulaText(value);
     setHasChanges(value !== getFormula(activeColumn || ''));
+    
+    // Check for slash command
+    const textarea = textareaRef.current;
+    if (textarea && value.endsWith('/')) {
+      const rect = textarea.getBoundingClientRect();
+      const textBeforeCursor = value.substring(0, textarea.selectionStart);
+      const lines = textBeforeCursor.split('\n');
+      const currentLine = lines.length;
+      const lineHeight = 20; // Approximate line height
+      
+      setSlashMenuPosition({
+        top: rect.top + currentLine * lineHeight,
+        left: rect.left + 20
+      });
+      setShowSlashMenu(true);
+    } else if (showSlashMenu && !value.endsWith('/')) {
+      setShowSlashMenu(false);
+    }
   };
 
   const insertExample = (exampleCode: string) => {
     setFormulaText(exampleCode);
     setHasChanges(true);
+  };
+
+  const handleSlashMenuSelect = (template: string) => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      const currentValue = formula;
+      const newValue = currentValue.slice(0, -1) + template; // Remove the '/' and insert template
+      setFormulaText(newValue);
+      setHasChanges(true);
+      setShowSlashMenu(false);
+      
+      // Focus back on textarea
+      setTimeout(() => textarea.focus(), 0);
+    }
   };
 
   if (!activeColumn) return null;
@@ -132,17 +179,28 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
 
           {/* Formula editor */}
           <div>
-            <h4 className="font-semibold mb-3">JavaScript Formula</h4>
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-semibold">JavaScript Formula</h4>
+              <Badge variant="outline" className="flex items-center gap-1 text-xs">
+                <Sparkles className="h-3 w-3" />
+                Type / for AI templates
+              </Badge>
+            </div>
             <Textarea
+              ref={textareaRef}
               value={formula}
               onChange={(e) => handleFormulaChange(e.target.value)}
               placeholder="// Enter your JavaScript code here
+// Type '/' to access AI templates
 // Example:
 return row.email?.includes('@gmail.com') ? 'Gmail User' : 'Other';"
               className="formula-editor"
               rows={12}
             />
           </div>
+
+          {/* Formula validation */}
+          <FormulaValidator formula={formula} availableColumns={headers} />
 
           {/* Examples */}
           <div>
@@ -181,13 +239,21 @@ return row.email?.includes('@gmail.com') ? 'Gmail User' : 'Other';"
           </Button>
           <Button
             onClick={handleSave}
-            disabled={!hasChanges}
+            disabled={!hasChanges || !validateFormula(formula, headers).isValid}
           >
             <Save className="h-4 w-4 mr-2" />
             Save Formula
           </Button>
         </SheetFooter>
       </SheetContent>
+
+      <SlashMenu
+        isVisible={showSlashMenu}
+        position={slashMenuPosition}
+        onSelect={handleSlashMenuSelect}
+        onClose={() => setShowSlashMenu(false)}
+        availableColumns={headers}
+      />
     </Sheet>
   );
 };

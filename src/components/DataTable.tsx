@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Settings, Play, ChevronUp, ChevronDown } from 'lucide-react';
+import { Settings, Play, ChevronUp, ChevronDown, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +11,7 @@ interface DataTableProps {
 }
 
 export const DataTable = ({ onEditFormula }: DataTableProps) => {
-  const { headers, rows, getFormula, updateCell, setLoading } = useDataStore();
+  const { headers, rows, getFormula, updateCell, setLoading, addRow } = useDataStore();
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [executingColumn, setExecutingColumn] = useState<string | null>(null);
@@ -102,6 +102,13 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
 
   return (
     <Card className="overflow-hidden">
+      <div className="flex items-center justify-between p-4 border-b border-border">
+        <h3 className="font-semibold">Data Table</h3>
+        <Button onClick={addRow} size="sm" className="flex items-center gap-2">
+          <Plus className="h-4 w-4" />
+          Add Row
+        </Button>
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>

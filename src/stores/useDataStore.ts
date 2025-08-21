@@ -20,6 +20,7 @@ export interface DataActions {
   getFormula: (column: string) => string;
   setLoading: (loading: boolean) => void;
   setActiveColumn: (column: string | null) => void;
+  addRow: () => void;
   clearData: () => void;
 }
 
@@ -67,6 +68,15 @@ export const useDataStore = create<DataState & DataActions>()(
       
       setActiveColumn: (activeColumn: string | null) => {
         set({ activeColumn });
+      },
+      
+      addRow: () => {
+        const { headers, rows } = get();
+        const newRow: DataRow = {};
+        headers.forEach(header => {
+          newRow[header] = '';
+        });
+        set({ rows: [...rows, newRow] });
       },
       
       clearData: () => {
