@@ -33,14 +33,24 @@ export const validateFormula = (formula: string, availableColumns: string[]): Va
   }
 
   // Check for referenced columns that don't exist
-  const columnReferences = formula.match(/row\.(\w+)/g);
+  const columnReferences = formula.match(/rows\[['"]([^'"]+)['"]\]/g);
   if (columnReferences) {
-    const referencedColumns = columnReferences.map(ref => ref.replace('row.', ''));
+    const referencedColumns = columnReferences.map(ref => {
+      const match = ref.match(/rows\[['"]([^'"]+)['"]\]/);
+      return match ? match[1] : '';
+    }).filter(col => col);
+    
     const invalidColumns = referencedColumns.filter(col => !availableColumns.includes(col));
     
     if (invalidColumns.length > 0) {
       warnings.push(`Referenced columns don't exist: ${invalidColumns.join(', ')}`);
     }
+  }
+
+  // Check for old dot notation and suggest bracket notation
+  const dotNotationReferences = formula.match(/rows\.(\w+)/g);
+  if (dotNotationReferences) {
+    warnings.push(`Use bracket notation instead of dot notation. Example: rows['Column Name'] instead of rows.columnName`);
   }
 
   // Check for potentially dangerous functions

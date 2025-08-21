@@ -2,6 +2,8 @@ import { Zap, Github, Download, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useDataStore } from '@/stores/useDataStore';
+import { AIConfiguration } from '@/components/AIConfiguration';
+import { TablesManager } from '@/components/TablesManager';
 import { toast } from '@/hooks/use-toast';
 
 export const AppHeader = () => {
@@ -89,6 +91,8 @@ export const AppHeader = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            <TablesManager />
+            <AIConfiguration />
             {headers.length > 0 && (
               <>
                 <Button
