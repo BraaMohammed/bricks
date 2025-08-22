@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, Key, Brain, Save } from 'lucide-react';
+import { Settings, Key, KeyRound, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,16 +15,23 @@ export const AIConfiguration = () => {
   const [model, setModel] = useState('gpt-3.5-turbo');
   const [customPrompt, setCustomPrompt] = useState('');
   const [hasApiKey, setHasApiKey] = useState(false);
+  const [firecrawlKey, setFirecrawlKey] = useState('');
+  const [hasFirecrawlKey, setHasFirecrawlKey] = useState(false);
 
   useEffect(() => {
     // Load saved settings
     const savedApiKey = localStorage.getItem('openai_api_key');
+    const savedFirecrawlKey = localStorage.getItem('firecrawl_api_key');
     const savedModel = localStorage.getItem('ai_model');
     const savedPrompt = localStorage.getItem('custom_ai_prompt');
 
     if (savedApiKey) {
       setApiKey(savedApiKey);
       setHasApiKey(true);
+    }
+    if (savedFirecrawlKey) {
+      setFirecrawlKey(savedFirecrawlKey);
+      setHasFirecrawlKey(true);
     }
     if (savedModel) {
       setModel(savedModel);
@@ -38,6 +45,10 @@ export const AIConfiguration = () => {
     if (apiKey.trim()) {
       localStorage.setItem('openai_api_key', apiKey.trim());
       setHasApiKey(true);
+    }
+    if (firecrawlKey.trim()) {
+      localStorage.setItem('firecrawl_api_key', firecrawlKey.trim());
+      setHasFirecrawlKey(true);
     }
     localStorage.setItem('ai_model', model);
     localStorage.setItem('custom_ai_prompt', customPrompt);
@@ -56,7 +67,17 @@ export const AIConfiguration = () => {
     setHasApiKey(false);
     toast({
       title: "API Key Cleared",
-      description: "Your API key has been removed.",
+      description: "Your OpenAI API key has been removed.",
+    });
+  };
+
+  const handleClearFirecrawlKey = () => {
+    localStorage.removeItem('firecrawl_api_key');
+    setFirecrawlKey('');
+    setHasFirecrawlKey(false);
+    toast({
+      title: "API Key Cleared",
+      description: "Your Firecrawl API key has been removed.",
     });
   };
 
@@ -72,12 +93,12 @@ export const AIConfiguration = () => {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="flex items-center gap-2">
-          <Brain className="h-4 w-4" />
-          AI Settings
+          <KeyRound className="h-4 w-4" />
+          API Keys
           {hasApiKey && <div className="w-2 h-2 bg-green-500 rounded-full" />}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl h-[80vh] overflow-y-scroll">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
@@ -86,20 +107,20 @@ export const AIConfiguration = () => {
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* API Key Section */}
+          {/* API Keys Section */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Key className="h-4 w-4" />
-                OpenAI API Key
+                API Keys
               </CardTitle>
               <CardDescription>
-                Your API key is stored locally and never sent to our servers.
+                Your API keys are stored locally and never sent to our servers.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="api-key">API Key</Label>
+                <Label htmlFor="api-key">OpenAI API Key</Label>
                 <div className="flex gap-2">
                   <Input
                     id="api-key"
@@ -123,6 +144,34 @@ export const AIConfiguration = () => {
                     className="text-primary hover:underline"
                   >
                     OpenAI Platform
+                  </a>
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="firecrawl-key">Firecrawl API Key</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="firecrawl-key"
+                    type="password"
+                    placeholder={hasFirecrawlKey ? "API key is saved" : "Enter your Firecrawl API key"}
+                    value={firecrawlKey}
+                    onChange={(e) => setFirecrawlKey(e.target.value)}
+                  />
+                  {hasFirecrawlKey && (
+                    <Button variant="outline" onClick={handleClearFirecrawlKey}>
+                      Clear
+                    </Button>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Get your API key from{' '}
+                  <a 
+                    href="https://app.firecrawl.dev/api-keys" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    Firecrawl
                   </a>
                 </p>
               </div>
