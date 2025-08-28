@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Code, Save, X, Info, Sparkles, Brain, Wand2, Trash2, Upload, FileSpreadsheet } from 'lucide-react';
+import { Code, Save, X, Info, Sparkles, Brain, Wand2, Trash2, Upload, FileSpreadsheet, Users, PenTool, UserCheck, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,11 +9,14 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
 import { useDataStore } from '@/stores/useDataStore';
 import { toast } from '@/hooks/use-toast';
 import { SlashMenu } from './SlashMenu';
 import { FormulaValidator, validateFormula } from './FormulaValidator';
 import { Input } from '@/components/ui/input';
+import { runAIAgents } from '@/lib/aiAgents';
 import Papa from 'papaparse';
 
 interface FormulaEditorProps {
@@ -27,7 +30,7 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   const [hasChanges, setHasChanges] = useState(false);
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashMenuPosition, setSlashMenuPosition] = useState({ top: 0, left: 0 });
-  const [mode, setMode] = useState<'code' | 'ai' | 'firecrawl'>('code');
+  const [mode, setMode] = useState<'code' | 'ai' | 'firecrawl' | 'ai-agents'>('code');
   const [aiModel, setAiModel] = useState('gpt-4o-mini');
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiMessage, setAiMessage] = useState('');
@@ -39,6 +42,86 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   const [firecrawlError, setFirecrawlError] = useState('');
   const [savedFormulas, setSavedFormulas] = useState<Array<{name: string, code: string}>>([]);
   const [formulaName, setFormulaName] = useState('');
+
+  // AI Agents state
+  const [userOfferDetails, setUserOfferDetails] = useState('');
+  const [messageCreatorModel, setMessageCreatorModel] = useState('gpt-4o-mini');
+  const [leadRoleplayModel, setLeadRoleplayModel] = useState('gpt-4o-mini');
+  const [messageCreatorThinking, setMessageCreatorThinking] = useState(false);
+  const [leadRoleplayThinking, setLeadRoleplayThinking] = useState(false);
+  const [messageCreatorInstructions, setMessageCreatorInstructions] = useState('');
+  const [leadRoleplayInstructions, setLeadRoleplayInstructions] = useState('');
+  const [maxIterations, setMaxIterations] = useState(5);
+
+  // Available models with thinking mode support (latest as of August 2025)
+  const availableModels = [
+    { id: 'gpt-5', name: 'GPT-5 (Flagship)', supportsThinking: false, cost: 'TBD' },
+    { id: 'gpt-5-mini', name: 'GPT-5 Mini', supportsThinking: false, cost: 'TBD' },
+    { id: 'gpt-5-thinking', name: 'GPT-5 Thinking', supportsThinking: true, cost: 'TBD' },
+    { id: 'gpt-5-thinking-pro', name: 'GPT-5 Thinking Pro', supportsThinking: true, cost: 'TBD' },
+   // { id: 'gpt-4.5-preview', name: 'GPT-4.5', supportsThinking: false, cost: 'TBD' },
+    { id: 'gpt-4o', name: 'GPT-4o (Latest)', supportsThinking: false, cost: '$5.00/$15.00 per 1M tokens' },
+    { id: 'gpt-4o-mini', name: 'GPT-4o Mini', supportsThinking: false, cost: '$0.15/$0.60 per 1M tokens' },
+    { id: 'o3', name: 'OpenAI o3 (Reasoning)', supportsThinking: true, cost: 'TBD' },
+    { id: 'o3-pro', name: 'OpenAI o3-pro (Reasoning)', supportsThinking: true, cost: 'TBD' },
+    { id: 'o4-mini', name: 'OpenAI o4-mini (Reasoning)', supportsThinking: true, cost: 'TBD' },
+  ];
+
+  // Default instructions
+  const defaultMessageCreatorInstructions = `You are an expert copywriter creating personalized DM messages. 
+
+CRITICAL: You MUST respond with ONLY a valid JSON object. No other text before or after.
+
+REQUIRED JSON FORMAT:
+{
+  "message": "Your personalized message here",
+  "reasoning": "Why this approach was chosen",
+  "improvements_made": ["List of improvements based on previous feedback"],
+  "personalization_used": ["Specific data points used for personalization"]
+}
+
+CONTEXT:
+- Lead Data: {columns}
+- User's Offer: {userOfferDetails}
+- Chat History: {previousIterations}
+- Additional Instructions: {customInstructions}
+
+GUIDELINES:
+- Keep under 200 characters for DMs
+- Integrate user's offer naturally
+- Personalize using lead data
+- Learn from chat history feedback
+- Follow user's additional instructions
+- Include clear value proposition
+- End with soft CTA
+
+REMEMBER: Output ONLY the JSON object, nothing else.`;
+
+  const defaultLeadRoleplayInstructions = `You roleplay as this lead prospect. Evaluate the message critically and decide approval.
+
+CRITICAL: You MUST respond with ONLY a valid JSON object. No other text before or after.
+
+REQUIRED JSON FORMAT:
+{
+  "approved": true/false,
+  "score": 1-10,
+  "feedback": "Your honest reaction as the lead",
+  "specific_issues": ["List specific problems"],
+  "suggested_improvements": ["Specific actionable suggestions"],
+  "decision_reasoning": "Why you approved/rejected this message"
+}
+
+CONTEXT:
+- Your Profile: {columns}
+- Message to Evaluate: {message}
+- Previous Iterations: {chatHistory}
+- Additional Instructions: {customInstructions}
+
+ROLEPLAY AS: {lead characteristics based on data}
+ONLY approve (true) if message is 8+ score and genuinely compelling.
+Consider: relevance, personalization, offer appeal, professionalism, likelihood to respond.
+
+REMEMBER: Output ONLY the JSON object, nothing else.`;
 
   const firstRow = rows && rows.length > 0 ? rows[0] : null;
 
@@ -216,16 +299,26 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
       
       // Check if it's an AI formula and parse it
       if (existingFormula.includes('localStorage.getItem(\'openai_api_key\')')) {
-        setMode('ai');
-        // Try to extract AI prompt and model from existing formula
-        const promptMatch = existingFormula.match(/content:\s*["'`]([^"'`]+)["'`]/);
-        const modelMatch = existingFormula.match(/model:\s*["'`]([^"'`]+)["'`]/);
-        
-        if (promptMatch) {
-          setAiPrompt(promptMatch[1]);
-        }
-        if (modelMatch) {
-          setAiModel(modelMatch[1]);
+        if (existingFormula.includes('🤖 AI Copy Agents Starting')) {
+          // AI Agents mode
+          setMode('ai-agents');
+          try {
+            // Try to extract config from the formula
+            const configMatch = existingFormula.match(/const config = ({.*?});/s);
+            if (configMatch) {
+              const config = JSON.parse(configMatch[1]);
+              setUserOfferDetails(config.userOfferDetails || '');
+              setMessageCreatorModel(config.messageCreatorModel || 'gpt-4o-mini');
+              setLeadRoleplayModel(config.leadRoleplayModel || 'gpt-4o-mini');
+              setMessageCreatorThinking(config.messageCreatorThinking || false);
+              setLeadRoleplayThinking(config.leadRoleplayThinking || false);
+              setMessageCreatorInstructions(config.messageCreatorInstructions || '');
+              setLeadRoleplayInstructions(config.leadRoleplayInstructions || '');
+              setMaxIterations(config.maxIterations || 5);
+            }
+          } catch (error) {
+            console.error('Error parsing AI agents config:', error);
+          }
         }
       } else if (existingFormula.includes('localStorage.getItem(\'firecrawl_api_key\')')) {
         setMode('firecrawl');
@@ -268,6 +361,17 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
           return;
         }
         finalFormula = generateFirecrawlFormula(firecrawlUrl);
+      } else if (mode === 'ai-agents') {
+        // Generate the AI Agents formula
+        if (!userOfferDetails.trim()) {
+          toast({
+            title: "Validation Error",
+            description: "Please enter your offer details for the AI agents.",
+            variant: "destructive",
+          });
+          return;
+        }
+        finalFormula = generateAIAgentsFormula();
       } else {
         // Only validate formula syntax when in code mode
         const validation = validateFormula(finalFormula, headers);
@@ -285,7 +389,7 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
       setHasChanges(false);
       toast({
         title: "Formula Saved",
-        description: `${mode === 'ai' ? 'AI prompt' : mode === 'firecrawl' ? 'Firecrawl URL template' : 'Formula'} for "${activeColumn}" has been saved.`,
+        description: `${mode === 'ai' ? 'AI prompt' : mode === 'firecrawl' ? 'Firecrawl URL template' : mode === 'ai-agents' ? 'AI Copy Agents configuration' : 'Formula'} for "${activeColumn}" has been saved.`,
       });
       onOpenChange(false);
     }
@@ -381,12 +485,42 @@ try {
 }`;
   };
 
-  const handleModeChange = (newMode: 'code' | 'ai' | 'firecrawl') => {
+  const generateAIAgentsFormula = () => {
+    const config = {
+      messageCreatorModel,
+      leadRoleplayModel,
+      messageCreatorThinking,
+      leadRoleplayThinking,
+      userOfferDetails,
+      messageCreatorInstructions: messageCreatorInstructions, // Keep user's custom instructions
+      leadRoleplayInstructions: leadRoleplayInstructions, // Keep user's custom instructions
+      maxIterations,
+    };
+
+    return `// AI Copy Agents Formula
+const { runAIAgents } = await import('/src/lib/aiAgents');
+const config = ${JSON.stringify(config)};
+
+return await runAIAgents(config, row);`;
+  };
+
+  const handleModeChange = (newMode: 'code' | 'ai' | 'firecrawl' | 'ai-agents') => {
     setMode(newMode);
     setHasChanges(true);
     
     if (newMode === 'ai' && !aiPrompt) {
       setAiPrompt('Analyze this data and provide insights');
+    } else if (newMode === 'ai-agents') {
+      // Initialize AI agents mode with defaults if empty
+      if (!userOfferDetails) {
+        setUserOfferDetails('');
+      }
+      if (!messageCreatorInstructions) {
+        setMessageCreatorInstructions('');
+      }
+      if (!leadRoleplayInstructions) {
+        setLeadRoleplayInstructions('');
+      }
     }
   };
 
@@ -520,7 +654,7 @@ try {
         <div className="space-y-6 py-6">
           {/* Mode Selection */}
           <Tabs value={mode} onValueChange={handleModeChange} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="code" className="flex items-center gap-2">
                 <Code className="h-4 w-4" />
                 Code Mode
@@ -532,6 +666,10 @@ try {
               <TabsTrigger value="firecrawl" className="flex items-center gap-2">
                 <Wand2 className="h-4 w-4" />
                 Firecrawl Mode
+              </TabsTrigger>
+              <TabsTrigger value="ai-agents" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                AI Copy Agents
               </TabsTrigger>
             </TabsList>
 
@@ -921,6 +1059,274 @@ return row['email']?.includes('@gmail.com') ? 'Gmail User' : 'Other';"
                 )}
               </div>
             </TabsContent>
+
+            <TabsContent value="ai-agents" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    AI Copy Agents Configuration
+                  </CardTitle>
+                  <CardDescription>
+                    Two AI agents collaborate to create perfect DM messages through iterative refinement
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  
+                  {/* Available columns for AI Agents */}
+                  <div>
+                    <h4 className="font-semibold mb-3 flex items-center gap-2">
+                      <Info className="h-4 w-4" />
+                      Available Columns
+                    </h4>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Click on a column to add it to your instructions. The AI agents will have access to all this data:
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {headers.map((header) => (
+                        <Badge 
+                          key={header} 
+                          variant="outline" 
+                          className="cursor-pointer hover:bg-muted"
+                          onClick={() => {
+                            const insertion = `{${header}}`;
+                            setUserOfferDetails(prev => prev + (prev ? ' ' : '') + insertion);
+                          }}
+                        >
+                          {header}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* User Offer Details */}
+                  <div>
+                    <Label className="text-base font-semibold mb-3 block">
+                      Your Offer Details
+                    </Label>
+                    <Textarea 
+                      placeholder="Describe your product/service/offer that will be mentioned in messages..."
+                      value={userOfferDetails}
+                      onChange={(e) => {
+                        setUserOfferDetails(e.target.value);
+                        setHasChanges(true);
+                      }}
+                      rows={3}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      💡 Tip: Use {`{Column Name}`} to reference lead data in your offer description
+                    </p>
+                  </div>
+
+                  {/* Agent Configuration Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Message Creator Agent */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                          <PenTool className="h-4 w-4" />
+                          Message Creator Agent
+                        </CardTitle>
+                        <CardDescription>
+                          Creates personalized DM messages
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div>
+                          <Label className="text-sm font-medium">Model</Label>
+                          <Select value={messageCreatorModel} onValueChange={(value) => {
+                            setMessageCreatorModel(value);
+                            setHasChanges(true);
+                          }}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableModels.map((model) => (
+                                <SelectItem key={model.id} value={model.id}>
+                                  <div className="flex items-center gap-2">
+                                    {model.name}
+                                    {model.supportsThinking && <Brain className="h-3 w-3" />}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {availableModels.find(m => m.id === messageCreatorModel)?.cost}
+                          </p>
+                        </div>
+
+                        {/* Thinking Mode Toggle */}
+                        {availableModels.find(m => m.id === messageCreatorModel)?.supportsThinking && (
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <Label className="text-sm font-medium">Thinking Mode</Label>
+                              <p className="text-xs text-muted-foreground">Enable advanced reasoning</p>
+                            </div>
+                            <Switch
+                              checked={messageCreatorThinking}
+                              onCheckedChange={(checked) => {
+                                setMessageCreatorThinking(checked);
+                                setHasChanges(true);
+                              }}
+                            />
+                          </div>
+                        )}
+
+                        <div>
+                          <Label className="text-sm font-medium">Custom Instructions (Optional)</Label>
+                          <Textarea
+                            placeholder="Additional instructions for the message creator..."
+                            value={messageCreatorInstructions}
+                            onChange={(e) => {
+                              setMessageCreatorInstructions(e.target.value);
+                              setHasChanges(true);
+                            }}
+                            rows={3}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Lead Roleplay Agent */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                          <UserCheck className="h-4 w-4" />
+                          Lead Roleplay Agent
+                        </CardTitle>
+                        <CardDescription>
+                          Acts as the lead and evaluates messages
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div>
+                          <Label className="text-sm font-medium">Model</Label>
+                          <Select value={leadRoleplayModel} onValueChange={(value) => {
+                            setLeadRoleplayModel(value);
+                            setHasChanges(true);
+                          }}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableModels.map((model) => (
+                                <SelectItem key={model.id} value={model.id}>
+                                  <div className="flex items-center gap-2">
+                                    {model.name}
+                                    {model.supportsThinking && <Brain className="h-3 w-3" />}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {availableModels.find(m => m.id === leadRoleplayModel)?.cost}
+                          </p>
+                        </div>
+
+                        {/* Thinking Mode Toggle */}
+                        {availableModels.find(m => m.id === leadRoleplayModel)?.supportsThinking && (
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <Label className="text-sm font-medium">Thinking Mode</Label>
+                              <p className="text-xs text-muted-foreground">Enable advanced reasoning</p>
+                            </div>
+                            <Switch
+                              checked={leadRoleplayThinking}
+                              onCheckedChange={(checked) => {
+                                setLeadRoleplayThinking(checked);
+                                setHasChanges(true);
+                              }}
+                            />
+                          </div>
+                        )}
+
+                        <div>
+                          <Label className="text-sm font-medium">Custom Instructions (Optional)</Label>
+                          <Textarea
+                            placeholder="Additional instructions for the lead roleplay..."
+                            value={leadRoleplayInstructions}
+                            onChange={(e) => {
+                              setLeadRoleplayInstructions(e.target.value);
+                              setHasChanges(true);
+                            }}
+                            rows={3}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Settings */}
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label className="text-sm font-medium">Max Iterations</Label>
+                            <p className="text-xs text-muted-foreground">Prevent infinite loops</p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm text-muted-foreground">{maxIterations}</span>
+                            <div className="w-32">
+                              <Slider 
+                                value={[maxIterations]} 
+                                onValueChange={(value) => {
+                                  setMaxIterations(value[0]);
+                                  setHasChanges(true);
+                                }}
+                                max={10} 
+                                min={1} 
+                                step={1} 
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Preview */}
+                  {userOfferDetails && firstRow && (
+                    <Card className="p-4 bg-muted/50">
+                      <h4 className="font-semibold mb-2 flex items-center gap-2">
+                        <Sparkles className="h-4 w-4" />
+                        Preview with First Row Data
+                      </h4>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Lead Profile:</p>
+                          <code className="text-xs bg-background px-2 py-1 rounded block overflow-x-auto">
+                            {JSON.stringify(firstRow, null, 2)}
+                          </code>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Your Offer (processed):</p>
+                          <span className="font-mono bg-background px-2 py-1 rounded text-sm block">
+                            {userOfferDetails.replace(/\{([^}]+)\}/g, (match, columnName) => {
+                              const value = firstRow[columnName.trim()];
+                              return value || `[${columnName.trim()} not found]`;
+                            })}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">API Key Status:</p>
+                          <Badge variant={localStorage.getItem('openai_api_key') ? "default" : "destructive"}>
+                            {localStorage.getItem('openai_api_key') ? "✅ API Key Found" : "❌ No API Key"}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        The AI agents will use this data to create and evaluate personalized messages.
+                      </div>
+                    </Card>
+                  )}
+
+                </CardContent>
+              </Card>
+            </TabsContent>
           </Tabs>
         </div>
 
@@ -966,11 +1372,12 @@ return row['email']?.includes('@gmail.com') ? 'Gmail User' : 'Other';"
                   !hasChanges || 
                   (mode === 'code' && !validateFormula(formula, headers).isValid) || 
                   (mode === 'ai' && !aiPrompt.trim()) ||
-                  (mode === 'firecrawl' && !firecrawlUrl.trim())
+                  (mode === 'firecrawl' && !firecrawlUrl.trim()) ||
+                  (mode === 'ai-agents' && !userOfferDetails.trim())
                 }
               >
                 <Save className="h-4 w-4 mr-2" />
-                Save {mode === 'ai' ? 'AI Prompt' : mode === 'firecrawl' ? 'Firecrawl Template' : 'Formula'}
+                Save {mode === 'ai' ? 'AI Prompt' : mode === 'firecrawl' ? 'Firecrawl Template' : mode === 'ai-agents' ? 'AI Copy Agents' : 'Formula'}
               </Button>
             </div>
           </div>
