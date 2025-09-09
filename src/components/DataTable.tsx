@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { Settings, Play, ChevronUp, ChevronDown, Plus, Trash2, Eye, Upload } from 'lucide-react';
+import { Settings, Play, ChevronUp, ChevronDown, Plus, Trash2, Eye, Upload, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -20,7 +20,7 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [executingColumn, setExecutingColumn] = useState<string | null>(null);
-  const [executingCell, setExecutingCell] = useState<string | null>(null);
+  const [executingCells, setExecutingCells] = useState<Set<string>>(new Set());
   const [showAddColumnDialog, setShowAddColumnDialog] = useState(false);
   const [newColumnName, setNewColumnName] = useState('');
   const [columnToRemove, setColumnToRemove] = useState<string | null>(null);
@@ -108,7 +108,7 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
 
   const executeCellFormula = async (rowIndex: number, column: string) => {
     const cellKey = `${rowIndex}-${column}`;
-    setExecutingCell(cellKey);
+    setExecutingCells(prev => new Set(prev).add(cellKey));
 
     try {
       await executeFormulaOnCell(rowIndex, column);
@@ -123,7 +123,11 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
         variant: "destructive",
       });
     } finally {
-      setExecutingCell(null);
+      setExecutingCells(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(cellKey);
+        return newSet;
+      });
     }
   };
 
@@ -395,7 +399,11 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
                           disabled={!hasFormula || isExecuting}
                           className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
                         >
-                          <Play className={`h-3 w-3 ${isExecuting ? 'animate-spin' : ''}`} />
+                          {isExecuting ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Play className="h-3 w-3" />
+                          )}
                         </Button>
                         
                         <AlertDialog open={columnToRemove === header} onOpenChange={(open) => !open && setColumnToRemove(null)}>
@@ -440,7 +448,7 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
                 {headers.map((header) => {
                   const hasFormula = !!getFormula(header);
                   const cellKey = `${index}-${header}`;
-                  const isCellExecuting = executingCell === cellKey;
+                  const isCellExecuting = executingCells.has(cellKey);
                   
                   return (
                     <td key={header} className="table-cell relative group">
@@ -461,7 +469,11 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
                               disabled={isCellExecuting}
                               className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity ml-1"
                             >
-                              <Play className={`h-3 w-3 ${isCellExecuting ? 'animate-spin' : ''}`} />
+                              {isCellExecuting ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Play className="h-3 w-3" />
+                              )}
                             </Button>
                           )}
                           <Button

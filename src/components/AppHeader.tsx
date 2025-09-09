@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { useDataStore } from '@/stores/useDataStore';
 import { AIConfiguration } from '@/components/AIConfiguration';
 import { TablesManager } from '@/components/TablesManager';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { toast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 
@@ -82,7 +83,7 @@ export const AppHeader = () => {
   return (
     <>
       <header className="border-b border-border bg-card/50 backdrop-blur-sm">
-        <div className="container mx-auto px-6 py-4">
+        <div className="mx-auto px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex flex-col items-center gap-2">
@@ -138,7 +139,7 @@ export const AppHeader = () => {
                   </Button>
                 </>
               )}
-           
+              <ThemeToggle />
             </div>
           </div>
         </div>
@@ -146,7 +147,7 @@ export const AppHeader = () => {
       
       {showPromo && (
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-200 dark:from-blue-950/20 dark:to-indigo-950/20 dark:border-blue-800">
-          <div className="container mx-auto px-6 py-3">
+          <div className="mx-auto px-8 py-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">

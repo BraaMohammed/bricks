@@ -25,8 +25,8 @@ const Index = () => {
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       <AppHeader />
       
-      <main className="container mx-auto px-6 py-8">
-        <div className="max-w-7xl mx-auto space-y-8">
+      <main className="mx-auto px-8 py-6">
+        <div className="max-w-[95%] mx-auto space-y-8">
           {headers.length === 0 ? (
             <div className="max-w-2xl mx-auto space-y-8">
               <div className="text-center space-y-4">

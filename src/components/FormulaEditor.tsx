@@ -498,7 +498,7 @@ try {
     };
 
     return `// AI Copy Agents Formula
-const { runAIAgents } = await import('/src/lib/aiAgents');
+const { runAIAgents } = await import('@/lib/aiAgents');
 const config = ${JSON.stringify(config)};
 
 return await runAIAgents(config, row);`;
