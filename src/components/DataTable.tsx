@@ -63,12 +63,8 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
     setLoading(true);
 
     try {
-      let successCount = 0;
-      let errorCount = 0;
-
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        
+      // Execute all rows in parallel using Promise.all
+      const rowPromises = rows.map(async (row, i) => {
         try {
           // Create async function from formula string with proper column access syntax
           const asyncFunction = new Function('row', `
@@ -81,13 +77,19 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
           const stringResult = result !== null && result !== undefined ? String(result) : '';
           
           updateCell(i, column, stringResult);
-          successCount++;
+          return { success: true, rowIndex: i };
         } catch (error) {
           updateCell(i, column, 'ERROR');
-          errorCount++;
           console.error(`Error in row ${i}:`, error);
+          return { success: false, rowIndex: i, error };
         }
-      }
+      });
+
+      // Wait for all rows to complete
+      const results = await Promise.all(rowPromises);
+      
+      const successCount = results.filter(r => r.success).length;
+      const errorCount = results.filter(r => !r.success).length;
 
       toast({
         title: "Formula Executed",
@@ -449,6 +451,8 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
                   const hasFormula = !!getFormula(header);
                   const cellKey = `${index}-${header}`;
                   const isCellExecuting = executingCells.has(cellKey);
+                  const isColumnExecuting = executingColumn === header;
+                  const isAnyExecuting = isCellExecuting || isColumnExecuting;
                   
                   return (
                     <td key={header} className="table-cell relative group">
@@ -466,10 +470,10 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
                               variant="ghost"
                               size="sm"
                               onClick={() => executeCellFormula(index, header)}
-                              disabled={isCellExecuting}
+                              disabled={isAnyExecuting}
                               className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity ml-1"
                             >
-                              {isCellExecuting ? (
+                              {isAnyExecuting ? (
                                 <Loader2 className="h-3 w-3 animate-spin" />
                               ) : (
                                 <Play className="h-3 w-3" />
