@@ -403,6 +403,12 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
     
     const fullPrompt = message ? `${processedPrompt}. Additional context: ${message}` : processedPrompt;
     
+    // Newer models (GPT-5, o-series) use 'max_completion_tokens'
+    const useMaxCompletionTokens = model.startsWith('gpt-5') || model.startsWith('o');
+    const tokenParameter = useMaxCompletionTokens 
+      ? `'max_completion_tokens': 150` 
+      : `'max_tokens': 150`;
+
     return `// AI Generated Formula
 const apiKey = localStorage.getItem('openai_api_key');
 
@@ -422,7 +428,7 @@ const response = await fetch('https://api.openai.com/v1/chat/completions', {
       role: 'user',
       content: \`${fullPrompt.replace(/`/g, '\\`')}\`
     }],
-    max_tokens: 150
+    ${tokenParameter}
   })
 });
 
