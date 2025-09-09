@@ -24,7 +24,7 @@ export interface DataActions {
   addColumn: (columnName: string) => void;
   removeColumn: (columnName: string) => void;
   clearData: () => void;
-  executeFormulaOnCell: (rowIndex: number, column: string) => Promise<void>;
+  executeFormulaOnCell: (rowIndex: number, column: string, dependencies?: Record<string, (...args: unknown[]) => unknown>) => Promise<void>;
 }
 
 const initialState: DataState = {
@@ -104,7 +104,7 @@ export const useDataStore = create<DataState & DataActions>()(
         });
       },
       
-      executeFormulaOnCell: async (rowIndex: number, column: string) => {
+      executeFormulaOnCell: async (rowIndex: number, column:string, dependencies?: Record<string, (...args: unknown[]) => unknown>) => {
         const { rows, formulas, updateCell } = get();
         const formula = formulas[column];
         
@@ -115,14 +115,17 @@ export const useDataStore = create<DataState & DataActions>()(
         const row = rows[rowIndex];
         
         try {
+          const depNames = Object.keys(dependencies || {});
+          const depValues = Object.values(dependencies || {});
+
           // Create async function from formula string with proper column access
-          const asyncFunction = new Function('row', `
+          const asyncFunction = new Function('row', ...depNames, `
             return (async () => {
               ${formula}
             })();
           `);
           
-          const result = await asyncFunction(row);
+          const result = await asyncFunction(row, ...depValues);
           const stringResult = result !== null && result !== undefined ? String(result) : '';
           
           updateCell(rowIndex, column, stringResult);

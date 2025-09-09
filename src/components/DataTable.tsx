@@ -114,7 +114,7 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
     setExecutingCells(prev => new Set(prev).add(cellKey));
 
     try {
-      await executeFormulaOnCell(rowIndex, column);
+      await executeFormulaOnCell(rowIndex, column, { runAIAgents });
       toast({
         title: "Cell Updated",
         description: `Cell ${column} in row ${rowIndex + 1} has been updated.`,
