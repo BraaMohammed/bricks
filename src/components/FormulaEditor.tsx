@@ -938,13 +938,21 @@ return row['email']?.includes('@gmail.com') ? 'Gmail User' : 'Other';"
                       <SelectValue placeholder="Select AI model" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="gpt-4o-mini">GPT-4o Mini (Fast & Cheap)</SelectItem>
-                      <SelectItem value="gpt-4o">GPT-4o (Most Capable)</SelectItem>
-                      <SelectItem value="gpt-4-turbo">GPT-4 Turbo</SelectItem>
-                      <SelectItem value="gpt-4">GPT-4</SelectItem>
-                      <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
+                      {availableModels.map((model) => (
+                        <SelectItem key={model.id} value={model.id}>
+                          <div className="flex items-center gap-2">
+                            {model.name}
+                            {model.supportsThinking && <Brain className="h-3 w-3" />}
+                          </div>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    💡 Cost: {availableModels.find(m => m.id === aiModel)?.cost || 'Select a model to see pricing'}
+                    <br />
+                    Choose based on your needs: GPT-4o Mini for cost efficiency, GPT-4o for multimodal tasks, o1/o3 for complex reasoning, GPT-5 for cutting-edge performance.
+                  </p>
                 </div>
 
                 {/* AI Prompt */}
