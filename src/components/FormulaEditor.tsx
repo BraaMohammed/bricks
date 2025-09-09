@@ -57,8 +57,8 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   const availableModels = [
     { id: 'gpt-5', name: 'GPT-5 (Flagship)', supportsThinking: false, cost: 'TBD' },
     { id: 'gpt-5-mini', name: 'GPT-5 Mini', supportsThinking: false, cost: 'TBD' },
-    { id: 'gpt-5-thinking', name: 'GPT-5 Thinking', supportsThinking: true, cost: 'TBD' },
-    { id: 'gpt-5-thinking-pro', name: 'GPT-5 Thinking Pro', supportsThinking: true, cost: 'TBD' },
+    //{ id: 'gpt-5-thinking', name: 'GPT-5 Thinking', supportsThinking: true, cost: 'TBD' },
+   // { id: 'gpt-5-thinking-pro', name: 'GPT-5 Thinking Pro', supportsThinking: true, cost: 'TBD' },
    // { id: 'gpt-4.5-preview', name: 'GPT-4.5', supportsThinking: false, cost: 'TBD' },
     { id: 'gpt-4o', name: 'GPT-4o (Latest)', supportsThinking: false, cost: '$5.00/$15.00 per 1M tokens' },
     { id: 'gpt-4o-mini', name: 'GPT-4o Mini', supportsThinking: false, cost: '$0.15/$0.60 per 1M tokens' },
@@ -403,10 +403,10 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
     
     const fullPrompt = message ? `${processedPrompt}. Additional context: ${message}` : processedPrompt;
     
-    // Newer models (GPT-5, o-series) use 'max_completion_tokens'
+    // Newer models (GPT-5, o-series) use 'max_completion_tokens' and need more tokens for reasoning
     const useMaxCompletionTokens = model.startsWith('gpt-5') || model.startsWith('o');
     const tokenParameter = useMaxCompletionTokens 
-      ? `'max_completion_tokens': 150` 
+      ? `'max_completion_tokens': 4000` 
       : `'max_tokens': 150`;
 
     return `// AI Generated Formula
@@ -416,29 +416,50 @@ if (!apiKey) {
   return 'Please set your OpenAI API key in AI Settings';
 }
 
-const response = await fetch('https://api.openai.com/v1/chat/completions', {
-  method: 'POST',
-  headers: {
-    'Authorization': \`Bearer \${apiKey}\`,
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    model: '${model}',
-    messages: [{
-      role: 'user',
-      content: \`${fullPrompt.replace(/`/g, '\\`')}\`
-    }],
-    ${tokenParameter}
-  })
-});
+try {
+  console.log('Making API request with model:', '${model}');
+  console.log('Prompt:', \`${fullPrompt.replace(/`/g, '\\`')}\`);
+  
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': \`Bearer \${apiKey}\`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: '${model}',
+      messages: [{
+        role: 'user',
+        content: \`${fullPrompt.replace(/`/g, '\\`')}\`
+      }],
+      ${tokenParameter}
+    })
+  });
 
-const data = await response.json();
+  console.log('Response status:', response.status);
+  
+  const data = await response.json();
+  console.log('API Response:', data);
 
-if (data.error) {
-  return \`API Error: \${data.error.message}\`;
-}
+  if (data.error) {
+    console.error('API Error:', data.error);
+    return \`API Error: \${data.error.message}\`;
+  }
 
-return data.choices[0].message.content;`;
+  // Check for standard response structure first
+  if (data.choices && data.choices.length > 0 && data.choices[0].message && data.choices[0].message.content) {
+    const result = data.choices[0].message.content;
+    console.log('Extracted content:', result);
+    return result;
+  }
+
+  // If standard structure is not found, return the whole response for debugging
+  console.warn('Unexpected response structure:', data);
+  return \`Unexpected response: \${JSON.stringify(data, null, 2)}\`;
+} catch (error) {
+  console.error('Fetch error:', error);
+  return \`Error: \${error.message}\`;
+}`;
   };
 
   const generateFirecrawlFormula = (urlTemplate: string) => {
