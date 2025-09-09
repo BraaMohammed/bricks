@@ -10,6 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { useDataStore } from '@/stores/useDataStore';
 import { toast } from '@/hooks/use-toast';
 import Papa from 'papaparse';
+import { runAIAgents } from '../lib/aiAgents';
 
 interface DataTableProps {
   onEditFormula: (column: string) => void;
@@ -67,13 +68,13 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
       const rowPromises = rows.map(async (row, i) => {
         try {
           // Create async function from formula string with proper column access syntax
-          const asyncFunction = new Function('row', `
+          const asyncFunction = new Function('row', 'runAIAgents', `
             return (async () => {
               ${formula}
             })();
           `);
           
-          const result = await asyncFunction(row);
+          const result = await asyncFunction(row, runAIAgents);
           const stringResult = result !== null && result !== undefined ? String(result) : '';
           
           updateCell(i, column, stringResult);
