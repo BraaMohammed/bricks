@@ -64,9 +64,11 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
     setLoading(true);
 
     try {
-      // Execute all rows in parallel using Promise.all
+      // Execute all rows in parallel with individual timeouts for each API call
       const rowPromises = rows.map(async (row, i) => {
         try {
+          console.log(`🚀 Starting row ${i + 1}/${rows.length} with individual timeout per API call`);
+          
           // Create async function from formula string with proper column access syntax
           const asyncFunction = new Function('row', 'runAIAgents', `
             return (async () => {
@@ -78,15 +80,16 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
           const stringResult = result !== null && result !== undefined ? String(result) : '';
           
           updateCell(i, column, stringResult);
+          console.log(`✅ Row ${i + 1} completed successfully`);
           return { success: true, rowIndex: i };
         } catch (error) {
           updateCell(i, column, 'ERROR');
-          console.error(`Error in row ${i}:`, error);
+          console.error(`❌ Row ${i + 1} failed:`, error);
           return { success: false, rowIndex: i, error };
         }
       });
 
-      // Wait for all rows to complete
+      // Wait for all rows to complete (each with its own independent timeout)
       const results = await Promise.all(rowPromises);
       
       const successCount = results.filter(r => r.success).length;

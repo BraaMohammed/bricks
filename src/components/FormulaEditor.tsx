@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Code, Save, X, Info, Sparkles, Brain, Wand2, Trash2, Upload, FileSpreadsheet, Users, PenTool, UserCheck, Zap } from 'lucide-react';
+import { Code, Save, X, Info, Sparkles, Brain, Wand2, Trash2, Upload, FileSpreadsheet, Users, PenTool, UserCheck, Zap, Server, Key, ChevronDown, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -8,16 +8,31 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
+import { Slider } from '@/components/ui/slider';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
-import { Slider } from '@/components/ui/slider';
-import { useDataStore } from '@/stores/useDataStore';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { useDataStore } from '@/stores/useDataStore'
 import { toast } from '@/hooks/use-toast';
 import { SlashMenu } from './SlashMenu';
 import { FormulaValidator, validateFormula } from './FormulaValidator';
 import { Input } from '@/components/ui/input';
 import { runAIAgents } from '@/lib/aiAgents';
+import { checkOllamaConnection as checkOllamaStatus } from '@/lib/ollama';
 import Papa from 'papaparse';
+
+// Helper function to detect Ollama models (same as in aiAgents.ts)
+const isOllamaModel = (modelName: string): boolean => {
+  const ollamaPatterns = [
+    'llama', 'mistral', 'codellama', 'vicuna', 'alpaca', 'orca', 
+    'phi', 'neural-chat', 'starling', 'openhermes', 'dolphin',
+    'wizardlm', 'evo', 'gemma', 'qwen', 'mixtral'
+  ];
+  
+  const lowerModel = modelName.toLowerCase();
+  return ollamaPatterns.some(pattern => lowerModel.includes(pattern)) ||
+         lowerModel.includes(':') && !lowerModel.startsWith('gpt');
+};
 
 interface FormulaEditorProps {
   open: boolean;
@@ -42,6 +57,16 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   const [firecrawlError, setFirecrawlError] = useState('');
   const [savedFormulas, setSavedFormulas] = useState<Array<{name: string, code: string}>>([]);
   const [formulaName, setFormulaName] = useState('');
+  const [aiProvider, setAiProvider] = useState<'openai' | 'ollama'>('openai');
+  const [ollamaModels, setOllamaModels] = useState<string[]>([]);
+  const [ollamaConnected, setOllamaConnected] = useState(false);
+  const [temperature, setTemperature] = useState(0.7);
+  const [maxTokens, setMaxTokens] = useState(2048);
+  const [topK, setTopK] = useState(40);
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+
+  // Thinking controls for reasoning models (DeepSeek R1, etc.)
+  const [thinkingMode, setThinkingMode] = useState(false);
 
   // AI Agents state
   const [userOfferDetails, setUserOfferDetails] = useState('');
@@ -54,17 +79,42 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   const [maxIterations, setMaxIterations] = useState(5);
 
   // Available models with thinking mode support (latest as of August 2025)
-  const availableModels = [
+  const openAIModels = [
     { id: 'gpt-5', name: 'GPT-5 (Flagship)', supportsThinking: false, cost: 'TBD' },
     { id: 'gpt-5-mini', name: 'GPT-5 Mini', supportsThinking: false, cost: 'TBD' },
-    //{ id: 'gpt-5-thinking', name: 'GPT-5 Thinking', supportsThinking: true, cost: 'TBD' },
-   // { id: 'gpt-5-thinking-pro', name: 'GPT-5 Thinking Pro', supportsThinking: true, cost: 'TBD' },
-   // { id: 'gpt-4.5-preview', name: 'GPT-4.5', supportsThinking: false, cost: 'TBD' },
     { id: 'gpt-4o', name: 'GPT-4o (Latest)', supportsThinking: false, cost: '$5.00/$15.00 per 1M tokens' },
     { id: 'gpt-4o-mini', name: 'GPT-4o Mini', supportsThinking: false, cost: '$0.15/$0.60 per 1M tokens' },
     { id: 'o3', name: 'OpenAI o3 (Reasoning)', supportsThinking: true, cost: 'TBD' },
     { id: 'o3-pro', name: 'OpenAI o3-pro (Reasoning)', supportsThinking: true, cost: 'TBD' },
     { id: 'o4-mini', name: 'OpenAI o4-mini (Reasoning)', supportsThinking: true, cost: 'TBD' },
+  ];
+  
+  // Helper function to detect thinking support in Ollama models
+  const detectThinkingSupport = (modelName: string): boolean => {
+    const thinkingPatterns = [
+      'deepseek', 'r1', 'thinking', 'reasoning', 'o1', 'o3', 'qwq'
+    ];
+    const lowerModel = modelName.toLowerCase();
+    return thinkingPatterns.some(pattern => lowerModel.includes(pattern));
+  };
+
+  const availableModels = aiProvider === 'openai' ? openAIModels : 
+    (ollamaModels || []).map(model => ({ 
+      id: model, 
+      name: model, 
+      supportsThinking: detectThinkingSupport(model), 
+      cost: 'Free (Local)' 
+    }));
+    
+  // For AI Agents mode, combine both OpenAI and Ollama models
+  const allAvailableModels = [
+    ...openAIModels,
+    ...(ollamaModels || []).map(model => ({ 
+      id: model, 
+      name: `${model} (Ollama)`, 
+      supportsThinking: false, 
+      cost: 'Free (Local)' 
+    }))
   ];
 
   // Default instructions
@@ -124,6 +174,69 @@ Consider: relevance, personalization, offer appeal, professionalism, likelihood 
 REMEMBER: Output ONLY the JSON object, nothing else.`;
 
   const firstRow = rows && rows.length > 0 ? rows[0] : null;
+
+  // Load provider settings and check Ollama connection
+  useEffect(() => {
+    try {
+      const savedProvider = localStorage.getItem('ai_provider') as 'openai' | 'ollama' || 'openai';
+      setAiProvider(savedProvider);
+      
+      // Load thinking controls settings
+      const savedThinkingMode = localStorage.getItem('thinking_mode') === 'true';
+      setThinkingMode(savedThinkingMode);
+      
+      // Load temperature setting
+      const savedTemperature = localStorage.getItem('ai_temperature');
+      if (savedTemperature) {
+        setTemperature(parseFloat(savedTemperature));
+      }
+      
+      // Load max tokens setting
+      const savedMaxTokens = localStorage.getItem('ai_max_tokens');
+      if (savedMaxTokens) {
+        setMaxTokens(parseInt(savedMaxTokens));
+      }
+      
+      // Load top_k setting
+      const savedTopK = localStorage.getItem('ai_top_k');
+      if (savedTopK) {
+        setTopK(parseInt(savedTopK));
+      }
+      
+      // Check Ollama connection if it's the selected provider
+      if (savedProvider === 'ollama') {
+        checkOllamaConnection().catch(error => {
+          console.error('Failed to check Ollama connection:', error);
+        });
+      }
+    } catch (error) {
+      console.error('Error loading provider settings:', error);
+      setAiProvider('openai'); // Fallback to OpenAI
+    }
+  }, []);
+  
+  const checkOllamaConnection = async () => {
+    try {
+      const status = await checkOllamaStatus();
+      setOllamaConnected(status.connected);
+      setOllamaModels(status.models);
+    } catch (error) {
+      console.error('Error checking Ollama:', error);
+      setOllamaConnected(false);
+      setOllamaModels([]);
+    }
+  };
+
+  // Validate and reset model when provider or available models change
+  useEffect(() => {
+    if (availableModels.length > 0) {
+      const isCurrentModelValid = availableModels.some(model => model.id === aiModel);
+      if (!isCurrentModelValid || !aiModel) {
+        // Reset to the first available model
+        setAiModel(availableModels[0].id);
+      }
+    }
+  }, [aiProvider, availableModels, aiModel]);
 
   // Load saved formulas from localStorage
   useEffect(() => {
@@ -298,7 +411,7 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
       setHasChanges(false);
       
       // Check if it's an AI formula and parse it
-      if (existingFormula.includes('localStorage.getItem(\'openai_api_key\')')) {
+      if (existingFormula.includes('localStorage.getItem(\'openai_api_key\')') || existingFormula.includes('http://localhost:11434/v1/chat/completions')) {
         if (existingFormula.includes('🤖 AI Copy Agents Starting')) {
           // AI Agents mode
           setMode('ai-agents');
@@ -318,6 +431,32 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
             }
           } catch (error) {
             console.error('Error parsing AI agents config:', error);
+          }
+        } else {
+          // Regular AI mode
+          setMode('ai');
+          
+          // Detect if it's Ollama or OpenAI
+          if (existingFormula.includes('http://localhost:11434/v1/chat/completions')) {
+            setAiProvider('ollama');
+            checkOllamaConnection();
+          } else {
+            setAiProvider('openai');
+          }
+          
+          // Try to extract model and prompt from existing formula
+          const modelMatch = existingFormula.match(/model: '([^']+)'/);  
+          if (modelMatch) {
+            setAiModel(modelMatch[1]);
+          }
+          
+          // Try to extract prompt from content
+          const promptMatch = existingFormula.match(/content: `([^`]+)`/);
+          if (promptMatch) {
+            let extractedPrompt = promptMatch[1];
+            // Convert back from template literal format
+            extractedPrompt = extractedPrompt.replace(/\$\{row\["([^"]+)"\] \|\| ""\}/g, '{$1}');
+            setAiPrompt(extractedPrompt);
           }
         }
       } else if (existingFormula.includes('localStorage.getItem(\'firecrawl_api_key\')')) {
@@ -349,7 +488,73 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
           });
           return;
         }
-        finalFormula = generateAIFormula(aiPrompt, aiMessage, aiModel);
+        
+        // Check provider-specific requirements
+        if (aiProvider === 'openai') {
+          const apiKey = localStorage.getItem('openai_api_key');
+          if (!apiKey) {
+            toast({
+              title: "Validation Error",
+              description: "Please set your OpenAI API key in AI Settings.",
+              variant: "destructive",
+            });
+            return;
+          }
+        } else if (aiProvider === 'ollama') {
+          if (!ollamaConnected) {
+            toast({
+              title: "Validation Error",
+              description: "Ollama is not running. Please start Ollama and refresh connection.",
+              variant: "destructive",
+            });
+            return;
+          }
+          if (ollamaModels.length === 0) {
+            toast({
+              title: "Validation Error",
+              description: "No Ollama models installed. Run 'ollama pull llama2' to install a model.",
+              variant: "destructive",
+            });
+            return;
+          }
+        }
+        
+        console.log('🔧 Generating AI formula with parameters:', {
+          aiPrompt,
+          aiMessage,
+          aiModel,
+          aiProvider,
+          thinkingMode
+        });
+        
+        try {
+          finalFormula = generateAIFormula(aiPrompt, aiMessage, aiModel, temperature, maxTokens, topK);
+          console.log('✅ Successfully generated AI formula');
+          console.log('📝 Formula preview:', finalFormula.substring(0, 500) + '...');
+          
+          // Validate the generated JavaScript syntax
+          try {
+            new Function('row', finalFormula);
+            console.log('✅ Generated formula has valid JavaScript syntax');
+          } catch (syntaxError) {
+            console.error('❌ Generated formula has invalid JavaScript syntax:', syntaxError);
+            console.error('🔍 Problematic formula:', finalFormula);
+            toast({
+              title: "Formula Syntax Error",
+              description: `Generated formula has invalid syntax: ${syntaxError.message}. Check console for details.`,
+              variant: "destructive",
+            });
+            return;
+          }
+        } catch (error) {
+          console.error('❌ Error generating AI formula:', error);
+          toast({
+            title: "Formula Generation Error",
+            description: `Failed to generate AI formula: ${error.message}`,
+            variant: "destructive",
+          });
+          return;
+        }
       } else if (mode === 'firecrawl') {
         // Generate the Firecrawl formula from the URL template
         if (!firecrawlUrl.trim()) {
@@ -371,6 +576,41 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
           });
           return;
         }
+        
+        // Check if models are available
+        const creatorIsOllama = isOllamaModel(messageCreatorModel);
+        const roleplayIsOllama = isOllamaModel(leadRoleplayModel);
+        
+        // Validate Ollama models
+        if (creatorIsOllama && (!ollamaConnected || !ollamaModels.includes(messageCreatorModel))) {
+          toast({
+            title: "Validation Error",
+            description: `Message Creator model '${messageCreatorModel}' is not available in Ollama. Please install it or choose a different model.`,
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        if (roleplayIsOllama && (!ollamaConnected || !ollamaModels.includes(leadRoleplayModel))) {
+          toast({
+            title: "Validation Error",
+            description: `Lead Roleplay model '${leadRoleplayModel}' is not available in Ollama. Please install it or choose a different model.`,
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Validate OpenAI API key for OpenAI models
+        const apiKey = localStorage.getItem('openai_api_key');
+        if ((!creatorIsOllama || !roleplayIsOllama) && !apiKey) {
+          toast({
+            title: "Validation Error",
+            description: "OpenAI API key required for OpenAI models. Please set it in AI Settings.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
         finalFormula = generateAIAgentsFormula();
       } else {
         // Only validate formula syntax when in code mode
@@ -385,17 +625,30 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
         }
       }
       
-      setFormula(activeColumn, finalFormula);
-      setHasChanges(false);
-      toast({
-        title: "Formula Saved",
-        description: `${mode === 'ai' ? 'AI prompt' : mode === 'firecrawl' ? 'Firecrawl URL template' : mode === 'ai-agents' ? 'AI Copy Agents configuration' : 'Formula'} for "${activeColumn}" has been saved.`,
-      });
-      onOpenChange(false);
+      console.log('💾 Setting formula for column:', activeColumn);
+      console.log('💾 Final formula length:', finalFormula.length);
+      
+      try {
+        setFormula(activeColumn, finalFormula);
+        console.log('✅ Formula saved successfully');
+        setHasChanges(false);
+        toast({
+          title: "Formula Saved",
+          description: `${mode === 'ai' ? 'AI prompt' : mode === 'firecrawl' ? 'Firecrawl URL template' : mode === 'ai-agents' ? 'AI Copy Agents configuration' : 'Formula'} for "${activeColumn}" has been saved.`,
+        });
+        onOpenChange(false);
+      } catch (error) {
+        console.error('❌ Error saving formula:', error);
+        toast({
+          title: "Save Error",
+          description: `Failed to save formula: ${error.message}`,
+          variant: "destructive",
+        });
+      }
     }
   };
 
-  const generateAIFormula = (prompt: string, message: string, model: string) => {
+  const generateAIFormula = (prompt: string, message: string, model: string, temp: number, maxTokens: number, topK: number) => {
     // Replace {Column Name} references with actual row data access
     const processedPrompt = prompt.replace(/\{([^}]+)\}/g, (match, columnName) => {
       return `\${row["${columnName}"] || ""}`;
@@ -403,63 +656,200 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
     
     const fullPrompt = message ? `${processedPrompt}. Additional context: ${message}` : processedPrompt;
     
+    // Determine if this is an Ollama model or OpenAI model
+    const isOllamaModelLocal = aiProvider === 'ollama';
+    const apiEndpoint = isOllamaModelLocal 
+      ? 'http://localhost:11434/api/chat'  // Use native Ollama API for better thinking control
+      : 'https://api.openai.com/v1/chat/completions';
+    
+    // API key handling
+    const apiKeyCheck = isOllamaModelLocal 
+      ? '// Ollama runs locally without API key\nconst apiKey = null;'
+      : `const apiKey = localStorage.getItem('openai_api_key');\n\nif (!apiKey) {\n  return 'Please set your OpenAI API key in AI Settings';\n}`;
+    
+    // Authorization header
+    const authHeader = isOllamaModelLocal 
+      ? `      'Content-Type': 'application/json',`
+      : `      'Authorization': \`Bearer \${apiKey}\`,\n      'Content-Type': 'application/json',`;
+    
     // Newer models (GPT-5, o-series) use 'max_completion_tokens' and need more tokens for reasoning
     const useMaxCompletionTokens = model.startsWith('gpt-5') || model.startsWith('o');
     const tokenParameter = useMaxCompletionTokens 
       ? `'max_completion_tokens': 4000` 
       : `'max_tokens': 150`;
 
-    return `// AI Generated Formula
-const apiKey = localStorage.getItem('openai_api_key');
+    // Check if this is a reasoning model
+    const isReasoningModel = detectThinkingSupport(model);
 
-if (!apiKey) {
-  return 'Please set your OpenAI API key in AI Settings';
-}
+    // Log the generated code for debugging
+    console.log('🏗️ Generated AI Formula Debug Info:');
+    console.log('- Model:', model);
+    console.log('- Is Reasoning Model:', isReasoningModel);
+    console.log('- Is Ollama:', isOllamaModelLocal);
+    console.log('- Thinking Mode:', thinkingMode);
+    console.log('- Using native Ollama API with think parameter:', isOllamaModelLocal && isReasoningModel);
 
-try {
-  console.log('Making API request with model:', '${model}');
-  console.log('Prompt:', \`${fullPrompt.replace(/`/g, '\\`')}\`);
+    const generatedCode = `// ${isOllamaModelLocal ? 'Ollama' : 'OpenAI'} Generated Formula${isReasoningModel ? ' (Reasoning Model)' : ''}
+${apiKeyCheck}
+
+// Filter thinking content from response
+const filterThinkingContent = (content) => {
+  if (!content) return content;
   
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': \`Bearer \${apiKey}\`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: '${model}',
-      messages: [{
-        role: 'user',
-        content: \`${fullPrompt.replace(/`/g, '\\`')}\`
-      }],
-      ${tokenParameter}
-    })
-  });
-
-  console.log('Response status:', response.status);
+  console.log('🚿 Original content length:', content.length);
+  console.log('🚿 Content preview:', content.substring(0, 200) + '...');
   
-  const data = await response.json();
-  console.log('API Response:', data);
+  // Remove <thinking>...</thinking> blocks (including nested ones)
+  let filtered = content;
+  
+  // Remove thinking tags and content between them
+  const beforeFilter = filtered.length;
+  filtered = filtered.replace(/<thinking[^>]*>[\\s\\S]*?<\\/thinking>/g, '');
+  filtered = filtered.replace(/<think[^>]*>[\\s\\S]*?<\\/think>/g, '');
+  
+  const afterFilter = filtered.length;
+  
+  console.log('🚿 Removed', beforeFilter - afterFilter, 'characters of thinking content');
+  
+  // Remove any remaining thinking markers
+  filtered = filtered.replace(/<\\/thinking>/g, '');
+  filtered = filtered.replace(/<thinking[^>]*>/g, '');
+  filtered = filtered.replace(/<\\/think>/g, '');
+  filtered = filtered.replace(/<think[^>]*>/g, '');
+  
+  // Clean up extra whitespace
+  filtered = filtered.replace(/\\n\\s*\\n\\s*\\n/g, '\\n\\n');
+  filtered = filtered.trim();
+  
+  console.log('🚿 Final filtered content length:', filtered.length);
+  return filtered;
+};
+
+// Use Promise-based approach with timeout control
+console.log('🚀 Making API request with model:', '${model}');
+console.log('📝 Prompt:', \`${fullPrompt.replace(/`/g, '\\`')}\`);
+console.log('🔧 Is reasoning model:', ${isReasoningModel});
+${isReasoningModel ? `console.log('🧠 Thinking mode:', ${thinkingMode});` : ''}
+
+${isOllamaModelLocal ? `
+const requestBody = {
+  model: '${model}',
+  messages: [
+    {
+      role: 'user',
+      content: \`${fullPrompt.replace(/`/g, '\\`')}\`
+    }
+  ],
+  stream: false,
+  think: ${thinkingMode},  // Use Ollama's native think parameter
+  options: {
+    temperature: ${temp},
+    num_predict: ${maxTokens},  // Ollama's parameter for max tokens
+    top_k: ${topK}  // Token selection diversity
+  }
+};` : `
+const requestBody = {
+  model: '${model}',
+  messages: [{
+    role: 'user',
+    content: \`${fullPrompt.replace(/`/g, '\\`')}\`
+  }],
+  temperature: ${temp},
+  ${tokenParameter}
+};`}
+
+console.log('📦 Request body:', JSON.stringify(requestBody, null, 2));
+
+return fetch('${apiEndpoint}', {
+  method: 'POST',
+  headers: {
+${authHeader}
+  },
+  body: JSON.stringify(requestBody)
+})
+.then(response => {
+  console.log('📡 Response status:', response.status);
+  console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+  return response.text();
+})
+.then(responseText => {
+  console.log('📡 Raw response text:', responseText.substring(0, 500) + '...');
+  
+  let data;
+  try {
+    data = JSON.parse(responseText);
+    console.log('✅ Successfully parsed JSON response');
+  } catch (parseError) {
+    console.error('❌ JSON Parse Error:', parseError);
+    console.error('❌ Raw response that failed to parse:', responseText);
+    throw new Error(\`JSON Parse Error: \${parseError.message}. Raw response: \${responseText.substring(0, 200)}...\`);
+  }
+  
+  console.log('📊 API Response structure:', Object.keys(data));
 
   if (data.error) {
-    console.error('API Error:', data.error);
-    return \`API Error: \${data.error.message}\`;
+    console.error('❌ API Error:', data.error);
+    throw new Error(\`API Error: \${data.error.message || JSON.stringify(data.error)}\`);
   }
 
-  // Check for standard response structure first
-  if (data.choices && data.choices.length > 0 && data.choices[0].message && data.choices[0].message.content) {
-    const result = data.choices[0].message.content;
-    console.log('Extracted content:', result);
+  ${isOllamaModelLocal ? `
+  // Handle Ollama native API response structure
+  if (data.message) {
+    let result;
+    
+    if (data.message.thinking && data.message.content) {
+      // Reasoning model with separate thinking and content
+      console.log('🧠 Found thinking content:', data.message.thinking.substring(0, 200) + '...');
+      console.log('💬 Found response content:', data.message.content.substring(0, 200) + '...');
+      
+      result = ${thinkingMode} ? 
+        \`Thinking:\\n\${data.message.thinking}\\n\\nResponse:\\n\${data.message.content}\` : 
+        data.message.content;
+    } else if (data.message.content) {
+      // Regular response or thinking disabled
+      result = data.message.content;
+      console.log('📄 Found content:', result.substring(0, 200) + '...');
+    } else {
+      throw new Error('No content found in Ollama response');
+    }
+    
+    // Apply content filtering if thinking mode is disabled
+    ${!thinkingMode ? 'result = filterThinkingContent(result);' : 'console.log("🧠 Thinking mode enabled - keeping all content");'}
+    console.log('📄 Final result preview:', result.substring(0, 200) + '...');
+    
     return result;
-  }
+  }` : `
+  // Handle OpenAI API response structure
+  if (data.choices && data.choices.length > 0 && data.choices[0].message && data.choices[0].message.content) {
+    let result = data.choices[0].message.content;
+    console.log('✅ Found content in OpenAI structure');
+    console.log('📄 Raw content preview:', result.substring(0, 200) + '...');
+    
+    // Apply content filtering for reasoning models
+    ${!thinkingMode && isReasoningModel ? 'result = filterThinkingContent(result);' : 'console.log("🧠 Keeping original content");'}
+    console.log('📄 Final result preview:', result.substring(0, 200) + '...');
+    
+    return result;
+  }`}
 
   // If standard structure is not found, return the whole response for debugging
-  console.warn('Unexpected response structure:', data);
-  return \`Unexpected response: \${JSON.stringify(data, null, 2)}\`;
-} catch (error) {
-  console.error('Fetch error:', error);
-  return \`Error: \${error.message}\`;
-}`;
+  console.warn('⚠️ Unexpected response structure:', data);
+  throw new Error(\`Unexpected response structure. Keys: \${Object.keys(data).join(', ')}. Data: \${JSON.stringify(data, null, 2)}\`);
+})
+.catch(error => {
+  
+  console.error('💥 Fetch error details:', {
+    name: error.name,
+    message: error.message,
+    stack: error.stack
+  });
+  return \`Error: \${error.name}: \${error.message}\`;
+});`;
+
+    console.log('📝 Generated code preview:');
+    console.log(generatedCode.substring(0, 1000) + '...');
+    
+    return generatedCode;
   };
 
   const generateFirecrawlFormula = (urlTemplate: string) => {
@@ -481,35 +871,35 @@ if (!url) {
   return 'No URL provided';
 }
 
-try {
-  const response = await fetch('https://api.firecrawl.dev/v2/scrape', {
-    method: 'POST',
-    headers: {
-      'Authorization': \`Bearer \${apiKey}\`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      url: url,
-      formats: ['markdown']
-    })
-  });
-
+return fetch('https://api.firecrawl.dev/v2/scrape', {
+  method: 'POST',
+  headers: {
+    'Authorization': \`Bearer \${apiKey}\`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    url: url,
+    formats: ['markdown']
+  })
+})
+.then(response => {
   if (!response.ok) {
-    return \`Firecrawl API error: \${response.status} - \${response.statusText}\`;
+    throw new Error(\`Firecrawl API error: \${response.status} - \${response.statusText}\`);
   }
-
-  const data = await response.json();
-  
+  return response.json();
+})
+.then(data => {
   if (data.success && data.data && data.data.markdown) {
     return data.data.markdown;
   } else if (data.markdown) {
     return data.markdown;
   } else {
-    return \`Unexpected response: \${JSON.stringify(data, null, 2)}\`;
+    throw new Error(\`Unexpected response: \${JSON.stringify(data, null, 2)}\`);
   }
-} catch (error) {
+})
+.catch(error => {
   return \`Error: \${error.message}\`;
-}`;
+});`;
   };
 
   const generateAIAgentsFormula = () => {
@@ -920,6 +1310,61 @@ return row['email']?.includes('@gmail.com') ? 'Gmail User' : 'Other';"
 
             <TabsContent value="ai" className="space-y-6">
               <div className="space-y-6">
+                {/* Provider Selection */}
+                <div>
+                  <Label className="text-base font-semibold flex items-center gap-2 mb-3">
+                    <Server className="h-4 w-4" />
+                    AI Provider
+                  </Label>
+                  <Select value={aiProvider} onValueChange={(value: 'openai' | 'ollama') => {
+                    setAiProvider(value);
+                    if (value === 'ollama') {
+                      checkOllamaConnection();
+                    }
+                    handleAIInputChange();
+                  }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select AI provider" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="openai">
+                        <div className="flex items-center gap-2">
+                          <Key className="h-4 w-4" />
+                          OpenAI (Cloud)
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="ollama">
+                        <div className="flex items-center gap-2">
+                          <Server className="h-4 w-4" />
+                          Ollama (Local)
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {aiProvider === 'ollama' && (
+                    <div className="mt-2 flex items-center gap-2 text-sm">
+                      {ollamaConnected ? (
+                        <div className="flex items-center gap-2 text-green-700">
+                          <div className="w-2 h-2 bg-green-500 rounded-full" />
+                          Connected ({ollamaModels.length} models)
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-red-700">
+                          <div className="w-2 h-2 bg-red-500 rounded-full" />
+                          Ollama not running
+                        </div>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={checkOllamaConnection}
+                        className="ml-auto h-6 px-2 text-xs"
+                      >
+                        Refresh
+                      </Button>
+                    </div>
+                  )}
+                </div>
                 {/* Available columns for AI mode */}
                 <div>
                   <h4 className="font-semibold mb-3 flex items-center gap-2">
@@ -958,7 +1403,14 @@ return row['email']?.includes('@gmail.com') ? 'Gmail User' : 'Other';"
                     <Wand2 className="h-4 w-4" />
                     AI Model
                   </Label>
-                  <Select value={aiModel} onValueChange={(value) => { setAiModel(value); handleAIInputChange(); }}>
+                  <Select 
+                    value={availableModels.length > 0 ? aiModel : undefined} 
+                    onValueChange={(value) => { 
+                      setAiModel(value); 
+                      handleAIInputChange(); 
+                    }}
+                    disabled={availableModels.length === 0}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select AI model" />
                     </SelectTrigger>
@@ -973,12 +1425,174 @@ return row['email']?.includes('@gmail.com') ? 'Gmail User' : 'Other';"
                       ))}
                     </SelectContent>
                   </Select>
+                  {availableModels.length === 0 && (
+                    <p className="text-sm text-orange-600 mt-2 p-2 bg-orange-50 rounded border border-orange-200">
+                      {aiProvider === 'ollama' 
+                        ? (ollamaConnected ? 'No models installed. Run: ollama pull llama2' : 'Connect to Ollama first')
+                        : 'No models available'
+                      }
+                    </p>
+                  )}
                   <p className="text-xs text-muted-foreground mt-2">
-                    💡 Cost: {availableModels.find(m => m.id === aiModel)?.cost || 'Select a model to see pricing'}
-                    <br />
-                    Choose based on your needs: GPT-4o Mini for cost efficiency, GPT-4o for multimodal tasks, o1/o3 for complex reasoning, GPT-5 for cutting-edge performance.
+                    {availableModels.length > 0 && aiProvider === 'openai' ? (
+                      <>💡 Cost: {availableModels.find(m => m.id === aiModel)?.cost || 'Select a model to see pricing'}
+                      <br />
+                      Choose based on your needs: GPT-4o Mini for cost efficiency, GPT-4o for multimodal tasks, o1/o3 for complex reasoning, GPT-5 for cutting-edge performance.</>
+                    ) : availableModels.length > 0 && aiProvider === 'ollama' ? (
+                      <>💡 {ollamaConnected 
+                        ? `${ollamaModels.length} local models available. No API costs.`
+                        : 'Install models with: ollama pull llama2'
+                      }</>
+                    ) : null}
                   </p>
                 </div>
+
+                {/* Temperature Control */}
+                <div>
+                  <Label className="text-base font-semibold flex items-center gap-2 mb-3">
+                    <Zap className="h-4 w-4" />
+                    Temperature ({temperature})
+                  </Label>
+                  <div className="space-y-2">
+                    <Slider
+                      value={[temperature]}
+                      onValueChange={(value) => {
+                        setTemperature(value[0]);
+                        localStorage.setItem('ai_temperature', value[0].toString());
+                        handleAIInputChange();
+                      }}
+                      max={2}
+                      min={0}
+                      step={0.1}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>0 (Deterministic)</span>
+                      <span>1 (Balanced)</span>
+                      <span>2 (Creative)</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Higher values make output more random and creative, lower values make it more focused and deterministic.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Advanced Settings for Ollama */}
+                {aiProvider === 'ollama' && (
+                  <Collapsible open={showAdvancedSettings} onOpenChange={setShowAdvancedSettings}>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" className="w-full justify-between p-0 h-auto">
+                        <Label className="text-base font-semibold flex items-center gap-2 cursor-pointer">
+                          <Settings className="h-4 w-4" />
+                          Advanced Settings
+                        </Label>
+                        <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showAdvancedSettings ? 'rotate-180' : ''}`} />
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-4 mt-3">
+                      {/* Max Tokens Control */}
+                      <div>
+                        <Label className="text-sm font-medium flex items-center gap-2 mb-2">
+                          <FileSpreadsheet className="h-3 w-3" />
+                          Max Tokens ({maxTokens})
+                        </Label>
+                        <div className="space-y-2">
+                          <Slider
+                            value={[maxTokens]}
+                            onValueChange={(value) => {
+                              setMaxTokens(value[0]);
+                              localStorage.setItem('ai_max_tokens', value[0].toString());
+                              handleAIInputChange();
+                            }}
+                            max={8192}
+                            min={128}
+                            step={128}
+                            className="w-full"
+                          />
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>128 (Short)</span>
+                            <span>2048 (Balanced)</span>
+                            <span>8192 (Long)</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Maximum number of tokens to generate. Higher values allow longer responses but may be slower.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Top-K Control */}
+                      <div>
+                        <Label className="text-sm font-medium flex items-center gap-2 mb-2">
+                          <Sparkles className="h-3 w-3" />
+                          Top-K Sampling ({topK})
+                        </Label>
+                        <div className="space-y-2">
+                          <Slider
+                            value={[topK]}
+                            onValueChange={(value) => {
+                              setTopK(value[0]);
+                              localStorage.setItem('ai_top_k', value[0].toString());
+                              handleAIInputChange();
+                            }}
+                            max={100}
+                            min={1}
+                            step={1}
+                            className="w-full"
+                          />
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>1 (Very Focused)</span>
+                            <span>40 (Balanced)</span>
+                            <span>100 (Diverse)</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Controls vocabulary diversity. Lower values focus on likely words, higher values allow more variety.
+                          </p>
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+
+                {/* Thinking Controls for Reasoning Models */}
+                {availableModels.find(m => m.id === aiModel)?.supportsThinking && (
+                  <Card className="p-4 border-orange-200 bg-orange-50/50">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Brain className="h-4 w-4 text-orange-600" />
+                        <h4 className="font-semibold text-orange-800">Reasoning Model Controls</h4>
+                        <Badge variant="outline" className="text-orange-700 border-orange-300">
+                          {aiModel}
+                        </Badge>
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label className="text-sm font-medium text-orange-800">Enable Thinking Mode</Label>
+                          <p className="text-xs text-orange-600">
+                            Allow model to show reasoning process (may include &lt;thinking&gt; tags)
+                          </p>
+                        </div>
+                        <Switch
+                          checked={thinkingMode}
+                          onCheckedChange={(checked) => {
+                            setThinkingMode(checked);
+                            localStorage.setItem('thinking_mode', checked.toString());
+                            handleAIInputChange();
+                          }}
+                        />
+                      </div>
+
+                      {!thinkingMode && (
+                        <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                          <p className="text-xs text-blue-700">
+                            💡 <strong>Recommendation:</strong> Keep thinking mode disabled for faster responses. 
+                            The output will be automatically filtered to remove &lt;thinking&gt; content.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                )}
 
                 {/* AI Prompt */}
                 <div>
@@ -1175,18 +1789,29 @@ return row['email']?.includes('@gmail.com') ? 'Gmail User' : 'Other';"
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {availableModels.map((model) => (
+                              {allAvailableModels.map((model) => (
                                 <SelectItem key={model.id} value={model.id}>
                                   <div className="flex items-center gap-2">
                                     {model.name}
                                     {model.supportsThinking && <Brain className="h-3 w-3" />}
+                                    {isOllamaModel(model.id) && <Server className="h-3 w-3 text-green-600" />}
                                   </div>
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {availableModels.find(m => m.id === messageCreatorModel)?.cost}
+                            {isOllamaModel(messageCreatorModel) ? (
+                              <span className="flex items-center gap-1">
+                                <Server className="h-3 w-3 text-green-600" />
+                                Ollama (Local) - {allAvailableModels.find(m => m.id === messageCreatorModel)?.cost}
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1">
+                                <Key className="h-3 w-3 text-blue-600" />
+                                OpenAI (Cloud) - {allAvailableModels.find(m => m.id === messageCreatorModel)?.cost}
+                              </span>
+                            )}
                           </p>
                         </div>
 
@@ -1244,18 +1869,29 @@ return row['email']?.includes('@gmail.com') ? 'Gmail User' : 'Other';"
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {availableModels.map((model) => (
+                              {allAvailableModels.map((model) => (
                                 <SelectItem key={model.id} value={model.id}>
                                   <div className="flex items-center gap-2">
                                     {model.name}
                                     {model.supportsThinking && <Brain className="h-3 w-3" />}
+                                    {isOllamaModel(model.id) && <Server className="h-3 w-3 text-green-600" />}
                                   </div>
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {availableModels.find(m => m.id === leadRoleplayModel)?.cost}
+                            {isOllamaModel(leadRoleplayModel) ? (
+                              <span className="flex items-center gap-1">
+                                <Server className="h-3 w-3 text-green-600" />
+                                Ollama (Local) - {allAvailableModels.find(m => m.id === leadRoleplayModel)?.cost}
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1">
+                                <Key className="h-3 w-3 text-blue-600" />
+                                OpenAI (Cloud) - {allAvailableModels.find(m => m.id === leadRoleplayModel)?.cost}
+                              </span>
+                            )}
                           </p>
                         </div>
 
@@ -1345,10 +1981,48 @@ return row['email']?.includes('@gmail.com') ? 'Gmail User' : 'Other';"
                           </span>
                         </div>
                         <div>
+                          <p className="text-sm text-muted-foreground">Provider Configuration:</p>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-mono">Creator:</span>
+                              {isOllamaModel(messageCreatorModel) ? (
+                                <Badge variant="outline" className="text-green-700">
+                                  <Server className="h-3 w-3 mr-1" />
+                                  Ollama Local
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-blue-700">
+                                  <Key className="h-3 w-3 mr-1" />
+                                  OpenAI Cloud
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-mono">Roleplay:</span>
+                              {isOllamaModel(leadRoleplayModel) ? (
+                                <Badge variant="outline" className="text-green-700">
+                                  <Server className="h-3 w-3 mr-1" />
+                                  Ollama Local
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-blue-700">
+                                  <Key className="h-3 w-3 mr-1" />
+                                  OpenAI Cloud
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div>
                           <p className="text-sm text-muted-foreground">API Key Status:</p>
-                          <Badge variant={localStorage.getItem('openai_api_key') ? "default" : "destructive"}>
-                            {localStorage.getItem('openai_api_key') ? "✅ API Key Found" : "❌ No API Key"}
-                          </Badge>
+                          <div className="space-y-1">
+                            <Badge variant={localStorage.getItem('openai_api_key') ? "default" : "destructive"}>
+                              {localStorage.getItem('openai_api_key') ? "✅ OpenAI API Key Found" : "❌ No OpenAI API Key"}
+                            </Badge>
+                            <Badge variant={ollamaConnected ? "default" : "destructive"}>
+                              {ollamaConnected ? "✅ Ollama Connected" : "❌ Ollama Disconnected"}
+                            </Badge>
+                          </div>
                         </div>
                       </div>
                       <div className="mt-2 text-xs text-muted-foreground">

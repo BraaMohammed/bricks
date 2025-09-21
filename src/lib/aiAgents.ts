@@ -9,6 +9,46 @@ interface AgentConfig {
   maxIterations: number;
 }
 
+// Helper function to detect if a model is from Ollama
+function isOllamaModel(modelName: string): boolean {
+  // Check if model name matches typical Ollama patterns
+  const ollamaPatterns = [
+    'llama', 'mistral', 'codellama', 'vicuna', 'alpaca', 'orca', 
+    'phi', 'neural-chat', 'starling', 'openhermes', 'dolphin',
+    'wizardlm', 'evo', 'gemma', 'qwen', 'mixtral'
+  ];
+  
+  const lowerModel = modelName.toLowerCase();
+  return ollamaPatterns.some(pattern => lowerModel.includes(pattern)) ||
+         lowerModel.includes(':') && !lowerModel.startsWith('gpt'); // Ollama models often have version tags
+}
+
+// Helper function to get API endpoint and headers
+function getApiConfig(modelName: string) {
+  const isOllama = isOllamaModel(modelName);
+  
+  if (isOllama) {
+    return {
+      endpoint: 'http://localhost:11434/v1/chat/completions',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      requiresApiKey: false
+    };
+  } else {
+    const apiKey = localStorage.getItem('openai_api_key');
+    return {
+      endpoint: 'https://api.openai.com/v1/chat/completions',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      requiresApiKey: true,
+      apiKey
+    };
+  }
+}
+
 interface MessageResult {
   message: string;
   reasoning?: string;
@@ -35,10 +75,24 @@ interface HistoryItem {
 type RowData = Record<string, string | number | boolean | null | undefined>;
 
 export async function runAIAgents(config: AgentConfig, row: RowData): Promise<string> {
-  const apiKey = localStorage.getItem('openai_api_key');
-  if (!apiKey) return 'Please set OpenAI API key in AI Settings';
+  // Check API requirements for both models
+  const creatorConfig = getApiConfig(config.messageCreatorModel);
+  const roleplayConfig = getApiConfig(config.leadRoleplayModel);
+  
+  // Validate API keys for OpenAI models
+  if (creatorConfig.requiresApiKey && !creatorConfig.apiKey) {
+    return 'Please set OpenAI API key in AI Settings for Message Creator model';
+  }
+  if (roleplayConfig.requiresApiKey && !roleplayConfig.apiKey) {
+    return 'Please set OpenAI API key in AI Settings for Lead Roleplay model';
+  }
 
-  console.log('🤖 AI Copy Agents Starting...', { leadData: row, config });
+  console.log('🤖 AI Copy Agents Starting...', { 
+    leadData: row, 
+    config,
+    creatorProvider: isOllamaModel(config.messageCreatorModel) ? 'Ollama' : 'OpenAI',
+    roleplayProvider: isOllamaModel(config.leadRoleplayModel) ? 'Ollama' : 'OpenAI'
+  });
 
   const chatHistory: HistoryItem[] = [];
   let currentMessage = '';
@@ -51,14 +105,14 @@ export async function runAIAgents(config: AgentConfig, row: RowData): Promise<st
       
       // Message Creator Agent
       console.log('✍️ Message Creator Agent working...');
-      const messageResult = await callMessageCreator(config, row, chatHistory, apiKey);
+      const messageResult = await callMessageCreator(config, row, chatHistory);
       currentMessage = messageResult.message || messageResult.toString();
       
       console.log('📝 Created message:', messageResult);
       
       // Lead Roleplay Agent
       console.log('🎭 Lead Roleplay Agent evaluating...');
-      const feedback = await callLeadRoleplay(config, row, currentMessage, chatHistory, apiKey);
+      const feedback = await callLeadRoleplay(config, row, currentMessage, chatHistory);
       
       console.log('🎯 Lead feedback:', feedback);
       
@@ -100,9 +154,10 @@ export async function runAIAgents(config: AgentConfig, row: RowData): Promise<st
 async function callMessageCreator(
   config: AgentConfig, 
   row: RowData, 
-  chatHistory: HistoryItem[], 
-  apiKey: string
+  chatHistory: HistoryItem[]
 ): Promise<MessageResult> {
+  const apiConfig = getApiConfig(config.messageCreatorModel);
+  
   const baseCreatorInstructions = `You are an expert copywriter creating personalized DM messages. 
 
 CRITICAL: You MUST respond with ONLY a valid JSON object. No other text before or after.
@@ -153,18 +208,25 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
 
   console.log('📤 Creator request:', JSON.stringify(creatorRequestBody, null, 2));
 
-  const creatorResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+  const creatorResponse = await fetch(apiConfig.endpoint, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
+    headers: apiConfig.headers,
     body: JSON.stringify(creatorRequestBody)
   });
   
   if (!creatorResponse.ok) {
     const errorText = await creatorResponse.text();
     console.error('Creator API Error Response:', errorText);
+    
+    // Provide specific error messages for different scenarios
+    if (isOllamaModel(config.messageCreatorModel)) {
+      if (creatorResponse.status === 0 || errorText.includes('fetch')) {
+        throw new Error(`Ollama connection failed. Make sure Ollama is running on localhost:11434`);
+      } else if (creatorResponse.status === 404) {
+        throw new Error(`Model '${config.messageCreatorModel}' not found in Ollama. Run: ollama pull ${config.messageCreatorModel}`);
+      }
+    }
+    
     throw new Error(`Creator API error: ${creatorResponse.status} - ${errorText}`);
   }
   
@@ -202,9 +264,10 @@ async function callLeadRoleplay(
   config: AgentConfig, 
   row: RowData, 
   currentMessage: string,
-  chatHistory: HistoryItem[], 
-  apiKey: string
+  chatHistory: HistoryItem[]
 ): Promise<FeedbackResult> {
+  const apiConfig = getApiConfig(config.leadRoleplayModel);
+  
   const baseRoleplayInstructions = `You roleplay as this lead prospect. Evaluate the message critically and decide approval.
 
 CRITICAL: You MUST respond with ONLY a valid JSON object. No other text before or after.
@@ -252,18 +315,25 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
 
   console.log('📤 Roleplay request:', JSON.stringify(roleplayRequestBody, null, 2));
 
-  const roleplayResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+  const roleplayResponse = await fetch(apiConfig.endpoint, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
+    headers: apiConfig.headers,
     body: JSON.stringify(roleplayRequestBody)
   });
   
   if (!roleplayResponse.ok) {
     const errorText = await roleplayResponse.text();
     console.error('Roleplay API Error Response:', errorText);
+    
+    // Provide specific error messages for different scenarios
+    if (isOllamaModel(config.leadRoleplayModel)) {
+      if (roleplayResponse.status === 0 || errorText.includes('fetch')) {
+        throw new Error(`Ollama connection failed. Make sure Ollama is running on localhost:11434`);
+      } else if (roleplayResponse.status === 404) {
+        throw new Error(`Model '${config.leadRoleplayModel}' not found in Ollama. Run: ollama pull ${config.leadRoleplayModel}`);
+      }
+    }
+    
     throw new Error(`Roleplay API error: ${roleplayResponse.status} - ${errorText}`);
   }
   
