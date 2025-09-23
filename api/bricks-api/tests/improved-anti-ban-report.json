@@ -1,0 +1,63 @@
+{
+  "testSuite": "Improved Anti-Ban Testing",
+  "timestamp": "2025-09-23T19:40:04.652Z",
+  "stealthScore": 45,
+  "humanLike": false,
+  "summary": {
+    "totalTests": 4,
+    "totalPassed": 1,
+    "successRate": "25.0%",
+    "webdriverDetection": "0/2",
+    "chromeDetection": "0/1",
+    "pluginsDetection": "1/1",
+    "botScore": "45/100",
+    "recommendation": "FAIR - Significant improvements needed"
+  },
+  "details": {
+    "webdriverDetection": [
+      {
+        "test": "Basic webdriver detection",
+        "webdriver": false,
+        "isUndefined": false,
+        "passed": false
+      },
+      {
+        "test": "Advanced webdriver detection",
+        "webdriverProperty": true,
+        "callPhantom": false,
+        "_phantom": false,
+        "phantom": false,
+        "webdriverValue": false,
+        "passed": false
+      }
+    ],
+    "chromeObjectDetection": [
+      {
+        "test": "Chrome object presence",
+        "chromeExists": true,
+        "chromeRuntime": false,
+        "chromeLoadTimes": true,
+        "chromeCSI": true,
+        "chromeApp": true,
+        "passed": false
+      }
+    ],
+    "pluginsDetection": [
+      {
+        "test": "Plugins and languages",
+        "pluginsLength": 5,
+        "languagesLength": 2,
+        "languages": [
+          "en-US",
+          "en"
+        ],
+        "hasPlugins": true,
+        "hasLanguages": true,
+        "passed": true
+      }
+    ],
+    "languagesDetection": [],
+    "permissionsDetection": [],
+    "stealthScore": 45
+  }
+}

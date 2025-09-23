@@ -52,6 +52,12 @@ export interface OllamaChatResponse {
   done: boolean;
   created_at: string;
   model: string;
+  // Optional fields for extended compatibility
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
 }
 
 const CONNECTION_TIMEOUT = 5000; // 5 seconds
@@ -192,21 +198,31 @@ export async function sendOllamaChatRequest(
 
   const data = await response.json();
   
-  // Handle OpenAI-compatible response format
-  if (data.choices && data.choices[0]) {
+  // Handle OpenAI-compatible response format (new default for Ollama)
+  if (data.choices && data.choices[0] && data.choices[0].message) {
     return {
       message: {
         role: data.choices[0].message.role,
         content: data.choices[0].message.content,
       },
       done: true,
-      created_at: new Date().toISOString(),
+      created_at: data.created ? new Date(data.created * 1000).toISOString() : new Date().toISOString(),
       model: data.model || model,
+      usage: data.usage ? {
+        prompt_tokens: data.usage.prompt_tokens,
+        completion_tokens: data.usage.completion_tokens,
+        total_tokens: data.usage.total_tokens,
+      } : undefined,
     };
   }
 
-  // Handle native Ollama format
-  return data as OllamaChatResponse;
+  // Fallback: Handle legacy native Ollama format (if still returned by some endpoints)
+  if (data.message) {
+    return data as OllamaChatResponse;
+  }
+
+  // If neither format is recognized, throw an error with details
+  throw new Error(`Unexpected Ollama response format. Keys: ${Object.keys(data).join(', ')}. Data: ${JSON.stringify(data, null, 2)}`);
 }
 
 /**

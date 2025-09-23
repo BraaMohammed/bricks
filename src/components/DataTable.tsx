@@ -101,6 +101,7 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
         variant: errorCount === 0 ? "default" : "destructive",
       });
     } catch (error) {
+      console.error('Error executing formula:', error);
       toast({
         title: "Execution Error",
         description: "Failed to execute formula. Check your syntax.",
@@ -123,6 +124,7 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
         description: `Cell ${column} in row ${rowIndex + 1} has been updated.`,
       });
     } catch (error) {
+      console.error('Error executing cell formula:', error);
       toast({
         title: "Execution Error",
         description: error instanceof Error ? error.message : "Failed to execute formula on this cell.",

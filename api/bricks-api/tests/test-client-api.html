@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Puppeteer API from Browser</title>
+</head>
+<body>
+    <h1>Puppeteer API Test</h1>
+    <button onclick="testAPI()">Test Ultra Simple Code</button>
+    <div id="results"></div>
+
+    <script>
+        async function testAPI() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<p>Testing API...</p>';
+
+            try {
+                // Test 1: Submit job
+                console.log('🚀 Submitting job...');
+                const response = await fetch('http://localhost:3000/api/puppeteer', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        code: "await page.goto('https://example.com'); return await page.title();",
+                        config: {
+                            timeout: 30000,
+                            headless: true
+                        },
+                        rowData: {}
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status} - ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                console.log('✅ Job queued:', data);
+
+                results.innerHTML += `<p><strong>✅ Job queued:</strong> ${data.jobId}</p>`;
+
+                // Test 2: Poll for result
+                const jobId = data.jobId;
+                let attempts = 0;
+                const maxAttempts = 20;
+
+                while (attempts < maxAttempts) {
+                    attempts++;
+                    console.log(`🔄 Checking status (attempt ${attempts})...`);
+                    
+                    const statusResponse = await fetch(`http://localhost:3000/api/puppeteer/status/${jobId}`);
+                    
+                    if (!statusResponse.ok) {
+                        throw new Error(`Status API Error: ${statusResponse.status}`);
+                    }
+
+                    const statusData = await statusResponse.json();
+                    console.log('📊 Status:', statusData);
+
+                    if (statusData.status === 'completed') {
+                        results.innerHTML += `<p><strong>🎉 SUCCESS:</strong> ${statusData.result}</p>`;
+                        results.innerHTML += `<p><strong>⏱️ Processing time:</strong> ${statusData.processingTime}ms</p>`;
+                        return;
+                    } else if (statusData.status === 'failed') {
+                        results.innerHTML += `<p><strong>❌ FAILED:</strong> ${statusData.error}</p>`;
+                        return;
+                    } else {
+                        results.innerHTML += `<p>🔄 Status: ${statusData.status}</p>`;
+                    }
+
+                    // Wait 2 seconds before next check
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                }
+
+                results.innerHTML += `<p><strong>⏰ TIMEOUT:</strong> Job did not complete in time</p>`;
+
+            } catch (error) {
+                console.error('💥 Error:', error);
+                results.innerHTML += `<p><strong>💥 ERROR:</strong> ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

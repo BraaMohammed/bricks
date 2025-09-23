@@ -1,0 +1,131 @@
+{
+  "testSuite": "Puppeteer Mode Integration Testing",
+  "phase": "Phase 3.4",
+  "timestamp": "2025-09-23T20:21:55.981Z",
+  "summary": {
+    "totalTests": 8,
+    "successful": 3,
+    "failed": 5,
+    "successRate": "37.5%",
+    "status": "MOSTLY_FAILED"
+  },
+  "results": {
+    "basicPuppeteerJob": {
+      "success": true,
+      "result": "",
+      "duration": 15250,
+      "jobId": "job_1758658852719_ucbwcaoz4"
+    },
+    "titleExtraction": {
+      "success": false,
+      "error": "Submit failed: 400 - Bad Request"
+    },
+    "textExtraction": {
+      "success": false,
+      "error": "Submit failed: 400 - Bad Request"
+    },
+    "screenCapture": {
+      "success": true,
+      "result": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAAEsCAIAAABi1XKVAAAAAX...[truncated]",
+      "duration": 5845,
+      "jobId": "job_1758658869259_n1nw5ag8g"
+    },
+    "formInteraction": {
+      "success": false,
+      "error": "Submit failed: 400 - Bad Request"
+    },
+    "multipleJobsQueue": {
+      "success": false,
+      "totalJobs": 3,
+      "successfulJobs": 0,
+      "results": [
+        {
+          "name": "Job A - Quick Title",
+          "success": false,
+          "error": "Navigation timeout of 30000 ms exceeded",
+          "jobId": "job_1758658876061_3915axkm3"
+        },
+        {
+          "name": "Job B - Get Headers",
+          "success": false,
+          "error": "Submit failed: 400 - Bad Request"
+        },
+        {
+          "name": "Job C - User Agent",
+          "success": false,
+          "error": "Submit failed: 400 - Bad Request"
+        }
+      ],
+      "totalTime": 33829
+    },
+    "errorHandling": {
+      "success": false,
+      "error": "Waiting for selector `nonexistent-element` failed: Waiting failed: 2000ms exceeded",
+      "jobId": "job_1758658909641_jaboaj7o2"
+    },
+    "queueStatus": {
+      "success": true,
+      "data": {
+        "queue": {
+          "total": 4,
+          "pending": 0,
+          "processing": 0,
+          "completed": 2,
+          "failed": 2,
+          "avgProcessingTime": 8,
+          "estimatedWaitTime": 0,
+          "maxConcurrent": 3
+        },
+        "browsers": {
+          "activeBrowsers": 1,
+          "totalPages": 1,
+          "busyPages": 0,
+          "browserDetails": [
+            {
+              "id": "browser_1758658859931_lc4a6tmvb",
+              "requestCount": 4,
+              "lastUsed": "2025-09-23T20:21:49.641Z",
+              "memoryUsage": 0
+            }
+          ]
+        },
+        "recentJobs": [
+          {
+            "id": "job_1758658909641_jaboaj7o2",
+            "status": "failed",
+            "createdAt": "2025-09-23T20:21:49.641Z",
+            "completedAt": "2025-09-23T20:21:53.563Z",
+            "progress": "Waiting for selector `nonexistent-element` failed: Waiting failed: 2000ms exceeded",
+            "error": "Waiting for selector `nonexistent-element` failed: Waiting failed: 2000ms exceeded"
+          },
+          {
+            "id": "job_1758658876061_3915axkm3",
+            "status": "failed",
+            "createdAt": "2025-09-23T20:21:16.061Z",
+            "completedAt": "2025-09-23T20:21:46.117Z",
+            "progress": "Navigation timeout of 30000 ms exceeded",
+            "error": "Navigation timeout of 30000 ms exceeded"
+          },
+          {
+            "id": "job_1758658869259_n1nw5ag8g",
+            "status": "completed",
+            "createdAt": "2025-09-23T20:21:09.259Z",
+            "completedAt": "2025-09-23T20:21:12.229Z"
+          },
+          {
+            "id": "job_1758658852719_ucbwcaoz4",
+            "status": "completed",
+            "createdAt": "2025-09-23T20:20:52.719Z",
+            "completedAt": "2025-09-23T20:21:05.447Z"
+          }
+        ],
+        "timestamp": "2025-09-23T20:21:55.982Z"
+      }
+    }
+  },
+  "recommendations": {
+    "readyForProduction": false,
+    "criticalIssues": true,
+    "nextSteps": "Address failed tests before proceeding to Phase 4"
+  }
+}

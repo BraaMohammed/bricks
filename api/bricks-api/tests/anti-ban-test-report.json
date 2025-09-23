@@ -1,0 +1,160 @@
+{
+  "testSuite": "Anti-Ban and Stealth Mode Testing",
+  "timestamp": "2025-09-23T19:35:36.243Z",
+  "duration": 194899,
+  "results": {
+    "userAgentRotation": [
+      {
+        "attempt": 1,
+        "expectedUA": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "success": false
+      },
+      {
+        "attempt": 2,
+        "expectedUA": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "detectedUA": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "success": true
+      },
+      {
+        "attempt": 3,
+        "expectedUA": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "detectedUA": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "success": true
+      },
+      {
+        "attempt": 4,
+        "error": "Navigation timeout of 10000 ms exceeded",
+        "success": false
+      },
+      {
+        "attempt": 5,
+        "error": "Navigation timeout of 10000 ms exceeded",
+        "success": false
+      }
+    ],
+    "viewportRandomization": [
+      {
+        "attempt": 1,
+        "expected": "1200x800",
+        "detected": "1200x800",
+        "success": true
+      },
+      {
+        "attempt": 2,
+        "expected": "1366x768",
+        "detected": "1366x768",
+        "success": true
+      },
+      {
+        "attempt": 3,
+        "expected": "1440x900",
+        "detected": "1440x900",
+        "success": true
+      },
+      {
+        "attempt": 4,
+        "expected": "1920x1080",
+        "detected": "1920x1080",
+        "success": true
+      }
+    ],
+    "requestDelays": [
+      {
+        "attempt": 1,
+        "duration": 14601,
+        "success": true
+      },
+      {
+        "attempt": 2,
+        "duration": 9374,
+        "success": true
+      },
+      {
+        "attempt": 3,
+        "error": "Navigation timeout of 15000 ms exceeded",
+        "success": false
+      }
+    ],
+    "headerValidation": [
+      {
+        "error": "Navigation timeout of 10000 ms exceeded",
+        "success": false
+      }
+    ],
+    "stealthDetection": [
+      {
+        "test": "navigator.webdriver",
+        "result": "BOT_DETECTED",
+        "detected": true,
+        "success": false
+      },
+      {
+        "test": "window.chrome",
+        "result": "CHROME_DETECTED",
+        "detected": true,
+        "success": true
+      }
+    ],
+    "memoryUsage": {
+      "measurements": [
+        {
+          "heapUsed": 0.3784942626953125,
+          "heapTotal": 1.25,
+          "rss": -0.68359375,
+          "cleanup": -0.0285491943359375
+        },
+        {
+          "heapUsed": 0.28498077392578125,
+          "heapTotal": 0,
+          "rss": 0.08203125,
+          "cleanup": -0.0485687255859375
+        },
+        {
+          "heapUsed": 0.31459808349609375,
+          "heapTotal": 0.25,
+          "rss": -0.1015625,
+          "cleanup": -0.07100677490234375
+        }
+      ],
+      "average": {
+        "heapUsed": 0.3260243733723958,
+        "rss": -0.234375
+      },
+      "withinLimits": true
+    },
+    "browserPooling": {
+      "error": "Navigation timeout of 15000 ms exceeded",
+      "success": false
+    }
+  },
+  "summary": {
+    "userAgentRotation": {
+      "total": 5,
+      "successful": 2,
+      "successRate": "40.0%"
+    },
+    "viewportRandomization": {
+      "total": 4,
+      "successful": 4,
+      "successRate": "100.0%"
+    },
+    "requestDelays": {
+      "total": 3,
+      "successful": 2,
+      "averageDelay": "7992ms"
+    },
+    "stealthDetection": {
+      "tests": 2,
+      "passed": 1,
+      "detected": 2
+    },
+    "memoryUsage": {
+      "averageHeapUsage": "0.3MB",
+      "withinLimits": true
+    },
+    "browserPooling": {
+      "maxConcurrent": 0,
+      "successful": false
+    }
+  }
+}

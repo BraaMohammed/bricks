@@ -53,23 +53,23 @@ export const validateFormula = (formula: string, availableColumns: string[]): Va
     warnings.push(`Use bracket notation instead of dot notation. Example: rows['Column Name'] instead of rows.columnName`);
   }
 
-  // Check for potentially dangerous functions
-  const dangerousPatterns = [
-    'eval(',
-    'Function(',
-    'setTimeout(',
-    'setInterval(',
-    'document.',
-    'window.',
-    'localStorage.',
-    'sessionStorage.'
-  ];
+  // Check for potentially dangerous functions - DISABLED FOR PUPPETEER MODE
+  // const dangerousPatterns = [
+  //   'eval(',
+  //   'Function(',
+  //   'setTimeout(',
+  //   'setInterval(',
+  //   'document.',
+  //   'window.',
+  //   'localStorage.',
+  //   'sessionStorage.'
+  // ];
 
-  dangerousPatterns.forEach(pattern => {
-    if (formula.includes(pattern)) {
-      warnings.push(`Potentially unsafe: ${pattern} detected`);
-    }
-  });
+  // dangerousPatterns.forEach(pattern => {
+  //   if (formula.includes(pattern)) {
+  //     warnings.push(`Potentially unsafe: ${pattern} detected`);
+  //   }
+  // });
 
   return {
     isValid: errors.length === 0,

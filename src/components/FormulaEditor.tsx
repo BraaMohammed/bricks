@@ -1,5 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Code, Save, X, Info, Sparkles, Brain, Wand2, Trash2, Upload, FileSpreadsheet, Users, PenTool, UserCheck, Zap, Server, Key, ChevronDown, Settings } from 'lucide-react';
+
+// Extend window interface for Puppeteer logging functions
+declare global {
+  interface Window {
+    updatePuppeteerLog?: (message: string) => void;
+    setPuppeteerLastResult?: (result: { type: 'success' | 'error', message: string }) => void;
+  }
+}
+import { Code, Save, X, Info, Sparkles, Brain, Wand2, Trash2, Upload, FileSpreadsheet, Users, PenTool, UserCheck, Zap, Server, Key, ChevronDown, Settings, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -45,7 +53,7 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   const [hasChanges, setHasChanges] = useState(false);
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashMenuPosition, setSlashMenuPosition] = useState({ top: 0, left: 0 });
-  const [mode, setMode] = useState<'code' | 'ai' | 'firecrawl' | 'ai-agents'>('code');
+  const [mode, setMode] = useState<'code' | 'ai' | 'firecrawl' | 'ai-agents' | 'puppeteer'>('code');
   const [aiModel, setAiModel] = useState('gpt-4o-mini');
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiMessage, setAiMessage] = useState('');
@@ -78,6 +86,13 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   const [messageCreatorInstructions, setMessageCreatorInstructions] = useState('');
   const [leadRoleplayInstructions, setLeadRoleplayInstructions] = useState('');
   const [maxIterations, setMaxIterations] = useState(5);
+
+  // Puppeteer mode state
+  const [puppeteerCode, setPuppeteerCode] = useState('');
+  const [puppeteerTimeout, setPuppeteerTimeout] = useState(30000);
+  const [puppeteerHeadless, setPuppeteerHeadless] = useState(true);
+  const [puppeteerExecutionLog, setPuppeteerExecutionLog] = useState<string[]>([]);
+  const [puppeteerLastResult, setPuppeteerLastResult] = useState<{type: 'success' | 'error', message: string} | null>(null);
 
   // Available models with thinking mode support (latest as of August 2025)
   const openAIModels = [
@@ -253,6 +268,26 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
         console.error('Error loading saved formulas:', error);
       }
     }
+  }, []);
+
+  // Expose functions to window for dynamic access from generated Puppeteer code
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.updatePuppeteerLog = (message: string) => {
+        const timestamp = new Date().toLocaleTimeString();
+        setPuppeteerExecutionLog(prev => [...prev, `${timestamp}: ${message}`]);
+      };
+      window.setPuppeteerLastResult = (result: { type: 'success' | 'error', message: string }) => {
+        setPuppeteerLastResult(result);
+      };
+    }
+    
+    return () => {
+      if (typeof window !== 'undefined') {
+        delete window.updatePuppeteerLog;
+        delete window.setPuppeteerLastResult;
+      }
+    };
   }, []);
 
   // Save formula to localStorage
@@ -626,6 +661,18 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
         }
         
         finalFormula = generateAIAgentsFormula();
+      } else if (mode === 'puppeteer') {
+        // Generate the Puppeteer formula - VALIDATION DISABLED
+        // if (!puppeteerCode.trim()) {
+        //   toast({
+        //     title: "Validation Error",
+        //     description: "Please enter Puppeteer code to execute.",
+        //     variant: "destructive",
+        //   });
+        //   return;
+        // }
+        
+        finalFormula = generatePuppeteerFormula(puppeteerCode, puppeteerTimeout, puppeteerHeadless);
       } else {
         // Only validate formula syntax when in code mode
         const validation = validateFormula(finalFormula, headers);
@@ -648,7 +695,7 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
         setHasChanges(false);
         toast({
           title: "Formula Saved",
-          description: `${mode === 'ai' ? 'AI prompt' : mode === 'firecrawl' ? 'Firecrawl URL template' : mode === 'ai-agents' ? 'AI Copy Agents configuration' : 'Formula'} for "${activeColumn}" has been saved.`,
+          description: `${mode === 'ai' ? 'AI prompt' : mode === 'firecrawl' ? 'Firecrawl URL template' : mode === 'ai-agents' ? 'AI Copy Agents configuration' : mode === 'puppeteer' ? 'Puppeteer automation code' : 'Formula'} for "${activeColumn}" has been saved.`,
         });
         onOpenChange(false);
       } catch (error) {
@@ -839,8 +886,21 @@ ${authHeader}
     throw new Error(\`API Error: \${data.error.message || JSON.stringify(data.error)}\`);
   }
 
+  // Handle OpenAI-compatible API response structure (used by both OpenAI and Ollama v1/chat/completions)
+  if (data.choices && data.choices.length > 0 && data.choices[0].message && data.choices[0].message.content) {
+    let result = data.choices[0].message.content;
+    console.log('✅ Found content in OpenAI-compatible structure');
+    console.log('📄 Raw content preview:', result.substring(0, 200) + '...');
+    
+    // Apply content filtering for reasoning models
+    ${!thinkingMode && isReasoningModel ? 'result = filterThinkingContent(result);' : 'console.log("🧠 Keeping original content");'}
+    console.log('📄 Final result preview:', result.substring(0, 200) + '...');
+    
+    return result;
+  }
+
   ${isOllamaModelLocal ? `
-  // Handle Ollama native API response structure
+  // Fallback: Handle legacy Ollama native API response structure (if still used)
   if (data.message) {
     let result;
     
@@ -865,19 +925,7 @@ ${authHeader}
     console.log('📄 Final result preview:', result.substring(0, 200) + '...');
     
     return result;
-  }` : `
-  // Handle OpenAI API response structure
-  if (data.choices && data.choices.length > 0 && data.choices[0].message && data.choices[0].message.content) {
-    let result = data.choices[0].message.content;
-    console.log('✅ Found content in OpenAI structure');
-    console.log('📄 Raw content preview:', result.substring(0, 200) + '...');
-    
-    // Apply content filtering for reasoning models
-    ${!thinkingMode && isReasoningModel ? 'result = filterThinkingContent(result);' : 'console.log("🧠 Keeping original content");'}
-    console.log('📄 Final result preview:', result.substring(0, 200) + '...');
-    
-    return result;
-  }`}
+  }` : ``}
 
   // If standard structure is not found, return the whole response for debugging
   console.warn('⚠️ Unexpected response structure:', data);
@@ -949,6 +997,257 @@ return fetch('https://api.firecrawl.dev/v2/scrape', {
 });`;
   };
 
+  const generatePuppeteerFormula = (code: string, timeout: number, headless: boolean) => {
+    // Replace {Column Name} references with actual row data access
+    const processedCode = code.replace(/\{([^}]+)\}/g, (match, columnName) => {
+      return `\${row["${columnName}"] || ""}`;
+    });
+
+    return `// Puppeteer Generated Formula (Enhanced Error Handling)  
+const puppeteerCode = ${JSON.stringify(processedCode)};
+const config = {
+  timeout: ${timeout},
+  headless: ${headless}
+};
+
+// Enhanced logging and error handling with UI updates
+const logToUI = (message) => {
+  console.log(message);
+  // Try to update UI logs if available
+  try {
+    if (window.updatePuppeteerLog) {
+      window.updatePuppeteerLog(message);
+    }
+  } catch (e) {
+    // Ignore UI update errors
+  }
+};
+
+logToUI('🤖 Puppeteer Mode: Starting browser automation');
+logToUI('📋 Code length: ' + puppeteerCode.length + ' characters');
+logToUI('⚙️ Config: ' + JSON.stringify(config, null, 2));
+logToUI('📊 Row data keys: ' + Object.keys(row).join(', '));
+
+// Validate inputs before sending - DISABLED FOR TESTING
+// if (!puppeteerCode || puppeteerCode.trim().length === 0) {
+//   console.error('❌ Validation failed: Empty Puppeteer code');
+//   return 'Error: No Puppeteer code provided';
+// }
+
+if (config.timeout < 5000 || config.timeout > 60000) {
+  console.error('❌ Validation failed: Invalid timeout value:', config.timeout);
+  return 'Error: Timeout must be between 5-60 seconds';
+}
+
+// API endpoint - using localhost:3000 for dev server
+const apiEndpoint = 'http://localhost:3000/api/puppeteer';
+logToUI('📡 API endpoint: ' + apiEndpoint);
+
+// Submit job to queue with enhanced error handling
+const startTime = Date.now();
+logToUI('🚀 Submitting job at: ' + new Date(startTime).toISOString());
+
+return fetch(apiEndpoint, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    code: puppeteerCode,
+    config: config,
+    rowData: row
+  })
+})
+.then(async response => {
+  const responseTime = Date.now() - startTime;
+  logToUI('📡 Response received in ' + responseTime + 'ms');
+  console.log('📊 Response status:', response.status);
+  console.log('📊 Response headers:', Object.fromEntries(response.headers.entries()));
+  
+  // Handle different response statuses
+  if (!response.ok) {
+    let errorMessage = \`API error: \${response.status} - \${response.statusText}\`;
+    
+    try {
+      const errorText = await response.text();
+      console.error('❌ Error response body:', errorText);
+      
+      if (errorText) {
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorMessage;
+        } catch (parseError) {
+          console.warn('⚠️ Could not parse error response as JSON');
+          errorMessage += \`. Response: \${errorText.substring(0, 200)}\`;
+        }
+      }
+    } catch (textError) {
+      console.error('❌ Failed to read error response body:', textError);
+    }
+    
+    throw new Error(errorMessage);
+  }
+  
+  return response.json();
+})
+.then(data => {
+  console.log('📊 Queue response data:', data);
+  
+  if (data.queued && data.jobId) {
+    logToUI('✅ Job successfully queued');
+    console.log('🆔 Job ID:', data.jobId);
+    console.log('🕒 Queue position:', data.position || 'Unknown');
+    console.log('📈 Queue stats:', data.queueStats || 'Not provided');
+    
+    // Start polling for result
+    return pollForResult(data.jobId, startTime);
+  } else {
+    console.error('❌ Invalid queue response structure');
+    console.error('📊 Expected: {queued: true, jobId: string}, Got:', data);
+    throw new Error(\`Invalid queue response: \${JSON.stringify(data)}\`);
+  }
+})
+.catch(error => {
+  const totalTime = Date.now() - startTime;
+  console.error('💥 Puppeteer submission failed after', totalTime, 'ms');
+  console.error('💥 Error details:', {
+    name: error.name,
+    message: error.message,
+    stack: error.stack
+  });
+  
+  // Provide user-friendly error messages
+  if (error.message.includes('Failed to fetch')) {
+    return 'Error: Cannot connect to Puppeteer API. Make sure the dev server is running on localhost:3000';
+  } else if (error.message.includes('Network')) {
+    return 'Error: Network connection failed. Check your internet connection';
+  } else if (error.message.includes('500')) {
+    return 'Error: Server error occurred. Check server logs for details';
+  } else if (error.message.includes('404')) {
+    return 'Error: Puppeteer API endpoint not found. Make sure the API server is running';
+  } else {
+    return \`Error: \${error.message}\`;
+  }
+});
+
+// Enhanced polling function with better logging and error handling
+async function pollForResult(jobId, startTime) {
+  const maxAttempts = 60; // 5 minutes max (5s intervals)
+  const pollInterval = 5000; // 5 seconds
+  let attempts = 0;
+  
+  console.log('🔄 Starting result polling');
+  console.log('🆔 Job ID:', jobId);
+  console.log('⏱️ Max attempts:', maxAttempts);
+  console.log('🕒 Poll interval:', pollInterval, 'ms');
+  
+  while (attempts < maxAttempts) {
+    attempts++;
+    const pollStartTime = Date.now();
+    
+    try {
+      console.log(\`🔄 Poll attempt \${attempts}/\${maxAttempts}\`);
+      
+      const statusEndpoint = \`http://localhost:3000/api/puppeteer/status/\${jobId}\`;
+      const response = await fetch(statusEndpoint);
+      
+      const pollResponseTime = Date.now() - pollStartTime;
+      console.log(\`📡 Status check completed in \${pollResponseTime}ms\`);
+      
+      if (!response.ok) {
+        console.warn(\`⚠️ Status check failed: \${response.status} - \${response.statusText}\`);
+        throw new Error(\`Status API error: \${response.status}\`);
+      }
+      
+      const data = await response.json();
+      console.log(\`📊 Job status: \${data.status}\`);
+      
+      if (data.status === 'completed') {
+        const totalTime = Date.now() - startTime;
+        console.log('✅ Puppeteer job completed successfully');
+        console.log(\`⏱️ Total execution time: \${totalTime}ms\`);
+        console.log('📄 Result preview:', typeof data.result === 'string' ? 
+          data.result.substring(0, 100) + '...' : 
+          JSON.stringify(data.result).substring(0, 100) + '...');
+        
+        // Update UI with success result if available
+        try {
+          if (window.setPuppeteerLastResult) {
+            window.setPuppeteerLastResult({ type: 'success', message: data.result });
+          }
+        } catch (e) {
+          // Ignore UI update errors
+        }
+        
+        return data.result;
+      } else if (data.status === 'failed') {
+        const totalTime = Date.now() - startTime;
+        console.error('❌ Puppeteer job failed');
+        console.error(\`⏱️ Failed after: \${totalTime}ms\`);
+        console.error('❌ Error details:', data.error);
+        console.error('📊 Full error data:', data);
+        
+        // Update UI with error result if available
+        try {
+          if (window.setPuppeteerLastResult) {
+            window.setPuppeteerLastResult({ type: 'error', message: data.error || 'Job failed without specific error message' });
+          }
+        } catch (e) {
+          // Ignore UI update errors
+        }
+        
+        return \`Error: \${data.error || 'Job failed without specific error message'}\`;
+      } else if (data.status === 'pending' || data.status === 'processing') {
+        const elapsed = Date.now() - startTime;
+        console.log(\`⏳ Job \${data.status}, elapsed: \${Math.round(elapsed/1000)}s\`);
+        console.log('🔢 Queue position:', data.position || 'Unknown');
+        
+        if (data.estimatedWaitTime) {
+          console.log('⏰ Estimated wait time:', data.estimatedWaitTime, 'ms');
+        }
+        
+        // Wait before next poll
+        console.log(\`⏸️ Waiting \${pollInterval}ms before next poll...\`);
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+      } else {
+        console.warn('⚠️ Unknown job status:', data.status);
+        console.warn('📊 Full status data:', data);
+        
+        // Still wait and continue for unknown statuses
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+      }
+      
+    } catch (pollError) {
+      console.error(\`❌ Poll attempt \${attempts} failed:\`, pollError);
+      
+      // For network errors, wait and retry
+      if (pollError.message.includes('Failed to fetch') || pollError.message.includes('Network')) {
+        console.log('🔄 Network error during polling, will retry...');
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        continue;
+      }
+      
+      // For other errors, still retry but log more details
+      console.error('📊 Poll error details:', {
+        name: pollError.name,
+        message: pollError.message,
+        stack: pollError.stack
+      });
+      
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
+  }
+  
+  // Timeout reached
+  const totalTime = Date.now() - startTime;
+  console.error('⏰ Polling timeout reached');
+  console.error(\`⏱️ Total time elapsed: \${Math.round(totalTime/1000)}s\`);
+  console.error(\`🔄 Total polling attempts: \${attempts}\`);
+  
+  return \`Error: Job timeout - execution took longer than \${Math.round(maxAttempts * pollInterval / 1000)} seconds. Check server performance or increase timeout.\`;
+}`;
+  };
+
   const generateAIAgentsFormula = () => {
     const config = {
       messageCreatorModel,
@@ -966,7 +1265,7 @@ const config = ${JSON.stringify(config, null, 2)};
 return await runAIAgents(config, row);`;
   };
 
-  const handleModeChange = (newMode: 'code' | 'ai' | 'firecrawl' | 'ai-agents') => {
+  const handleModeChange = (newMode: 'code' | 'ai' | 'firecrawl' | 'ai-agents' | 'puppeteer') => {
     setMode(newMode);
     setHasChanges(true);
     
@@ -982,6 +1281,11 @@ return await runAIAgents(config, row);`;
       }
       if (!leadRoleplayInstructions) {
         setLeadRoleplayInstructions('');
+      }
+    } else if (newMode === 'puppeteer') {
+      // Initialize Puppeteer mode with defaults if empty
+      if (!puppeteerCode) {
+        setPuppeteerCode('// Enter your Puppeteer automation code here\n// Example: Get page title\nawait page.goto("{URL}");\nreturn await page.title();');
       }
     }
   };
@@ -1116,7 +1420,7 @@ return await runAIAgents(config, row);`;
         <div className="space-y-6 py-6">
           {/* Mode Selection */}
           <Tabs value={mode} onValueChange={handleModeChange} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="code" className="flex items-center gap-2">
                 <Code className="h-4 w-4" />
                 Code Mode
@@ -1132,6 +1436,10 @@ return await runAIAgents(config, row);`;
               <TabsTrigger value="ai-agents" className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
                 AI Copy Agents
+              </TabsTrigger>
+              <TabsTrigger value="puppeteer" className="flex items-center gap-2">
+                <Bot className="h-4 w-4" />
+                Puppeteer Mode
               </TabsTrigger>
             </TabsList>
 
@@ -2110,6 +2418,356 @@ return row['email']?.includes('@gmail.com') ? 'Gmail User' : 'Other';"
                 </CardContent>
               </Card>
             </TabsContent>
+
+            <TabsContent value="puppeteer" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Bot className="h-4 w-4" />
+                    Puppeteer Browser Automation
+                  </CardTitle>
+                  <CardDescription>
+                    Write Puppeteer code to automate browser interactions. Code runs on the server with stealth plugin for anti-detection.
+                    <div className="flex items-center gap-2 mt-2">
+                      <Badge variant="outline" className="text-xs">
+                        API: localhost:3000
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        Queue-based processing
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        Enhanced logging
+                      </Badge>
+                    </div>
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  
+                  {/* System Status Check */}
+                  <Card className="p-4 bg-blue-50/50 border-blue-200">
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Bot className="h-4 w-4 text-blue-600" />
+                        <h4 className="font-semibold text-blue-800">Puppeteer API Status</h4>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+                          <span className="text-blue-700">Server: localhost:3000</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-green-500 rounded-full" />
+                          <span className="text-blue-700">Queue: Ready</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-green-500 rounded-full" />
+                          <span className="text-blue-700">Browser Pool: Active</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-green-500 rounded-full" />
+                          <span className="text-blue-700">Stealth Mode: Enabled</span>
+                        </div>
+                      </div>
+                      <div className="text-xs text-blue-600 bg-blue-100 p-2 rounded">
+                        💡 <strong>Ultra Simple Test:</strong> Try this code: <code className="bg-white px-1 rounded">await page.goto('https://example.com'); return await page.title();</code>
+                      </div>
+                      <div className="text-xs text-green-600 bg-green-100 p-2 rounded">
+                        ✅ <strong>CORS Fixed:</strong> API now supports cross-origin requests from port 8080 to port 3000
+                      </div>
+                      <div className="text-xs text-green-600 bg-green-100 p-2 rounded">
+                        🔍 <strong>Debug Tip:</strong> Open browser console (F12) to see detailed execution logs and error details
+                      </div>
+                    </div>
+                  </Card>
+                  
+                  {/* Available columns for Puppeteer mode */}
+                  <div>
+                    <h4 className="font-semibold mb-3 flex items-center gap-2">
+                      <Info className="h-4 w-4" />
+                      Available Columns
+                    </h4>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Click on a column to add it to your code. The data will be available in your Puppeteer script:
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {headers.map((header) => (
+                        <Badge 
+                          key={header} 
+                          variant="outline" 
+                          className="cursor-pointer hover:bg-muted"
+                          onClick={() => {
+                            const insertion = `{${header}}`;
+                            const currentCode = puppeteerCode;
+                            const newCode = currentCode + (currentCode ? ' ' : '') + insertion;
+                            setPuppeteerCode(newCode);
+                            setHasChanges(true);
+                          }}
+                        >
+                          {header}
+                        </Badge>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      💡 Tip: Use {`{Column Name}`} in your code to reference data from each row
+                    </p>
+                  </div>
+
+                  {/* Puppeteer Configuration */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium mb-2 block">
+                        Execution Timeout (ms)
+                      </Label>
+                      <Input
+                        type="number"
+                        min="5000"
+                        max="60000"
+                        step="1000"
+                        value={puppeteerTimeout}
+                        onChange={(e) => {
+                          setPuppeteerTimeout(parseInt(e.target.value));
+                          setHasChanges(true);
+                        }}
+                        className="w-full"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Timeout for Puppeteer execution (5-60 seconds)
+                      </p>
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-medium mb-2 block">
+                        Browser Mode
+                      </Label>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          checked={puppeteerHeadless}
+                          onCheckedChange={(checked) => {
+                            setPuppeteerHeadless(checked);
+                            setHasChanges(true);
+                          }}
+                        />
+                        <Label className="text-sm">
+                          Headless Mode {puppeteerHeadless ? '(Recommended)' : '(Debug)'}
+                        </Label>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Headless mode is faster and uses less resources
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Puppeteer Code Editor */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-semibold">Puppeteer Code</h4>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="flex items-center gap-1 text-xs">
+                          <Bot className="h-3 w-3" />
+                          Server-side execution
+                        </Badge>
+                        <Badge variant="outline" className="flex items-center gap-1 text-xs">
+                          <Info className="h-3 w-3" />
+                          Enhanced logging
+                        </Badge>
+                      </div>
+                    </div>
+                    <Textarea
+                      value={puppeteerCode}
+                      onChange={(e) => {
+                        setPuppeteerCode(e.target.value);
+                        setHasChanges(true);
+                      }}
+                      placeholder="// Enter your Puppeteer automation code here
+// Example: Get page title
+await page.goto('{URL}');
+return await page.title();
+
+// Available objects:
+// - page: Puppeteer page instance
+// - browser: Puppeteer browser instance  
+// - rowData: Current row data
+// - console: For logging (console.log)
+
+// Error handling is automatic - check browser console for detailed logs
+// Queue position and timing information will be displayed automatically"
+                      className="font-mono text-sm"
+                      rows={12}
+                    />
+                  </div>
+
+                  {/* Enhanced Code Templates */}
+                  <div>
+                    <h4 className="font-semibold mb-3">Code Templates</h4>
+                    <div className="grid gap-2">
+                      {[
+                        {
+                          name: 'Get Page Title (Ultra Simple Test)',
+                          description: 'Test with example.com - should return "Example Domain"',
+                          code: 'await page.goto(\'https://example.com\');\nreturn await page.title();'
+                        },
+                        {
+                          name: 'Extract Text Content',
+                          description: 'Extract text from specific elements',
+                          code: 'await page.goto(\'{URL}\');\nawait page.waitForSelector(\'h1\', { timeout: 10000 });\nreturn await page.$eval(\'h1\', el => el.textContent);'
+                        },
+                        {
+                          name: 'Take Screenshot',
+                          description: 'Capture page screenshot as base64',
+                          code: 'await page.goto(\'{URL}\');\nawait page.setViewport({ width: 1200, height: 800 });\nconst screenshot = await page.screenshot({ encoding: \'base64\' });\nreturn `data:image/png;base64,${screenshot}`;'
+                        },
+                        {
+                          name: 'Get All Links',
+                          description: 'Extract all links from a page',
+                          code: 'await page.goto(\'{URL}\');\nconst links = await page.$$eval(\'a\', anchors => \n  anchors.map(a => ({ text: a.textContent, href: a.href })).filter(link => link.href)\n);\nreturn JSON.stringify(links, null, 2);'
+                        },
+                        {
+                          name: 'Form Interaction',
+                          description: 'Fill and submit forms',
+                          code: 'await page.goto(\'{URL}\');\nawait page.waitForSelector(\'#search\', { timeout: 5000 });\nawait page.type(\'#search\', \'{Search Term}\');\nawait page.click(\'#submit\');\nawait page.waitForNavigation();\nreturn await page.url();'
+                        },
+                        {
+                          name: 'Wait for Element',
+                          description: 'Wait for dynamic content to load',
+                          code: 'await page.goto(\'{URL}\');\n// Wait for dynamic content\nawait page.waitForSelector(\'.dynamic-content\', { timeout: 15000 });\nconst content = await page.$eval(\'.dynamic-content\', el => el.textContent);\nreturn content;'
+                        }
+                      ].map((template, index) => (
+                        <Card key={index} className="p-3 hover:bg-muted/50 transition-colors">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <p className="font-medium text-sm">{template.name}</p>
+                                <Badge variant="secondary" className="text-xs">
+                                  {template.description}
+                                </Badge>
+                              </div>
+                              <code className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded block overflow-x-auto">
+                                {template.code.length > 100 
+                                  ? template.code.substring(0, 100) + '...' 
+                                  : template.code}
+                              </code>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setPuppeteerCode(template.code);
+                                setHasChanges(true);
+                              }}
+                            >
+                              Use
+                            </Button>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Execution Logs and Results */}
+                  {puppeteerLastResult && (
+                    <Card className={`p-4 ${puppeteerLastResult.type === 'success' ? 'bg-green-50/50 border-green-200' : 'bg-red-50/50 border-red-200'}`}>
+                      <h4 className="font-semibold mb-2 flex items-center gap-2">
+                        {puppeteerLastResult.type === 'success' ? (
+                          <>
+                            <Sparkles className="h-4 w-4 text-green-600" />
+                            <span className="text-green-800">Last Execution Result</span>
+                          </>
+                        ) : (
+                          <>
+                            <X className="h-4 w-4 text-red-600" />
+                            <span className="text-red-800">Execution Error</span>
+                          </>
+                        )}
+                      </h4>
+                      <div className={`p-3 rounded ${puppeteerLastResult.type === 'success' ? 'bg-green-100' : 'bg-red-100'}`}>
+                        <pre className={`text-xs whitespace-pre-wrap ${puppeteerLastResult.type === 'success' ? 'text-green-800' : 'text-red-800'}`}>
+                          {puppeteerLastResult.message}
+                        </pre>
+                      </div>
+                    </Card>
+                  )}
+
+                  {/* Execution Logs */}
+                  {puppeteerExecutionLog.length > 0 && (
+                    <Card className="p-4 bg-gray-50/50 border-gray-200">
+                      <h4 className="font-semibold mb-2 flex items-center gap-2">
+                        <Info className="h-4 w-4 text-gray-600" />
+                        <span className="text-gray-800">Execution Log</span>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setPuppeteerExecutionLog([])}
+                          className="ml-auto h-6 px-2 text-xs"
+                        >
+                          Clear
+                        </Button>
+                      </h4>
+                      <div className="bg-gray-100 p-3 rounded max-h-40 overflow-y-auto">
+                        {puppeteerExecutionLog.map((log, index) => (
+                          <div key={index} className="text-xs text-gray-700 mb-1 font-mono">
+                            {log}
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+                  )}
+
+                  {/* Preview */}
+                  {puppeteerCode && firstRow && (
+                    <Card className="p-4 bg-muted/50">
+                      <h4 className="font-semibold mb-2 flex items-center gap-2">
+                        <Sparkles className="h-4 w-4" />
+                        Preview with First Row Data
+                      </h4>
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Code with actual data from the first row:</p>
+                          <code className="text-xs bg-background px-2 py-1 rounded block overflow-x-auto mt-1">
+                            {puppeteerCode.replace(/\{([^}]+)\}/g, (match, columnName) => {
+                              const value = firstRow[columnName.trim()];
+                              return value || `[${columnName.trim()} not found]`;
+                            })}
+                          </code>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">Execution Mode:</span>
+                            <Badge variant="outline" className="text-xs">
+                              {puppeteerHeadless ? 'Headless' : 'GUI Debug'}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">Timeout:</span>
+                            <Badge variant="outline" className="text-xs">
+                              {puppeteerTimeout}ms
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">Queue Processing:</span>
+                            <Badge variant="outline" className="text-xs">
+                              Server-side
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">Anti-Detection:</span>
+                            <Badge variant="outline" className="text-xs">
+                              Stealth enabled
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="p-3 bg-green-50 border border-green-200 rounded">
+                          <p className="text-xs text-green-700">
+                            ✅ <strong>Ready to execute:</strong> Your code will be sent to the queue and processed on the server. 
+                            Execution logs and results will appear above in real-time.
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
+                  )}
+
+                </CardContent>
+              </Card>
+            </TabsContent>
           </Tabs>
         </div>
 
@@ -2157,10 +2815,11 @@ return row['email']?.includes('@gmail.com') ? 'Gmail User' : 'Other';"
                   (mode === 'ai' && !aiPrompt.trim()) ||
                   (mode === 'firecrawl' && !firecrawlUrl.trim()) ||
                   (mode === 'ai-agents' && !userOfferDetails.trim())
+                  // (mode === 'puppeteer' && !puppeteerCode.trim()) // DISABLED
                 }
               >
                 <Save className="h-4 w-4 mr-2" />
-                Save {mode === 'ai' ? 'AI Prompt' : mode === 'firecrawl' ? 'Firecrawl Template' : mode === 'ai-agents' ? 'AI Copy Agents' : 'Formula'}
+                Save {mode === 'ai' ? 'AI Prompt' : mode === 'firecrawl' ? 'Firecrawl Template' : mode === 'ai-agents' ? 'AI Copy Agents' : mode === 'puppeteer' ? 'Puppeteer Code' : 'Formula'}
               </Button>
             </div>
           </div>
