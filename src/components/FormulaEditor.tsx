@@ -64,6 +64,7 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   const [maxTokens, setMaxTokens] = useState(2048);
   const [topK, setTopK] = useState(40);
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  const [ollamaBaseUrl, setOllamaBaseUrl] = useState('http://localhost:11434');
 
   // Thinking controls for reasoning models (DeepSeek R1, etc.)
   const [thinkingMode, setThinkingMode] = useState(false);
@@ -202,6 +203,10 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
       if (savedTopK) {
         setTopK(parseInt(savedTopK));
       }
+      
+      // Load Ollama base URL
+      const savedOllamaUrl = localStorage.getItem('ollama_base_url') || 'http://localhost:11434';
+      setOllamaBaseUrl(savedOllamaUrl);
       
       // Check Ollama connection if it's the selected provider
       if (savedProvider === 'ollama') {
@@ -675,9 +680,8 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
     
     // Determine if this is an Ollama model or OpenAI model
     const isOllamaModelLocal = aiProvider === 'ollama';
-    const ollamaBaseUrl = localStorage.getItem('ollama_base_url') || 'http://localhost:11434';
     const apiEndpoint = isOllamaModelLocal 
-      ? `${ollamaBaseUrl}/v1/chat/completions`  // Use OpenAI-compatible endpoint for better compatibility
+      ? `${ollamaBaseUrl}/v1/chat/completions`  // Use the configurable Ollama base URL
       : 'https://api.openai.com/v1/chat/completions';
     
     // API key handling
@@ -1408,6 +1412,35 @@ return row['email']?.includes('@gmail.com') ? 'Gmail User' : 'Other';"
                     </div>
                   )}
                 </div>
+
+                {/* Ollama Base URL Configuration */}
+                {aiProvider === 'ollama' && (
+                  <div>
+                    <Label className="text-base font-semibold flex items-center gap-2 mb-3">
+                      <Server className="h-4 w-4" />
+                      Ollama Base URL
+                    </Label>
+                    <Input
+                      type="url"
+                      placeholder="http://localhost:11434"
+                      value={ollamaBaseUrl}
+                      onChange={(e) => {
+                        setOllamaBaseUrl(e.target.value);
+                        localStorage.setItem('ollama_base_url', e.target.value);
+                        handleAIInputChange();
+                        // Automatically check connection after URL change
+                        setTimeout(() => {
+                          checkOllamaConnection();
+                        }, 500);
+                      }}
+                      className="mb-2"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      The base URL where your Ollama server is running. Change this if Ollama is running on a different port or remote server.
+                    </p>
+                  </div>
+                )}
+
                 {/* Available columns for AI mode */}
                 <div>
                   <h4 className="font-semibold mb-3 flex items-center gap-2">
