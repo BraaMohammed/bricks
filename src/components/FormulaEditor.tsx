@@ -528,7 +528,16 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
         });
         
         try {
-          finalFormula = generateAIFormula(aiPrompt, aiMessage, aiModel, temperature, maxTokens, topK);
+          // Check which settings were explicitly set by the user
+          const hasCustomTemperature = localStorage.getItem('ai_temperature') !== null;
+          const hasCustomMaxTokens = localStorage.getItem('ai_max_tokens') !== null;
+          const hasCustomTopK = localStorage.getItem('ai_top_k') !== null;
+          
+          finalFormula = generateAIFormula(aiPrompt, aiMessage, aiModel, temperature, maxTokens, topK, {
+            hasCustomTemperature,
+            hasCustomMaxTokens,
+            hasCustomTopK
+          });
           console.log('✅ Successfully generated AI formula');
           console.log('📝 Formula preview:', finalFormula.substring(0, 500) + '...');
           
@@ -648,7 +657,15 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
     }
   };
 
-  const generateAIFormula = (prompt: string, message: string, model: string, temp: number, maxTokens: number, topK: number) => {
+  const generateAIFormula = (prompt: string, message: string, model: string, temp: number, maxTokens: number, topK: number, customSettings?: {
+    hasCustomTemperature?: boolean;
+    hasCustomMaxTokens?: boolean;
+    hasCustomTopK?: boolean;
+  }) => {
+    // Default to true if customSettings not provided (for backward compatibility)
+    const hasCustomTemperature = customSettings?.hasCustomTemperature ?? true;
+    const hasCustomMaxTokens = customSettings?.hasCustomMaxTokens ?? true;
+    const hasCustomTopK = customSettings?.hasCustomTopK ?? true;
     // Replace {Column Name} references with actual row data access
     const processedPrompt = prompt.replace(/\{([^}]+)\}/g, (match, columnName) => {
       return `\${row["${columnName}"] || ""}`;
@@ -658,8 +675,9 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
     
     // Determine if this is an Ollama model or OpenAI model
     const isOllamaModelLocal = aiProvider === 'ollama';
+    const ollamaBaseUrl = localStorage.getItem('ollama_base_url') || 'http://localhost:11434';
     const apiEndpoint = isOllamaModelLocal 
-      ? 'http://localhost:11434/api/chat'  // Use native Ollama API for better thinking control
+      ? `${ollamaBaseUrl}/v1/chat/completions`  // Use OpenAI-compatible endpoint for better compatibility
       : 'https://api.openai.com/v1/chat/completions';
     
     // API key handling
@@ -729,9 +747,28 @@ const filterThinkingContent = (content) => {
 console.log('🚀 Making API request with model:', '${model}');
 console.log('📝 Prompt:', \`${fullPrompt.replace(/`/g, '\\`')}\`);
 console.log('🔧 Is reasoning model:', ${isReasoningModel});
+console.log('⚙️ Custom settings - Temperature: ${hasCustomTemperature}, MaxTokens: ${hasCustomMaxTokens}, TopK: ${hasCustomTopK}');
 ${isReasoningModel ? `console.log('🧠 Thinking mode:', ${thinkingMode});` : ''}
 
 ${isOllamaModelLocal ? `
+// Build Ollama options object conditionally
+const ollamaOptions = {};
+
+// Only include temperature if user explicitly set it
+if (${hasCustomTemperature}) {
+  ollamaOptions.temperature = ${temp};
+}
+
+// Only include num_predict if user explicitly set max tokens
+if (${hasCustomMaxTokens}) {
+  ollamaOptions.num_predict = ${maxTokens};
+}
+
+// Only include top_k if user explicitly set it
+if (${hasCustomTopK}) {
+  ollamaOptions.top_k = ${topK};
+}
+
 const requestBody = {
   model: '${model}',
   messages: [
@@ -742,21 +779,27 @@ const requestBody = {
   ],
   stream: false,
   think: ${thinkingMode},  // Use Ollama's native think parameter
-  options: {
-    temperature: ${temp},
-    num_predict: ${maxTokens},  // Ollama's parameter for max tokens
-    top_k: ${topK}  // Token selection diversity
-  }
+  options: ollamaOptions
 };` : `
+// Build OpenAI request body conditionally
 const requestBody = {
   model: '${model}',
   messages: [{
     role: 'user',
     content: \`${fullPrompt.replace(/`/g, '\\`')}\`
-  }],
-  temperature: ${temp},
-  ${tokenParameter}
-};`}
+  }]
+};
+
+// Only include temperature if user explicitly set it
+if (${hasCustomTemperature}) {
+  requestBody.temperature = ${temp};
+}
+
+// Only include token limit if user explicitly set max tokens
+if (${hasCustomMaxTokens}) {
+  ${useMaxCompletionTokens ? `requestBody.max_completion_tokens = ${maxTokens};` : `requestBody.max_tokens = ${maxTokens};`}
+}
+`}
 
 console.log('📦 Request body:', JSON.stringify(requestBody, null, 2));
 

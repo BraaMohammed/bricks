@@ -54,8 +54,14 @@ export interface OllamaChatResponse {
   model: string;
 }
 
-const OLLAMA_BASE_URL = 'http://localhost:11434';
 const CONNECTION_TIMEOUT = 5000; // 5 seconds
+
+/**
+ * Get the Ollama base URL from localStorage or use default
+ */
+function getOllamaBaseUrl(): string {
+  return localStorage.getItem('ollama_base_url') || 'http://localhost:11434';
+}
 
 /**
  * Check if Ollama is running and fetch available models
@@ -65,7 +71,8 @@ export async function checkOllamaConnection(): Promise<OllamaConnectionStatus> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), CONNECTION_TIMEOUT);
 
-    const response = await fetch(`${OLLAMA_BASE_URL}/api/tags`, {
+    const baseUrl = getOllamaBaseUrl();
+    const response = await fetch(`${baseUrl}/api/tags`, {
       method: 'GET',
       signal: controller.signal,
       headers: {
@@ -126,7 +133,8 @@ export async function getOllamaModels(): Promise<OllamaModel[]> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), CONNECTION_TIMEOUT);
 
-    const response = await fetch(`${OLLAMA_BASE_URL}/api/tags`, {
+    const baseUrl = getOllamaBaseUrl();
+    const response = await fetch(`${baseUrl}/api/tags`, {
       method: 'GET',
       signal: controller.signal,
     });
@@ -160,7 +168,8 @@ export async function sendOllamaChatRequest(
     options,
   };
 
-  const response = await fetch(`${OLLAMA_BASE_URL}/v1/chat/completions`, {
+  const baseUrl = getOllamaBaseUrl();
+  const response = await fetch(`${baseUrl}/v1/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

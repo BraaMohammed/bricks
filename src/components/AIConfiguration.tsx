@@ -24,6 +24,7 @@ export const AIConfiguration = () => {
   const [ollamaConnected, setOllamaConnected] = useState(false);
   const [ollamaModels, setOllamaModels] = useState<string[]>([]);
   const [checkingOllama, setCheckingOllama] = useState(false);
+  const [ollamaBaseUrl, setOllamaBaseUrl] = useState('http://localhost:11434');
 
   const checkOllamaConnection = useCallback(async () => {
     console.log('🔍 checkOllamaConnection called');
@@ -60,8 +61,9 @@ export const AIConfiguration = () => {
       const savedModel = localStorage.getItem('ai_model');
       const savedPrompt = localStorage.getItem('custom_ai_prompt');
       const savedProvider = localStorage.getItem('ai_provider') as 'openai' | 'ollama' || 'openai';
+      const savedOllamaUrl = localStorage.getItem('ollama_base_url') || 'http://localhost:11434';
 
-      console.log('💾 Loaded settings:', { savedProvider, savedModel });
+      console.log('💾 Loaded settings:', { savedProvider, savedModel, savedOllamaUrl });
 
       if (savedApiKey) {
         setApiKey(savedApiKey);
@@ -78,6 +80,7 @@ export const AIConfiguration = () => {
         setCustomPrompt(savedPrompt);
       }
       setAiProvider(savedProvider);
+      setOllamaBaseUrl(savedOllamaUrl);
       
       // Check Ollama connection on load only if provider is ollama
       if (savedProvider === 'ollama') {
@@ -131,6 +134,7 @@ export const AIConfiguration = () => {
     localStorage.setItem('ai_model', model);
     localStorage.setItem('custom_ai_prompt', customPrompt);
     localStorage.setItem('ai_provider', aiProvider);
+    localStorage.setItem('ollama_base_url', ollamaBaseUrl);
 
     toast({
       title: "AI Settings Saved",
@@ -323,9 +327,22 @@ export const AIConfiguration = () => {
                 </Select>
               </div>
               
-              {/* Ollama Status */}
+              {/* Ollama Configuration */}
               {aiProvider === 'ollama' && (
-                <div className="space-y-2">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="ollama-url">Ollama Base URL</Label>
+                    <Input
+                      id="ollama-url"
+                      type="url"
+                      placeholder="http://localhost:11434"
+                      value={ollamaBaseUrl}
+                      onChange={(e) => setOllamaBaseUrl(e.target.value)}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      The base URL where your Ollama server is running. Default is http://localhost:11434
+                    </p>
+                  </div>
                   <div className="flex items-center justify-between">
                     <Label>Ollama Status</Label>
                     <Button

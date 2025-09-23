@@ -28,8 +28,9 @@ function getApiConfig(modelName: string) {
   const isOllama = isOllamaModel(modelName);
   
   if (isOllama) {
+    const baseUrl = localStorage.getItem('ollama_base_url') || 'http://localhost:11434';
     return {
-      endpoint: 'http://localhost:11434/v1/chat/completions',
+      endpoint: `${baseUrl}/v1/chat/completions`,
       headers: {
         'Content-Type': 'application/json'
       },
