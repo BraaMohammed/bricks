@@ -45,7 +45,7 @@ class PuppeteerQueue {
     };
 
     this.jobs.set(id, job);
-    console.log(`➕ Added job ${id} to queue (${this.getQueueStats().pending} pending, ${this.jobs.size} total jobs)`);
+    console.log(`➕ Added job ${id} to queue (${this.getQueueStats().pending} pending)`);
     
     // Record performance metric
     recordJobSubmitted(id, {
@@ -63,7 +63,12 @@ class PuppeteerQueue {
   getJob(id: string): QueueJob | undefined {
     const job = this.jobs.get(id);
     if (!job) {
-      console.log(`🔍 Job ${id} not found. Available jobs:`, Array.from(this.jobs.keys()).slice(-5));
+      const allJobs = Array.from(this.jobs.values());
+      const recentJobs = allJobs
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+        .slice(0, 5)
+        .map(j => ({ id: j.id, status: j.status, created: j.createdAt.toISOString().slice(-8, -3) }));
+      console.log(`🔍 Job ${id} not found. Total jobs: ${allJobs.length}. Recent jobs:`, recentJobs);
     }
     return job;
   }
@@ -176,14 +181,9 @@ class PuppeteerQueue {
             if (errorMsg.includes('missing ) after argument list')) {
               guidance = ' Common causes: unclosed function calls like page.goto("url" or missing closing parenthesis in expressions.';
             } else if (errorMsg.includes('Unexpected token')) {
-              guidance = ' Check for unmatched quotes, brackets, or braces. If using ${variable}, use backticks: `${variable}` not "${variable}".';
+              guidance = ' Check for unmatched quotes, brackets, or braces.';
             } else if (errorMsg.includes('Unexpected end of input')) {
               guidance = ' Code appears incomplete - missing closing brackets, braces, or parentheses.';
-            }
-            
-            // Check for common template literal mistake
-            if (job.code.includes('"${') && !job.code.includes('`${')) {
-              guidance += ' TEMPLATE LITERAL ERROR: Use backticks (`) instead of quotes (") for template literals like `${variable}`.';
             }
             
             // Include the user's code in the error message for easier debugging
@@ -214,6 +214,12 @@ class PuppeteerQueue {
     } catch (error) {
       console.error(`❌ Job ${job.id} failed:`, error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      
+      // Ensure the job has a completion timestamp
+      if (!job.completedAt) {
+        job.completedAt = new Date();
+      }
+      
       this.updateJobStatus(job.id, 'failed', undefined, errorMessage);
       
       // Record performance metric for failed job
@@ -303,6 +309,11 @@ class PuppeteerQueue {
           stringChar = '';
         }
         continue;
+      }
+      
+      // Check for template literal syntax in regular strings
+      if (inString && stringChar !== '`' && char === '$' && i < code.length - 1 && code[i + 1] === '{') {
+        throw new Error(`Template literal syntax \${} found in regular string at position ${i}. Use backticks (\`) instead of quotes for template literals.`);
       }
       
       if (inString) continue;
@@ -405,19 +416,17 @@ class PuppeteerQueue {
   // Cleanup old completed jobs (keep last 1000)
   cleanup(): void {
     const completedJobs = Array.from(this.jobs.values())
-      .filter(j => j.status === 'completed' || j.status === 'failed')
+      .filter(j => (j.status === 'completed' || j.status === 'failed') && j.completedAt)
       .sort((a, b) => b.completedAt!.getTime() - a.completedAt!.getTime());
-
-    console.log(`🧹 Cleanup check: ${this.jobs.size} total jobs, ${completedJobs.length} completed/failed`);
 
     if (completedJobs.length > 1000) {
       const toRemove = completedJobs.slice(1000);
       toRemove.forEach(job => {
         this.jobs.delete(job.id);
       });
-      console.log(`🧹 Cleaned up ${toRemove.length} old jobs, ${this.jobs.size} jobs remaining`);
+      console.log(`🧹 Cleaned up ${toRemove.length} old jobs. Remaining: ${this.jobs.size}`);
     } else {
-      console.log(`🧹 No cleanup needed (${completedJobs.length} ≤ 1000)`);
+      console.log(`🧹 Cleanup check: ${completedJobs.length} completed/failed jobs, ${this.jobs.size} total jobs`);
     }
   }
 
@@ -440,7 +449,7 @@ class PuppeteerQueue {
 // Singleton instance
 export const puppeteerQueue = new PuppeteerQueue();
 
-// Periodic cleanup
+// Periodic cleanup - run less frequently during development
 setInterval(() => {
   puppeteerQueue.cleanup();
-}, 300000); // Every 5 minutes
+}, 600000); // Every 10 minutes
