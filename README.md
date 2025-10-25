@@ -1,4 +1,4 @@
-# DataVibe Sheet 🚀
+# Bricks
 
 > A lightweight, powerful alternative to Clay.com for data enrichment and automation workflows
 
