@@ -5,7 +5,7 @@
  * Provides input fields with clear buttons and help links.
  */
 
-import { Key } from 'lucide-react';
+import { Key, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,6 +16,11 @@ export interface APIKeysSectionProps {
   setOpenaiKey: (key: string) => void;
   clearOpenaiKey: () => void;
   hasOpenaiKey: boolean;
+  
+  geminiKey: string;
+  setGeminiKey: (key: string) => void;
+  clearGeminiKey: () => void;
+  hasGeminiKey: boolean;
   
   firecrawlKey: string;
   setFirecrawlKey: (key: string) => void;
@@ -28,6 +33,10 @@ export const APIKeysSection = ({
   setOpenaiKey,
   clearOpenaiKey,
   hasOpenaiKey,
+  geminiKey,
+  setGeminiKey,
+  clearGeminiKey,
+  hasGeminiKey,
   firecrawlKey,
   setFirecrawlKey,
   clearFirecrawlKey,
@@ -72,6 +81,40 @@ export const APIKeysSection = ({
             >
               OpenAI Platform
             </a>
+          </p>
+        </div>
+
+        {/* Google Gemini API Key */}
+        <div className="space-y-2">
+          <Label htmlFor="gemini-key" className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4" />
+            Google Gemini API Key
+          </Label>
+          <div className="flex gap-2">
+            <Input
+              id="gemini-key"
+              type="password"
+              placeholder={hasGeminiKey ? "API key is saved" : "Enter your Gemini API key"}
+              value={geminiKey}
+              onChange={(e) => setGeminiKey(e.target.value)}
+            />
+            {hasGeminiKey && (
+              <Button variant="outline" onClick={clearGeminiKey}>
+                Clear
+              </Button>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Get your API key from{' '}
+            <a 
+              href="https://aistudio.google.com/app/apikey" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              Google AI Studio
+            </a>
+            {' '}(Free tier available)
           </p>
         </div>
 

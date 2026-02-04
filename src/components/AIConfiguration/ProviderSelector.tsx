@@ -5,7 +5,7 @@
  * Displays appropriate icons and descriptions for each provider.
  */
 
-import { Key, Server } from 'lucide-react';
+import { Key, Server, Sparkles } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,7 +28,7 @@ export const ProviderSelector = ({
           AI Provider
         </CardTitle>
         <CardDescription>
-          Choose between OpenAI's cloud models or local Ollama models.
+          Choose between OpenAI, Google Gemini, or local Ollama models.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -46,6 +46,12 @@ export const ProviderSelector = ({
                 <div className="flex items-center gap-2">
                   <Key className="h-4 w-4" />
                   OpenAI (Cloud)
+                </div>
+              </SelectItem>
+              <SelectItem value="gemini">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  Google Gemini (Cloud)
                 </div>
               </SelectItem>
               <SelectItem value="ollama">

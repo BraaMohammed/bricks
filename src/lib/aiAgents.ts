@@ -1,3 +1,6 @@
+import { isGeminiModel, sendGeminiChatRequest } from './gemini';
+import type { AIProvider } from './constants/aiModels';
+
 interface AgentConfig {
   messageCreatorModel: string;
   leadRoleplayModel: string;
@@ -23,18 +26,39 @@ function isOllamaModel(modelName: string): boolean {
          lowerModel.includes(':') && !lowerModel.startsWith('gpt'); // Ollama models often have version tags
 }
 
+// Helper function to determine which provider a model belongs to
+function getModelProvider(modelName: string): AIProvider {
+  if (isGeminiModel(modelName)) {
+    return 'gemini';
+  } else if (isOllamaModel(modelName)) {
+    return 'ollama';
+  } else {
+    return 'openai';
+  }
+}
+
 // Helper function to get API endpoint and headers
 function getApiConfig(modelName: string) {
-  const isOllama = isOllamaModel(modelName);
+  const provider = getModelProvider(modelName);
   
-  if (isOllama) {
+  if (provider === 'gemini') {
+    const apiKey = localStorage.getItem('gemini_api_key');
+    return {
+      endpoint: '', // Gemini uses custom API calls
+      headers: {},
+      requiresApiKey: true,
+      apiKey,
+      provider: 'gemini' as const
+    };
+  } else if (provider === 'ollama') {
     const baseUrl = localStorage.getItem('ollama_base_url') || 'http://localhost:11434';
     return {
       endpoint: `${baseUrl}/v1/chat/completions`,
       headers: {
         'Content-Type': 'application/json'
       },
-      requiresApiKey: false
+      requiresApiKey: false,
+      provider: 'ollama' as const
     };
   } else {
     const apiKey = localStorage.getItem('openai_api_key');
@@ -45,7 +69,8 @@ function getApiConfig(modelName: string) {
         'Content-Type': 'application/json'
       },
       requiresApiKey: true,
-      apiKey
+      apiKey,
+      provider: 'openai' as const
     };
   }
 }
@@ -91,8 +116,8 @@ export async function runAIAgents(config: AgentConfig, row: RowData): Promise<st
   console.log('🤖 AI Copy Agents Starting...', { 
     leadData: row, 
     config,
-    creatorProvider: isOllamaModel(config.messageCreatorModel) ? 'Ollama' : 'OpenAI',
-    roleplayProvider: isOllamaModel(config.leadRoleplayModel) ? 'Ollama' : 'OpenAI'
+    creatorProvider: getModelProvider(config.messageCreatorModel),
+    roleplayProvider: getModelProvider(config.leadRoleplayModel)
   });
 
   const chatHistory: HistoryItem[] = [];
@@ -209,46 +234,63 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
 
   console.log('📤 Creator request:', JSON.stringify(creatorRequestBody, null, 2));
 
-  const creatorResponse = await fetch(apiConfig.endpoint, {
-    method: 'POST',
-    headers: apiConfig.headers,
-    body: JSON.stringify(creatorRequestBody)
-  });
-  
-  if (!creatorResponse.ok) {
-    const errorText = await creatorResponse.text();
-    console.error('Creator API Error Response:', errorText);
+  let rawCreatorContent: string;
+
+  // Handle Gemini API calls differently
+  if (apiConfig.provider === 'gemini') {
+    try {
+      rawCreatorContent = await sendGeminiChatRequest(
+        config.messageCreatorModel as any,
+        [{ role: 'user', content: creatorPrompt }],
+        { temperature: 0.7, maxOutputTokens: 2048 }
+      );
+      console.log('📥 Gemini creator response:', rawCreatorContent);
+    } catch (error) {
+      throw new Error(`Gemini Creator API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  } else {
+    // OpenAI and Ollama use standard chat completions API
+    const creatorResponse = await fetch(apiConfig.endpoint, {
+      method: 'POST',
+      headers: apiConfig.headers,
+      body: JSON.stringify(creatorRequestBody)
+    });
     
-    // Provide specific error messages for different scenarios
-    if (isOllamaModel(config.messageCreatorModel)) {
-      if (creatorResponse.status === 0 || errorText.includes('fetch')) {
-        throw new Error(`Ollama connection failed. Make sure Ollama is running on localhost:11434`);
-      } else if (creatorResponse.status === 404) {
-        throw new Error(`Model '${config.messageCreatorModel}' not found in Ollama. Run: ollama pull ${config.messageCreatorModel}`);
+    if (!creatorResponse.ok) {
+      const errorText = await creatorResponse.text();
+      console.error('Creator API Error Response:', errorText);
+      
+      // Provide specific error messages for different scenarios
+      if (isOllamaModel(config.messageCreatorModel)) {
+        if (creatorResponse.status === 0 || errorText.includes('fetch')) {
+          throw new Error(`Ollama connection failed. Make sure Ollama is running on localhost:11434`);
+        } else if (creatorResponse.status === 404) {
+          throw new Error(`Model '${config.messageCreatorModel}' not found in Ollama. Run: ollama pull ${config.messageCreatorModel}`);
+        }
       }
+      
+      throw new Error(`Creator API error: ${creatorResponse.status} - ${errorText}`);
     }
     
-    throw new Error(`Creator API error: ${creatorResponse.status} - ${errorText}`);
-  }
-  
-  const creatorData = await creatorResponse.json();
-  console.log('📥 Creator response:', creatorData);
-  
-  // Check if response has the expected structure
-  if (!creatorData.choices || !creatorData.choices[0]) {
-    console.error('Unexpected API response structure:', creatorData);
-    throw new Error(`Unexpected API response structure: ${JSON.stringify(creatorData)}`);
-  }
-  
-  // Handle different response structures for newer models
-  const choice = creatorData.choices[0];
-  const rawCreatorContent = choice.message?.content || choice.content || '';
-  console.log('📄 Raw creator content:', rawCreatorContent);
-  console.log('📄 Full choice object:', choice);
-  
-  if (!rawCreatorContent || rawCreatorContent.trim() === '') {
-    console.error('Empty content from Creator API. Full response:', JSON.stringify(creatorData, null, 2));
-    throw new Error(`Empty response from Creator API. Response: ${JSON.stringify(creatorData)}`);
+    const creatorData = await creatorResponse.json();
+    console.log('📥 Creator response:', creatorData);
+    
+    // Check if response has the expected structure
+    if (!creatorData.choices || !creatorData.choices[0]) {
+      console.error('Unexpected API response structure:', creatorData);
+      throw new Error(`Unexpected API response structure: ${JSON.stringify(creatorData)}`);
+    }
+    
+    // Handle different response structures for newer models
+    const choice = creatorData.choices[0];
+    rawCreatorContent = choice.message?.content || choice.content || '';
+    console.log('📄 Raw creator content:', rawCreatorContent);
+    console.log('📄 Full choice object:', choice);
+    
+    if (!rawCreatorContent || rawCreatorContent.trim() === '') {
+      console.error('Empty content from Creator API. Full response:', JSON.stringify(creatorData, null, 2));
+      throw new Error(`Empty response from Creator API. Response: ${JSON.stringify(creatorData)}`);
+    }
   }
   
   try {
@@ -316,46 +358,63 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
 
   console.log('📤 Roleplay request:', JSON.stringify(roleplayRequestBody, null, 2));
 
-  const roleplayResponse = await fetch(apiConfig.endpoint, {
-    method: 'POST',
-    headers: apiConfig.headers,
-    body: JSON.stringify(roleplayRequestBody)
-  });
-  
-  if (!roleplayResponse.ok) {
-    const errorText = await roleplayResponse.text();
-    console.error('Roleplay API Error Response:', errorText);
+  let rawRoleplayContent: string;
+
+  // Handle Gemini API calls differently
+  if (apiConfig.provider === 'gemini') {
+    try {
+      rawRoleplayContent = await sendGeminiChatRequest(
+        config.leadRoleplayModel as any,
+        [{ role: 'user', content: roleplayPrompt }],
+        { temperature: 0.7, maxOutputTokens: 2048 }
+      );
+      console.log('📥 Gemini roleplay response:', rawRoleplayContent);
+    } catch (error) {
+      throw new Error(`Gemini Roleplay API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  } else {
+    // OpenAI and Ollama use standard chat completions API
+    const roleplayResponse = await fetch(apiConfig.endpoint, {
+      method: 'POST',
+      headers: apiConfig.headers,
+      body: JSON.stringify(roleplayRequestBody)
+    });
     
-    // Provide specific error messages for different scenarios
-    if (isOllamaModel(config.leadRoleplayModel)) {
-      if (roleplayResponse.status === 0 || errorText.includes('fetch')) {
-        throw new Error(`Ollama connection failed. Make sure Ollama is running on localhost:11434`);
-      } else if (roleplayResponse.status === 404) {
-        throw new Error(`Model '${config.leadRoleplayModel}' not found in Ollama. Run: ollama pull ${config.leadRoleplayModel}`);
+    if (!roleplayResponse.ok) {
+      const errorText = await roleplayResponse.text();
+      console.error('Roleplay API Error Response:', errorText);
+      
+      // Provide specific error messages for different scenarios
+      if (isOllamaModel(config.leadRoleplayModel)) {
+        if (roleplayResponse.status === 0 || errorText.includes('fetch')) {
+          throw new Error(`Ollama connection failed. Make sure Ollama is running on localhost:11434`);
+        } else if (roleplayResponse.status === 404) {
+          throw new Error(`Model '${config.leadRoleplayModel}' not found in Ollama. Run: ollama pull ${config.leadRoleplayModel}`);
+        }
       }
+      
+      throw new Error(`Roleplay API error: ${roleplayResponse.status} - ${errorText}`);
     }
     
-    throw new Error(`Roleplay API error: ${roleplayResponse.status} - ${errorText}`);
-  }
-  
-  const roleplayData = await roleplayResponse.json();
-  console.log('📥 Roleplay response:', roleplayData);
-  
-  // Check if response has the expected structure
-  if (!roleplayData.choices || !roleplayData.choices[0]) {
-    console.error('Unexpected API response structure:', roleplayData);
-    throw new Error(`Unexpected API response structure: ${JSON.stringify(roleplayData)}`);
-  }
-  
-  // Handle different response structures for newer models
-  const choice = roleplayData.choices[0];
-  const rawRoleplayContent = choice.message?.content || choice.content || '';
-  console.log('📄 Raw roleplay content:', rawRoleplayContent);
-  console.log('📄 Full choice object:', choice);
-  
-  if (!rawRoleplayContent || rawRoleplayContent.trim() === '') {
-    console.error('Empty content from Roleplay API. Full response:', JSON.stringify(roleplayData, null, 2));
-    throw new Error(`Empty response from Roleplay API. Response: ${JSON.stringify(roleplayData)}`);
+    const roleplayData = await roleplayResponse.json();
+    console.log('📥 Roleplay response:', roleplayData);
+    
+    // Check if response has the expected structure
+    if (!roleplayData.choices || !roleplayData.choices[0]) {
+      console.error('Unexpected API response structure:', roleplayData);
+      throw new Error(`Unexpected API response structure: ${JSON.stringify(roleplayData)}`);
+    }
+    
+    // Handle different response structures for newer models
+    const choice = roleplayData.choices[0];
+    rawRoleplayContent = choice.message?.content || choice.content || '';
+    console.log('📄 Raw roleplay content:', rawRoleplayContent);
+    console.log('📄 Full choice object:', choice);
+    
+    if (!rawRoleplayContent || rawRoleplayContent.trim() === '') {
+      console.error('Empty content from Roleplay API. Full response:', JSON.stringify(roleplayData, null, 2));
+      throw new Error(`Empty response from Roleplay API. Response: ${JSON.stringify(roleplayData)}`);
+    }
   }
   
   try {

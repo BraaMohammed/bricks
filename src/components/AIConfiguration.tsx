@@ -23,8 +23,12 @@ import { useOllamaConnection } from '@/hooks/useOllamaConnection';
 import { APIKeysSection } from '@/components/AIConfiguration/APIKeysSection';
 import { ProviderSelector } from '@/components/AIConfiguration/ProviderSelector';
 import { OllamaConfiguration } from '@/components/AIConfiguration/OllamaConfiguration';
+import { GeminiConfiguration } from '@/components/AIConfiguration/GeminiConfiguration';
 import { ModelSelector } from '@/components/AIConfiguration/ModelSelector';
 import { CustomPromptSection } from '@/components/AIConfiguration/CustomPromptSection';
+
+// Utilities
+import { testGeminiConnection } from '@/lib/gemini';
 
 // Constants
 import { OPENAI_MODELS } from '@/lib/constants/aiModels';
@@ -66,7 +70,11 @@ export const AIConfiguration = () => {
     setOpen(false);
   };
 
-  const handleProviderChange = (provider: 'openai' | 'ollama') => {
+  const handleTestGemini = async () => {
+    return await testGeminiConnection();
+  };
+
+  const handleProviderChange = (provider: 'openai' | 'ollama' | 'gemini') => {
     settings.setAiProvider(provider);
     
     // Trigger Ollama connection check if switching to Ollama
@@ -83,7 +91,7 @@ export const AIConfiguration = () => {
         <Button variant="outline" size="sm" className="flex items-center gap-2">
           <KeyRound className="h-4 w-4" />
           API Keys
-          {settings.hasApiKey && <div className="w-2 h-2 bg-green-500 rounded-full" />}
+          {(settings.hasApiKey || settings.hasGeminiKey) && <div className="w-2 h-2 bg-green-500 rounded-full" />}
         </Button>
       </DialogTrigger>
       
@@ -102,6 +110,10 @@ export const AIConfiguration = () => {
             setOpenaiKey={settings.setApiKey}
             clearOpenaiKey={settings.clearApiKey}
             hasOpenaiKey={settings.hasApiKey}
+            geminiKey={settings.geminiKey}
+            setGeminiKey={settings.setGeminiKey}
+            clearGeminiKey={settings.clearGeminiKey}
+            hasGeminiKey={settings.hasGeminiKey}
             firecrawlKey={settings.firecrawlKey}
             setFirecrawlKey={settings.setFirecrawlKey}
             clearFirecrawlKey={settings.clearFirecrawlKey}
@@ -126,6 +138,14 @@ export const AIConfiguration = () => {
                 onRefresh={ollama.checkConnection}
               />
             </Card>
+          )}
+
+          {/* Gemini Configuration - only shown when Gemini is selected */}
+          {settings.aiProvider === 'gemini' && (
+            <GeminiConfiguration
+              hasApiKey={settings.hasGeminiKey}
+              onTestConnection={handleTestGemini}
+            />
           )}
 
           {/* Model Selection */}

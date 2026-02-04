@@ -19,6 +19,12 @@ export interface AISettings {
   setApiKey: (key: string) => void;
   clearApiKey: () => void;
   
+  // Gemini API Key
+  geminiKey: string;
+  hasGeminiKey: boolean;
+  setGeminiKey: (key: string) => void;
+  clearGeminiKey: () => void;
+  
   // Firecrawl API Key
   firecrawlKey: string;
   hasFirecrawlKey: boolean;
@@ -60,6 +66,12 @@ export const useAISettings = (): AISettings => {
     initialConfig.openaiKey
   );
   
+  const geminiKeyManager = useAPIKeyManager(
+    STORAGE_KEYS.GEMINI_KEY,
+    'Gemini',
+    initialConfig.geminiKey
+  );
+  
   const firecrawlKeyManager = useAPIKeyManager(
     STORAGE_KEYS.FIRECRAWL_KEY,
     'Firecrawl',
@@ -83,6 +95,7 @@ export const useAISettings = (): AISettings => {
     const config = aiConfigStorage.loadAll();
     
     openaiKeyManager.setKey(config.openaiKey);
+    geminiKeyManager.setKey(config.geminiKey);
     firecrawlKeyManager.setKey(config.firecrawlKey);
     setAiProviderState(config.provider);
     setModelState(config.model || DEFAULT_OPENAI_MODEL);
@@ -98,6 +111,9 @@ export const useAISettings = (): AISettings => {
     if (openaiKeyManager.key.trim()) {
       aiConfigStorage.setOpenAIKey(openaiKeyManager.key);
     }
+    if (geminiKeyManager.key.trim()) {
+      aiConfigStorage.setGeminiKey(geminiKeyManager.key);
+    }
     if (firecrawlKeyManager.key.trim()) {
       aiConfigStorage.setFirecrawlKey(firecrawlKeyManager.key);
     }
@@ -109,6 +125,7 @@ export const useAISettings = (): AISettings => {
     aiConfigStorage.setOllamaBaseUrl(ollamaBaseUrl);
   }, [
     openaiKeyManager.key,
+    geminiKeyManager.key,
     firecrawlKeyManager.key,
     aiProvider,
     model,
@@ -161,6 +178,14 @@ export const useAISettings = (): AISettings => {
   }, [openaiKeyManager]);
 
   /**
+   * Wrapper for clearGeminiKey with persistence
+   */
+  const clearGeminiKey = useCallback(() => {
+    geminiKeyManager.clearKey();
+    aiConfigStorage.clearGeminiKey();
+  }, [geminiKeyManager]);
+
+  /**
    * Wrapper for clearFirecrawlKey with persistence
    */
   const clearFirecrawlKey = useCallback(() => {
@@ -174,6 +199,12 @@ export const useAISettings = (): AISettings => {
     hasApiKey: openaiKeyManager.hasKey,
     setApiKey: openaiKeyManager.setKey,
     clearApiKey,
+    
+    // Gemini API Key
+    geminiKey: geminiKeyManager.key,
+    hasGeminiKey: geminiKeyManager.hasKey,
+    setGeminiKey: geminiKeyManager.setKey,
+    clearGeminiKey,
     
     // Firecrawl API Key
     firecrawlKey: firecrawlKeyManager.key,

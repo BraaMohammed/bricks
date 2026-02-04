@@ -65,7 +65,7 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   const [firecrawlError, setFirecrawlError] = useState('');
   const [savedFormulas, setSavedFormulas] = useState<Array<{name: string, code: string}>>([]);
   const [formulaName, setFormulaName] = useState('');
-  const [aiProvider, setAiProvider] = useState<'openai' | 'ollama'>('openai');
+  const [aiProvider, setAiProvider] = useState<'openai' | 'ollama' | 'gemini'>('openai');
   const [ollamaModels, setOllamaModels] = useState<string[]>([]);
   const [ollamaConnected, setOllamaConnected] = useState(false);
   const [temperature, setTemperature] = useState(0.7);
@@ -104,6 +104,14 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
     { id: 'o3-pro', name: 'OpenAI o3-pro (Reasoning)', supportsThinking: true, cost: 'TBD' },
     { id: 'o4-mini', name: 'OpenAI o4-mini (Reasoning)', supportsThinking: true, cost: 'TBD' },
   ];
+
+  const geminiModels = [
+    { id: 'gemini-3-pro', name: 'Gemini 3 Pro (Latest)', supportsThinking: false, cost: 'Variable pricing' },
+    { id: 'gemini-3-flash', name: 'Gemini 3 Flash', supportsThinking: false, cost: 'Variable pricing' },
+    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', supportsThinking: false, cost: '$1.25/M tokens' },
+    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', supportsThinking: false, cost: '$0.40/M tokens' },
+    { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite', supportsThinking: false, cost: '$0.10/M tokens' },
+  ];
   
   // Helper function to detect thinking support in Ollama models
   const detectThinkingSupport = (modelName: string): boolean => {
@@ -115,6 +123,7 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   };
 
   const availableModels = aiProvider === 'openai' ? openAIModels : 
+    aiProvider === 'gemini' ? geminiModels :
     (ollamaModels || []).map(model => ({ 
       id: model, 
       name: model, 
@@ -122,9 +131,13 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
       cost: 'Free (Local)' 
     }));
     
-  // For AI Agents mode, combine both OpenAI and Ollama models
+  // For AI Agents mode, combine OpenAI, Gemini, and Ollama models
   const allAvailableModels = [
     ...openAIModels,
+    ...geminiModels.map(model => ({
+      ...model,
+      name: `${model.name} (Gemini)`
+    })),
     ...(ollamaModels || []).map(model => ({ 
       id: model, 
       name: `${model} (Ollama)`, 
@@ -540,6 +553,16 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
             });
             return;
           }
+        } else if (aiProvider === 'gemini') {
+          const apiKey = localStorage.getItem('gemini_api_key');
+          if (!apiKey) {
+            toast({
+              title: "Validation Error",
+              description: "Please set your Gemini API key in AI Settings.",
+              variant: "destructive",
+            });
+            return;
+          }
         } else if (aiProvider === 'ollama') {
           if (!ollamaConnected) {
             toast({
@@ -725,21 +748,39 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
     
     const fullPrompt = message ? `${processedPrompt}. Additional context: ${message}` : processedPrompt;
     
-    // Determine if this is an Ollama model or OpenAI model
+    // Determine provider type
     const isOllamaModelLocal = aiProvider === 'ollama';
-    const apiEndpoint = isOllamaModelLocal 
-      ? `${ollamaBaseUrl}/v1/chat/completions`  // Use the configurable Ollama base URL
-      : 'https://api.openai.com/v1/chat/completions';
+    const isGeminiModel = aiProvider === 'gemini';
+    
+    // API endpoint
+    let apiEndpoint = '';
+    if (isOllamaModelLocal) {
+      apiEndpoint = `${ollamaBaseUrl}/v1/chat/completions`;
+    } else if (isGeminiModel) {
+      apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    } else {
+      apiEndpoint = 'https://api.openai.com/v1/chat/completions';
+    }
     
     // API key handling
-    const apiKeyCheck = isOllamaModelLocal 
-      ? '// Ollama runs locally without API key\nconst apiKey = null;'
-      : `const apiKey = localStorage.getItem('openai_api_key');\n\nif (!apiKey) {\n  return 'Please set your OpenAI API key in AI Settings';\n}`;
+    let apiKeyCheck = '';
+    if (isOllamaModelLocal) {
+      apiKeyCheck = '// Ollama runs locally without API key\nconst apiKey = null;';
+    } else if (isGeminiModel) {
+      apiKeyCheck = `const apiKey = localStorage.getItem('gemini_api_key');\n\nif (!apiKey) {\n  return 'Please set your Gemini API key in AI Settings';\n}`;
+    } else {
+      apiKeyCheck = `const apiKey = localStorage.getItem('openai_api_key');\n\nif (!apiKey) {\n  return 'Please set your OpenAI API key in AI Settings';\n}`;
+    }
     
     // Authorization header
-    const authHeader = isOllamaModelLocal 
-      ? `      'Content-Type': 'application/json',`
-      : `      'Authorization': \`Bearer \${apiKey}\`,\n      'Content-Type': 'application/json',`;
+    let authHeader = '';
+    if (isOllamaModelLocal) {
+      authHeader = `      'Content-Type': 'application/json',`;
+    } else if (isGeminiModel) {
+      authHeader = `      'x-goog-api-key': apiKey,\n      'Content-Type': 'application/json',`;
+    } else {
+      authHeader = `      'Authorization': \`Bearer \${apiKey}\`,\n      'Content-Type': 'application/json',`;
+    }
     
     // Newer models (GPT-5, o-series) use 'max_completion_tokens' and need more tokens for reasoning
     const useMaxCompletionTokens = model.startsWith('gpt-5') || model.startsWith('o');
@@ -753,12 +794,15 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
     // Log the generated code for debugging
     console.log('🏗️ Generated AI Formula Debug Info:');
     console.log('- Model:', model);
+    console.log('- Provider:', aiProvider);
     console.log('- Is Reasoning Model:', isReasoningModel);
     console.log('- Is Ollama:', isOllamaModelLocal);
+    console.log('- Is Gemini:', isGeminiModel);
     console.log('- Thinking Mode:', thinkingMode);
     console.log('- Using native Ollama API with think parameter:', isOllamaModelLocal && isReasoningModel);
 
-    const generatedCode = `// ${isOllamaModelLocal ? 'Ollama' : 'OpenAI'} Generated Formula${isReasoningModel ? ' (Reasoning Model)' : ''}
+    const providerName = isGeminiModel ? 'Gemini' : isOllamaModelLocal ? 'Ollama' : 'OpenAI';
+    const generatedCode = `// ${providerName} Generated Formula${isReasoningModel ? ' (Reasoning Model)' : ''}
 ${apiKeyCheck}
 
 // Filter thinking content from response
@@ -801,7 +845,26 @@ console.log('🔧 Is reasoning model:', ${isReasoningModel});
 console.log('⚙️ Custom settings - Temperature: ${hasCustomTemperature}, MaxTokens: ${hasCustomMaxTokens}, TopK: ${hasCustomTopK}');
 ${isReasoningModel ? `console.log('🧠 Thinking mode:', ${thinkingMode});` : ''}
 
-${isOllamaModelLocal ? `
+${isGeminiModel ? `
+// Build Gemini request body
+const generationConfig = {};
+
+// Only include temperature if user explicitly set it
+if (${hasCustomTemperature}) {
+  generationConfig.temperature = ${temp};
+}
+
+// Only include maxOutputTokens if user explicitly set max tokens
+if (${hasCustomMaxTokens}) {
+  generationConfig.maxOutputTokens = ${maxTokens};
+}
+
+const requestBody = {
+  contents: [{
+    parts: [{ text: \`${fullPrompt.replace(/`/g, '\\`')}\` }]
+  }],
+  generationConfig: generationConfig
+};` : isOllamaModelLocal ? `
 // Build Ollama options object conditionally
 const ollamaOptions = {};
 
@@ -884,6 +947,17 @@ ${authHeader}
   if (data.error) {
     console.error('❌ API Error:', data.error);
     throw new Error(\`API Error: \${data.error.message || JSON.stringify(data.error)}\`);
+  }
+
+  // Handle Gemini API response structure
+  if (data.candidates && data.candidates.length > 0) {
+    const candidate = data.candidates[0];
+    if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+      const result = candidate.content.parts[0].text;
+      console.log('✅ Found content in Gemini structure');
+      console.log('📄 Result preview:', result.substring(0, 200) + '...');
+      return result;
+    }
   }
 
   // Handle OpenAI-compatible API response structure (used by both OpenAI and Ollama v1/chat/completions)
@@ -1671,7 +1745,7 @@ return row['email']?.includes('@gmail.com') ? 'Gmail User' : 'Other';"
                     <Server className="h-4 w-4" />
                     AI Provider
                   </Label>
-                  <Select value={aiProvider} onValueChange={(value: 'openai' | 'ollama') => {
+                  <Select value={aiProvider} onValueChange={(value: 'openai' | 'ollama' | 'gemini') => {
                     setAiProvider(value);
                     if (value === 'ollama') {
                       checkOllamaConnection();
@@ -1686,6 +1760,12 @@ return row['email']?.includes('@gmail.com') ? 'Gmail User' : 'Other';"
                         <div className="flex items-center gap-2">
                           <Key className="h-4 w-4" />
                           OpenAI (Cloud)
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="gemini">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="h-4 w-4" />
+                          Google Gemini (Cloud)
                         </div>
                       </SelectItem>
                       <SelectItem value="ollama">

@@ -13,6 +13,7 @@ import { STORAGE_KEYS, DEFAULT_OPENAI_MODEL, DEFAULT_OLLAMA_BASE_URL, AIProvider
  */
 export interface AIConfig {
   openaiKey: string;
+  geminiKey: string;
   firecrawlKey: string;
   provider: AIProvider;
   model: string;
@@ -81,6 +82,29 @@ export const aiConfigStorage = {
     removeItem(STORAGE_KEYS.OPENAI_KEY);
   },
 
+  // ==================== Gemini API Key ====================
+  
+  /**
+   * Get the stored Gemini API key
+   */
+  getGeminiKey: (): string | null => {
+    return getItem(STORAGE_KEYS.GEMINI_KEY);
+  },
+
+  /**
+   * Store the Gemini API key
+   */
+  setGeminiKey: (key: string): void => {
+    setItem(STORAGE_KEYS.GEMINI_KEY, key.trim());
+  },
+
+  /**
+   * Clear the stored Gemini API key
+   */
+  clearGeminiKey: (): void => {
+    removeItem(STORAGE_KEYS.GEMINI_KEY);
+  },
+
   // ==================== Firecrawl API Key ====================
   
   /**
@@ -107,12 +131,12 @@ export const aiConfigStorage = {
   // ==================== AI Provider ====================
   
   /**
-   * Get the stored AI provider ('openai' or 'ollama')
+   * Get the stored AI provider ('openai', 'ollama', or 'gemini')
    * Defaults to 'openai' if not set
    */
   getProvider: (): AIProvider => {
     const provider = getItem(STORAGE_KEYS.AI_PROVIDER);
-    return (provider === 'openai' || provider === 'ollama') ? provider : 'openai';
+    return (provider === 'openai' || provider === 'ollama' || provider === 'gemini') ? provider : 'openai';
   },
 
   /**
@@ -185,6 +209,14 @@ export const aiConfigStorage = {
       }
     }
     
+    if (config.geminiKey !== undefined) {
+      if (config.geminiKey) {
+        aiConfigStorage.setGeminiKey(config.geminiKey);
+      } else {
+        aiConfigStorage.clearGeminiKey();
+      }
+    }
+    
     if (config.firecrawlKey !== undefined) {
       if (config.firecrawlKey) {
         aiConfigStorage.setFirecrawlKey(config.firecrawlKey);
@@ -216,6 +248,7 @@ export const aiConfigStorage = {
   loadAll: (): AIConfig => {
     return {
       openaiKey: aiConfigStorage.getOpenAIKey() || '',
+      geminiKey: aiConfigStorage.getGeminiKey() || '',
       firecrawlKey: aiConfigStorage.getFirecrawlKey() || '',
       provider: aiConfigStorage.getProvider(),
       model: aiConfigStorage.getModel() || DEFAULT_OPENAI_MODEL,
@@ -229,6 +262,7 @@ export const aiConfigStorage = {
    */
   clearAll: (): void => {
     aiConfigStorage.clearOpenAIKey();
+    aiConfigStorage.clearGeminiKey();
     aiConfigStorage.clearFirecrawlKey();
     removeItem(STORAGE_KEYS.AI_MODEL);
     removeItem(STORAGE_KEYS.AI_PROVIDER);
