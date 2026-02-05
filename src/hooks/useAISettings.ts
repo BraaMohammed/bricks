@@ -4,12 +4,27 @@
  * Central hook for managing all AI configuration settings.
  * Handles state management, localStorage persistence, and provides
  * a unified interface for all AI-related configuration.
+ * 
+ * This hook manages:
+ * - API keys for all providers
+ * - Provider and model selection
+ * - Advanced settings (temperature, maxTokens, topK)
+ * - Thinking mode for reasoning models
+ * - Available models list based on provider
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAPIKeyManager } from '@/hooks/useAPIKeyManager';
 import { aiConfigStorage } from '@/lib/storage/aiConfigStorage';
-import { STORAGE_KEYS, AIProvider, DEFAULT_OPENAI_MODEL } from '@/lib/constants/aiModels';
+import { 
+  STORAGE_KEYS, 
+  AIProvider, 
+  DEFAULT_OPENAI_MODEL, 
+  openAIModels, 
+  geminiModels,
+  ModelDefinition 
+} from '@/lib/constants/aiModels';
+import { detectThinkingSupport } from '@/lib/providers/aiProviders';
 import { toast } from '@/hooks/use-toast';
 
 export interface AISettings {
@@ -36,6 +51,7 @@ export interface AISettings {
   setAiProvider: (provider: AIProvider) => void;
   model: string;
   setModel: (model: string) => void;
+  availableModels: ModelDefinition[];
   
   // Custom Prompt
   customPrompt: string;
@@ -45,6 +61,18 @@ export interface AISettings {
   ollamaBaseUrl: string;
   setOllamaBaseUrl: (url: string) => void;
   
+  // Advanced Settings (for AI mode in FormulaEditor)
+  temperature: number;
+  setTemperature: (value: number) => void;
+  maxTokens: number;
+  setMaxTokens: (value: number) => void;
+  topK: number;
+  setTopK: (value: number) => void;
+  
+  // Thinking Mode (for reasoning models)
+  thinkingMode: boolean;
+  setThinkingMode: (enabled: boolean) => void;
+  
   // Actions
   saveAllSettings: () => void;
   loadSettings: () => void;
@@ -53,9 +81,10 @@ export interface AISettings {
 /**
  * Hook for managing all AI configuration settings
  * 
+ * @param ollamaModels - Optional array of available Ollama models (from useOllamaConnection)
  * @returns Complete AI settings interface with state and actions
  */
-export const useAISettings = (): AISettings => {
+export const useAISettings = (ollamaModels: string[] = []): AISettings => {
   // Load initial values from localStorage
   const initialConfig = aiConfigStorage.loadAll();
   
@@ -87,6 +116,45 @@ export const useAISettings = (): AISettings => {
   
   // Ollama Configuration State
   const [ollamaBaseUrl, setOllamaBaseUrlState] = useState<string>(initialConfig.ollamaBaseUrl);
+  
+  // Advanced Settings State
+  const [temperature, setTemperatureState] = useState<number>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.AI_TEMPERATURE);
+    return saved ? parseFloat(saved) : 0.7;
+  });
+  
+  const [maxTokens, setMaxTokensState] = useState<number>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.AI_MAX_TOKENS);
+    return saved ? parseInt(saved) : 2048;
+  });
+  
+  const [topK, setTopKState] = useState<number>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.AI_TOP_K);
+    return saved ? parseInt(saved) : 40;
+  });
+  
+  // Thinking Mode State
+  const [thinkingMode, setThinkingModeState] = useState<boolean>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.THINKING_MODE);
+    return saved === 'true';
+  });
+  
+  // Compute available models based on current provider
+  const availableModels = useMemo<ModelDefinition[]>(() => {
+    if (aiProvider === 'openai') {
+      return openAIModels;
+    } else if (aiProvider === 'gemini') {
+      return geminiModels;
+    } else {
+      // Ollama models
+      return ollamaModels.map(modelName => ({
+        id: modelName,
+        name: modelName,
+        supportsThinking: detectThinkingSupport(modelName),
+        cost: 'Free (Local)'
+      }));
+    }
+  }, [aiProvider, ollamaModels]);
 
   /**
    * Load all settings from localStorage
@@ -123,6 +191,12 @@ export const useAISettings = (): AISettings => {
     aiConfigStorage.setModel(model);
     aiConfigStorage.setCustomPrompt(customPrompt);
     aiConfigStorage.setOllamaBaseUrl(ollamaBaseUrl);
+    
+    // Save advanced settings
+    localStorage.setItem(STORAGE_KEYS.AI_TEMPERATURE, temperature.toString());
+    localStorage.setItem(STORAGE_KEYS.AI_MAX_TOKENS, maxTokens.toString());
+    localStorage.setItem(STORAGE_KEYS.AI_TOP_K, topK.toString());
+    localStorage.setItem(STORAGE_KEYS.THINKING_MODE, thinkingMode.toString());
   }, [
     openaiKeyManager.key,
     geminiKeyManager.key,
@@ -131,6 +205,10 @@ export const useAISettings = (): AISettings => {
     model,
     customPrompt,
     ollamaBaseUrl,
+    temperature,
+    maxTokens,
+    topK,
+    thinkingMode,
   ]);
 
   /**
@@ -158,6 +236,38 @@ export const useAISettings = (): AISettings => {
   /**
    * Wrapper for setCustomPrompt
    */
+  
+  /**
+   * Wrapper for setTemperature with persistence
+   */
+  const setTemperature = useCallback((value: number) => {
+    setTemperatureState(value);
+    localStorage.setItem(STORAGE_KEYS.AI_TEMPERATURE, value.toString());
+  }, []);
+  
+  /**
+   * Wrapper for setMaxTokens with persistence
+   */
+  const setMaxTokens = useCallback((value: number) => {
+    setMaxTokensState(value);
+    localStorage.setItem(STORAGE_KEYS.AI_MAX_TOKENS, value.toString());
+  }, []);
+  
+  /**
+   * Wrapper for setTopK with persistence
+   */
+  const setTopK = useCallback((value: number) => {
+    setTopKState(value);
+    localStorage.setItem(STORAGE_KEYS.AI_TOP_K, value.toString());
+  }, []);
+  
+  /**
+   * Wrapper for setThinkingMode with persistence
+   */
+  const setThinkingMode = useCallback((enabled: boolean) => {
+    setThinkingModeState(enabled);
+    localStorage.setItem(STORAGE_KEYS.THINKING_MODE, enabled.toString());
+  }, []);
   const setCustomPrompt = useCallback((prompt: string) => {
     setCustomPromptState(prompt);
   }, []);
@@ -217,6 +327,7 @@ export const useAISettings = (): AISettings => {
     setAiProvider,
     model,
     setModel,
+    availableModels,
     
     // Custom Prompt
     customPrompt,
@@ -225,6 +336,18 @@ export const useAISettings = (): AISettings => {
     // Ollama Configuration
     ollamaBaseUrl,
     setOllamaBaseUrl,
+    
+    // Advanced Settings
+    temperature,
+    setTemperature,
+    maxTokens,
+    setMaxTokens,
+    topK,
+    setTopK,
+    
+    // Thinking Mode
+    thinkingMode,
+    setThinkingMode,
     
     // Actions
     saveAllSettings,

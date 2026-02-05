@@ -1,46 +1,54 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+/**
+ * FormulaEditor Component (Refactored Orchestrator)
+ * 
+ * Main orchestrator component that coordinates all formula editing modes.
+ * This component is intentionally kept small (~300 lines) by delegating
+ * to specialized sub-components and custom hooks.
+ * 
+ * Architecture:
+ * - Custom Hooks: Handle state management and business logic
+ * - Sub-Components: Handle UI rendering for each mode
+ * - This File: Orchestrates everything and manages data flow
+ */
 
-// Extend window interface for Puppeteer logging functions
+import { useState, useEffect, useRef } from 'react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { Tabs, TabsContent, TabsList } from '@/components/ui/tabs';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { toast } from '@/hooks/use-toast';
+
+// Store
+import { useDataStore } from '@/stores/useDataStore';
+
+// Custom Hooks
+import { useAISettings } from '@/hooks/useAISettings';
+import { useOllamaConnection } from '@/hooks/useOllamaConnection';
+import { useFormulaGeneration } from '@/hooks/useFormulaGeneration';
+import { useSavedFormulas } from '@/hooks/useSavedFormulas';
+import { useFormulaMode } from '@/hooks/useFormulaMode';
+
+// Sub-Components
+import { ModeSelector } from '@/components/FormulaEditor/ModeSelector';
+import { CodeModeEditor } from '@/components/FormulaEditor/modes/CodeModeEditor';
+import { AIModeEditor } from '@/components/FormulaEditor/modes/AIModeEditor';
+import { FirecrawlModeEditor } from '@/components/FormulaEditor/modes/FirecrawlModeEditor';
+import { AIAgentsModeEditor } from '@/components/FormulaEditor/modes/AIAgentsModeEditor';
+import { PuppeteerModeEditor } from '@/components/FormulaEditor/modes/PuppeteerModeEditor';
+import { SlashMenu } from '@/components/SlashMenu';
+
+// Utilities
+import { validateFormula } from '@/components/FormulaValidator';
+import { openAIModels, geminiModels, defaultMessageCreatorInstructions, defaultLeadRoleplayInstructions } from '@/lib/constants/aiModels';
+import type { FormulaMode } from '@/lib/constants/formulaModes';
+
+// Extend window interface for Puppeteer logging
 declare global {
   interface Window {
     updatePuppeteerLog?: (message: string) => void;
     setPuppeteerLastResult?: (result: { type: 'success' | 'error', message: string }) => void;
   }
 }
-import { Code, Save, X, Info, Sparkles, Brain, Wand2, Trash2, Upload, FileSpreadsheet, Users, PenTool, UserCheck, Zap, Server, Key, ChevronDown, Settings, Bot } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
-import { Slider } from '@/components/ui/slider';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Switch } from '@/components/ui/switch';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { useDataStore } from '@/stores/useDataStore'
-import { toast } from '@/hooks/use-toast';
-import { SlashMenu } from './SlashMenu';
-import { FormulaValidator, validateFormula } from './FormulaValidator';
-import { Input } from '@/components/ui/input';
-import { runAIAgents } from '@/lib/aiAgents';
-import { checkOllamaConnection as checkOllamaStatus } from '@/lib/ollama';
-import Papa from 'papaparse';
-
-// Helper function to detect Ollama models (same as in aiAgents.ts)
-const isOllamaModel = (modelName: string): boolean => {
-  const ollamaPatterns = [
-    'llama', 'mistral', 'codellama', 'vicuna', 'alpaca', 'orca', 
-    'phi', 'neural-chat', 'starling', 'openhermes', 'dolphin',
-    'wizardlm', 'evo', 'gemma', 'qwen', 'mixtral'
-  ];
-  
-  const lowerModel = modelName.toLowerCase();
-  return ollamaPatterns.some(pattern => lowerModel.includes(pattern)) ||
-         lowerModel.includes(':') && !lowerModel.startsWith('gpt');
-};
 
 interface FormulaEditorProps {
   open: boolean;
@@ -48,36 +56,40 @@ interface FormulaEditorProps {
 }
 
 export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
-  const { activeColumn, getFormula, setFormula, removeColumn, headers, rows, setData, clearData } = useDataStore();
+  // ============================================================
+  // STORE & DATA ACCESS
+  // ============================================================
+  const { activeColumn, getFormula, setFormula, removeColumn, headers, rows } = useDataStore();
+  
+  // ============================================================
+  // CUSTOM HOOKS - Business Logic & State Management
+  // ============================================================
+  const ollamaConnection = useOllamaConnection();
+  const aiSettings = useAISettings(ollamaConnection.models);
+  const formulaModeHook = useFormulaMode('code');
+  const savedFormulasHook = useSavedFormulas();
+  const formulaGenerators = useFormulaGeneration();
+  
+  // ============================================================
+  // LOCAL COMPONENT STATE - UI State Only
+  // ============================================================
   const [formula, setFormulaText] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashMenuPosition, setSlashMenuPosition] = useState({ top: 0, left: 0 });
-  const [mode, setMode] = useState<'code' | 'ai' | 'firecrawl' | 'ai-agents' | 'puppeteer'>('code');
-  const [aiModel, setAiModel] = useState('gpt-4o-mini');
+  const [showRemoveDialog, setShowRemoveDialog] = useState(false);
+  const [formulaName, setFormulaName] = useState('');
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Mode-specific state (AI mode)
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiMessage, setAiMessage] = useState('');
-  const [showRemoveDialog, setShowRemoveDialog] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Mode-specific state (Firecrawl mode)
   const [firecrawlUrl, setFirecrawlUrl] = useState('');
-  const [firecrawlResult, setFirecrawlResult] = useState('');
-  const [firecrawlLoading, setFirecrawlLoading] = useState(false);
-  const [firecrawlError, setFirecrawlError] = useState('');
-  const [savedFormulas, setSavedFormulas] = useState<Array<{name: string, code: string}>>([]);
-  const [formulaName, setFormulaName] = useState('');
-  const [aiProvider, setAiProvider] = useState<'openai' | 'ollama' | 'gemini'>('openai');
-  const [ollamaModels, setOllamaModels] = useState<string[]>([]);
-  const [ollamaConnected, setOllamaConnected] = useState(false);
-  const [temperature, setTemperature] = useState(0.7);
-  const [maxTokens, setMaxTokens] = useState(2048);
-  const [topK, setTopK] = useState(40);
-  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
-  const [ollamaBaseUrl, setOllamaBaseUrl] = useState('http://localhost:11434');
-
-  // Thinking controls for reasoning models (DeepSeek R1, etc.)
-  const [thinkingMode, setThinkingMode] = useState(false);
-
-  // AI Agents state
+  
+  // Mode-specific state (AI Agents mode)
   const [userOfferDetails, setUserOfferDetails] = useState('');
   const [messageCreatorModel, setMessageCreatorModel] = useState('gpt-4o-mini');
   const [leadRoleplayModel, setLeadRoleplayModel] = useState('gpt-4o-mini');
@@ -87,203 +99,45 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   const [leadRoleplayInstructions, setLeadRoleplayInstructions] = useState('');
   const [maxIterations, setMaxIterations] = useState(5);
 
-  // Puppeteer mode state
+  // Mode-specific state (Puppeteer mode)
   const [puppeteerCode, setPuppeteerCode] = useState('');
   const [puppeteerTimeout, setPuppeteerTimeout] = useState(30000);
   const [puppeteerHeadless, setPuppeteerHeadless] = useState(true);
   const [puppeteerExecutionLog, setPuppeteerExecutionLog] = useState<string[]>([]);
   const [puppeteerLastResult, setPuppeteerLastResult] = useState<{type: 'success' | 'error', message: string} | null>(null);
-
-  // Available models with thinking mode support (latest as of August 2025)
-  const openAIModels = [
-    { id: 'gpt-5', name: 'GPT-5 (Flagship)', supportsThinking: false, cost: 'TBD' },
-    { id: 'gpt-5-mini', name: 'GPT-5 Mini', supportsThinking: false, cost: 'TBD' },
-    { id: 'gpt-4o', name: 'GPT-4o (Latest)', supportsThinking: false, cost: '$5.00/$15.00 per 1M tokens' },
-    { id: 'gpt-4o-mini', name: 'GPT-4o Mini', supportsThinking: false, cost: '$0.15/$0.60 per 1M tokens' },
-    { id: 'o3', name: 'OpenAI o3 (Reasoning)', supportsThinking: true, cost: 'TBD' },
-    { id: 'o3-pro', name: 'OpenAI o3-pro (Reasoning)', supportsThinking: true, cost: 'TBD' },
-    { id: 'o4-mini', name: 'OpenAI o4-mini (Reasoning)', supportsThinking: true, cost: 'TBD' },
-  ];
-
-  const geminiModels = [
-    { id: 'gemini-3-pro', name: 'Gemini 3 Pro (Latest)', supportsThinking: false, cost: 'Variable pricing' },
-    { id: 'gemini-3-flash', name: 'Gemini 3 Flash', supportsThinking: false, cost: 'Variable pricing' },
-    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', supportsThinking: false, cost: '$1.25/M tokens' },
-    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', supportsThinking: false, cost: '$0.40/M tokens' },
-    { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite', supportsThinking: false, cost: '$0.10/M tokens' },
-  ];
   
-  // Helper function to detect thinking support in Ollama models
-  const detectThinkingSupport = (modelName: string): boolean => {
-    const thinkingPatterns = [
-      'deepseek', 'r1', 'thinking', 'reasoning', 'o1', 'o3', 'qwq'
-    ];
-    const lowerModel = modelName.toLowerCase();
-    return thinkingPatterns.some(pattern => lowerModel.includes(pattern));
-  };
-
-  const availableModels = aiProvider === 'openai' ? openAIModels : 
-    aiProvider === 'gemini' ? geminiModels :
-    (ollamaModels || []).map(model => ({ 
-      id: model, 
-      name: model, 
-      supportsThinking: detectThinkingSupport(model), 
-      cost: 'Free (Local)' 
-    }));
-    
-  // For AI Agents mode, combine OpenAI, Gemini, and Ollama models
+  // ============================================================
+  // COMPUTED VALUES
+  // ============================================================
+  const firstRow = rows && rows.length > 0 ? rows[0] : null;
+  
+  // Combine all models for AI Agents mode
   const allAvailableModels = [
     ...openAIModels,
     ...geminiModels.map(model => ({
       ...model,
       name: `${model.name} (Gemini)`
     })),
-    ...(ollamaModels || []).map(model => ({ 
+    ...(ollamaConnection.models || []).map(model => ({ 
       id: model, 
       name: `${model} (Ollama)`, 
       supportsThinking: false, 
       cost: 'Free (Local)' 
     }))
   ];
-
-  // Default instructions
-  const defaultMessageCreatorInstructions = `You are an expert copywriter creating personalized DM messages. 
-
-CRITICAL: You MUST respond with ONLY a valid JSON object. No other text before or after.
-
-REQUIRED JSON FORMAT:
-{
-  "message": "Your personalized message here",
-  "reasoning": "Why this approach was chosen",
-  "improvements_made": ["List of improvements based on previous feedback"],
-  "personalization_used": ["Specific data points used for personalization"]
-}
-
-CONTEXT:
-- Lead Data: {columns}
-- User's Offer: {userOfferDetails}
-- Chat History: {previousIterations}
-- Additional Instructions: {customInstructions}
-
-GUIDELINES:
-- Keep under 200 characters for DMs
-- Integrate user's offer naturally
-- Personalize using lead data
-- Learn from chat history feedback
-- Follow user's additional instructions
-- Include clear value proposition
-- End with soft CTA
-
-REMEMBER: Output ONLY the JSON object, nothing else.`;
-
-  const defaultLeadRoleplayInstructions = `You roleplay as this lead prospect. Evaluate the message critically and decide approval.
-
-CRITICAL: You MUST respond with ONLY a valid JSON object. No other text before or after.
-
-REQUIRED JSON FORMAT:
-{
-  "approved": true/false,
-  "score": 1-10,
-  "feedback": "Your honest reaction as the lead",
-  "specific_issues": ["List specific problems"],
-  "suggested_improvements": ["Specific actionable suggestions"],
-  "decision_reasoning": "Why you approved/rejected this message"
-}
-
-CONTEXT:
-- Your Profile: {columns}
-- Message to Evaluate: {message}
-- Previous Iterations: {chatHistory}
-- Additional Instructions: {customInstructions}
-
-ROLEPLAY AS: {lead characteristics based on data}
-ONLY approve (true) if message is 8+ score and genuinely compelling.
-Consider: relevance, personalization, offer appeal, professionalism, likelihood to respond.
-
-REMEMBER: Output ONLY the JSON object, nothing else.`;
-
-  const firstRow = rows && rows.length > 0 ? rows[0] : null;
-
-  // Load provider settings and check Ollama connection
-  useEffect(() => {
-    try {
-      const savedProvider = localStorage.getItem('ai_provider') as 'openai' | 'ollama' || 'openai';
-      setAiProvider(savedProvider);
-      
-      // Load thinking controls settings
-      const savedThinkingMode = localStorage.getItem('thinking_mode') === 'true';
-      setThinkingMode(savedThinkingMode);
-      
-      // Load temperature setting
-      const savedTemperature = localStorage.getItem('ai_temperature');
-      if (savedTemperature) {
-        setTemperature(parseFloat(savedTemperature));
-      }
-      
-      // Load max tokens setting
-      const savedMaxTokens = localStorage.getItem('ai_max_tokens');
-      if (savedMaxTokens) {
-        setMaxTokens(parseInt(savedMaxTokens));
-      }
-      
-      // Load top_k setting
-      const savedTopK = localStorage.getItem('ai_top_k');
-      if (savedTopK) {
-        setTopK(parseInt(savedTopK));
-      }
-      
-      // Load Ollama base URL
-      const savedOllamaUrl = localStorage.getItem('ollama_base_url') || 'http://localhost:11434';
-      setOllamaBaseUrl(savedOllamaUrl);
-      
-      // Check Ollama connection if it's the selected provider
-      if (savedProvider === 'ollama') {
-        checkOllamaConnection().catch(error => {
-          console.error('Failed to check Ollama connection:', error);
-        });
-      }
-    } catch (error) {
-      console.error('Error loading provider settings:', error);
-      setAiProvider('openai'); // Fallback to OpenAI
-    }
-  }, []);
   
-  const checkOllamaConnection = async () => {
-    try {
-      const status = await checkOllamaStatus();
-      setOllamaConnected(status.connected);
-      setOllamaModels(status.models);
-    } catch (error) {
-      console.error('Error checking Ollama:', error);
-      setOllamaConnected(false);
-      setOllamaModels([]);
-    }
-  };
-
-  // Validate and reset model when provider or available models change
+  // ============================================================
+  // EFFECTS
+  // ============================================================
+  
+  // Initialize Ollama connection if using Ollama provider
   useEffect(() => {
-    if (availableModels.length > 0) {
-      const isCurrentModelValid = availableModels.some(model => model.id === aiModel);
-      if (!isCurrentModelValid || !aiModel) {
-        // Reset to the first available model
-        setAiModel(availableModels[0].id);
-      }
+    if (aiSettings.aiProvider === 'ollama') {
+      ollamaConnection.checkConnection();
     }
-  }, [aiProvider, availableModels, aiModel]);
-
-  // Load saved formulas from localStorage
-  useEffect(() => {
-    const savedFormulasFromStorage = localStorage.getItem('saved_formulas');
-    if (savedFormulasFromStorage) {
-      try {
-        setSavedFormulas(JSON.parse(savedFormulasFromStorage));
-      } catch (error) {
-        console.error('Error loading saved formulas:', error);
-      }
-    }
-  }, []);
-
-  // Expose functions to window for dynamic access from generated Puppeteer code
+  }, [aiSettings.aiProvider, ollamaConnection]);
+  
+  // Expose Puppeteer logging functions to window
   useEffect(() => {
     if (typeof window !== 'undefined') {
       window.updatePuppeteerLog = (message: string) => {
@@ -302,2617 +156,367 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
       }
     };
   }, []);
-
-  // Save formula to localStorage
-  const saveCurrentFormula = () => {
-    if (!formulaName.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Please enter a name for the formula.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!formula.trim()) {
-      toast({
-        title: "Validation Error", 
-        description: "Please enter a formula to save.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const newFormula = {
-      name: formulaName.trim(),
-      code: formula
-    };
-
-    const updatedFormulas = [...savedFormulas.filter(f => f.name !== newFormula.name), newFormula];
-    setSavedFormulas(updatedFormulas);
-    localStorage.setItem('saved_formulas', JSON.stringify(updatedFormulas));
-    setFormulaName('');
-    
-    toast({
-      title: "Formula Saved",
-      description: `Formula "${newFormula.name}" has been saved for reuse.`,
-    });
-  };
-
-  // Delete saved formula
-  const deleteSavedFormula = (name: string) => {
-    const updatedFormulas = savedFormulas.filter(f => f.name !== name);
-    setSavedFormulas(updatedFormulas);
-    localStorage.setItem('saved_formulas', JSON.stringify(updatedFormulas));
-    
-    toast({
-      title: "Formula Deleted",
-      description: `Formula "${name}" has been deleted.`,
-    });
-  };
-
-  // Clear current formula
-  const clearCurrentFormula = () => {
-    setFormulaText('');
-    setFormulaName('');
-    setHasChanges(true);
-  };
-
-  // Auto-save current table to localStorage  
-  const autoSaveCurrentTable = useCallback(() => {
-    try {
-      const currentData = {
-        headers,
-        rows,
-        timestamp: new Date().toISOString(),
-        name: `Auto-saved ${new Date().toLocaleString()}`
-      };
-      
-      // Get existing auto-saves
-      const existingAutoSaves = localStorage.getItem('auto_saved_tables');
-      let autoSaves = existingAutoSaves ? JSON.parse(existingAutoSaves) : [];
-      
-      // Keep only last 5 auto-saves
-      autoSaves.unshift(currentData);
-      if (autoSaves.length > 5) {
-        autoSaves = autoSaves.slice(0, 5);
-      }
-      
-      localStorage.setItem('auto_saved_tables', JSON.stringify(autoSaves));
-      
-      toast({
-        title: "Table Auto-saved",
-        description: "Current table has been automatically saved before loading new CSV.",
-      });
-    } catch (error) {
-      console.error('Error auto-saving table:', error);
-    }
-  }, [headers, rows]);
-
-  // Process CSV file upload
-  const processCSVFile = useCallback((file: File) => {
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        if (results.errors.length > 0) {
-          toast({
-            title: "CSV Parse Error",
-            description: "There were errors parsing your CSV file.",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        const newHeaders = results.meta.fields || [];
-        const newRows = results.data as Record<string, string>[];
-
-        if (newHeaders.length === 0) {
-          toast({
-            title: "No Headers Found",
-            description: "Your CSV file doesn't appear to have headers.",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        // Auto-save current table before loading new one
-        if (headers.length > 0 && rows.length > 0) {
-          autoSaveCurrentTable();
-        }
-
-        // Clear existing data and load new data
-        clearData();
-        setData(newHeaders, newRows);
-        
-        toast({
-          title: "CSV Loaded Successfully",
-          description: `Loaded ${newRows.length} rows with ${newHeaders.length} columns.`,
-        });
-
-        // Close the formula editor
-        onOpenChange(false);
-      },
-      error: (error) => {
-        toast({
-          title: "File Error",
-          description: `Error reading file: ${error.message}`,
-          variant: "destructive",
-        });
-      },
-    });
-  }, [headers, rows, clearData, setData, onOpenChange, autoSaveCurrentTable]);
-
-  // Handle CSV file selection
-  const handleCSVUpload = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.csv,text/csv,application/vnd.ms-excel';
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        processCSVFile(file);
-      }
-    };
-    input.click();
-  };
-
+  
+  // Load existing formula when column changes
   useEffect(() => {
     if (activeColumn) {
       const existingFormula = getFormula(activeColumn);
       setFormulaText(existingFormula);
       setHasChanges(false);
       
-      // Check if it's an AI formula and parse it
-      if (existingFormula.includes('localStorage.getItem(\'openai_api_key\')') || existingFormula.includes('http://localhost:11434/v1/chat/completions')) {
-        if (existingFormula.includes('🤖 AI Copy Agents Starting')) {
-          // AI Agents mode
-          setMode('ai-agents');
-          try {
-            // Try to extract config from the formula
-            const configMatch = existingFormula.match(/const config = ({.*?});/s);
-            if (configMatch) {
-              const config = JSON.parse(configMatch[1]);
-              setUserOfferDetails(config.userOfferDetails || '');
-              setMessageCreatorModel(config.messageCreatorModel || 'gpt-4o-mini');
-              setLeadRoleplayModel(config.leadRoleplayModel || 'gpt-4o-mini');
-              setMessageCreatorThinking(config.messageCreatorThinking || false);
-              setLeadRoleplayThinking(config.leadRoleplayThinking || false);
-              setMessageCreatorInstructions(config.messageCreatorInstructions || '');
-              setLeadRoleplayInstructions(config.leadRoleplayInstructions || '');
-              setMaxIterations(config.maxIterations || 5);
-            }
-          } catch (error) {
-            console.error('Error parsing AI agents config:', error);
-          }
-        } else {
-          // Regular AI mode
-          setMode('ai');
-          
-          // Detect if it's Ollama or OpenAI
-          if (existingFormula.includes('http://localhost:11434/v1/chat/completions')) {
-            setAiProvider('ollama');
-            checkOllamaConnection();
-          } else {
-            setAiProvider('openai');
-          }
-          
-          // Try to extract model and prompt from existing formula
-          const modelMatch = existingFormula.match(/model: '([^']+)'/);  
-          if (modelMatch) {
-            setAiModel(modelMatch[1]);
-          }
-          
-          // Try to extract prompt from content
-          const promptMatch = existingFormula.match(/content: `([^`]+)`/);
-          if (promptMatch) {
-            let extractedPrompt = promptMatch[1];
-            // Convert back from template literal format
-            extractedPrompt = extractedPrompt.replace(/\$\{row\["([^"]+)"\] \|\| ""\}/g, '{$1}');
-            setAiPrompt(extractedPrompt);
-          }
-        }
-      } else if (existingFormula.includes('localStorage.getItem(\'firecrawl_api_key\')')) {
-        setMode('firecrawl');
-        // Try to extract URL template from existing formula
-        const urlMatch = existingFormula.match(/const url = `([^`]+)`;/);
-        if (urlMatch) {
-          // Convert back from template literal to our format
-          const urlTemplate = urlMatch[1].replace(/\$\{row\["([^"]+)"\] \|\| ""\}/g, '{$1}');
-          setFirecrawlUrl(urlTemplate);
-        }
-      } else {
-        setMode('code');
-      }
+      // Detect mode from formula
+      const detectedMode = formulaModeHook.detectModeFromFormula(existingFormula);
+      formulaModeHook.setMode(detectedMode);
+      
+      // TODO: Parse and set mode-specific state from existing formulas
+      // This would extract things like AI prompts, Firecrawl URLs, etc.
     }
-  }, [activeColumn, getFormula]);
-
-  const handleSave = () => {
-    if (activeColumn) {
-      let finalFormula = formula;
-      
-      if (mode === 'ai') {
-        // Generate the AI formula from the simple inputs
-        if (!aiPrompt.trim()) {
-          toast({
-            title: "Validation Error",
-            description: "Please enter a prompt for the AI.",
-            variant: "destructive",
-          });
-          return;
-        }
-        
-        // Check provider-specific requirements
-        if (aiProvider === 'openai') {
-          const apiKey = localStorage.getItem('openai_api_key');
-          if (!apiKey) {
-            toast({
-              title: "Validation Error",
-              description: "Please set your OpenAI API key in AI Settings.",
-              variant: "destructive",
-            });
-            return;
-          }
-        } else if (aiProvider === 'gemini') {
-          const apiKey = localStorage.getItem('gemini_api_key');
-          if (!apiKey) {
-            toast({
-              title: "Validation Error",
-              description: "Please set your Gemini API key in AI Settings.",
-              variant: "destructive",
-            });
-            return;
-          }
-        } else if (aiProvider === 'ollama') {
-          if (!ollamaConnected) {
-            toast({
-              title: "Validation Error",
-              description: "Ollama is not running. Please start Ollama and refresh connection.",
-              variant: "destructive",
-            });
-            return;
-          }
-          if (ollamaModels.length === 0) {
-            toast({
-              title: "Validation Error",
-              description: "No Ollama models installed. Run 'ollama pull llama2' to install a model.",
-              variant: "destructive",
-            });
-            return;
-          }
-        }
-        
-        console.log('🔧 Generating AI formula with parameters:', {
-          aiPrompt,
-          aiMessage,
-          aiModel,
-          aiProvider,
-          thinkingMode
-        });
-        
-        try {
-          // Check which settings were explicitly set by the user
-          const hasCustomTemperature = localStorage.getItem('ai_temperature') !== null;
-          const hasCustomMaxTokens = localStorage.getItem('ai_max_tokens') !== null;
-          const hasCustomTopK = localStorage.getItem('ai_top_k') !== null;
-          
-          finalFormula = generateAIFormula(aiPrompt, aiMessage, aiModel, temperature, maxTokens, topK, {
-            hasCustomTemperature,
-            hasCustomMaxTokens,
-            hasCustomTopK
-          });
-          console.log('✅ Successfully generated AI formula');
-          console.log('📝 Formula preview:', finalFormula.substring(0, 500) + '...');
-          
-          // Validate the generated JavaScript syntax
-          try {
-            new Function('row', finalFormula);
-            console.log('✅ Generated formula has valid JavaScript syntax');
-          } catch (syntaxError) {
-            console.error('❌ Generated formula has invalid JavaScript syntax:', syntaxError);
-            console.error('🔍 Problematic formula:', finalFormula);
-            toast({
-              title: "Formula Syntax Error",
-              description: `Generated formula has invalid syntax: ${syntaxError.message}. Check console for details.`,
-              variant: "destructive",
-            });
-            return;
-          }
-        } catch (error) {
-          console.error('❌ Error generating AI formula:', error);
-          toast({
-            title: "Formula Generation Error",
-            description: `Failed to generate AI formula: ${error.message}`,
-            variant: "destructive",
-          });
-          return;
-        }
-      } else if (mode === 'firecrawl') {
-        // Generate the Firecrawl formula from the URL template
-        if (!firecrawlUrl.trim()) {
-          toast({
-            title: "Validation Error",
-            description: "Please enter a URL template for Firecrawl.",
-            variant: "destructive",
-          });
-          return;
-        }
-        finalFormula = generateFirecrawlFormula(firecrawlUrl);
-      } else if (mode === 'ai-agents') {
-        // Generate the AI Agents formula
-        if (!userOfferDetails.trim()) {
-          toast({
-            title: "Validation Error",
-            description: "Please enter your offer details for the AI agents.",
-            variant: "destructive",
-          });
-          return;
-        }
-        
-        // Check if models are available
-        const creatorIsOllama = isOllamaModel(messageCreatorModel);
-        const roleplayIsOllama = isOllamaModel(leadRoleplayModel);
-        
-        // Validate Ollama models
-        if (creatorIsOllama && (!ollamaConnected || !ollamaModels.includes(messageCreatorModel))) {
-          toast({
-            title: "Validation Error",
-            description: `Message Creator model '${messageCreatorModel}' is not available in Ollama. Please install it or choose a different model.`,
-            variant: "destructive",
-          });
-          return;
-        }
-        
-        if (roleplayIsOllama && (!ollamaConnected || !ollamaModels.includes(leadRoleplayModel))) {
-          toast({
-            title: "Validation Error",
-            description: `Lead Roleplay model '${leadRoleplayModel}' is not available in Ollama. Please install it or choose a different model.`,
-            variant: "destructive",
-          });
-          return;
-        }
-        
-        // Validate OpenAI API key for OpenAI models
-        const apiKey = localStorage.getItem('openai_api_key');
-        if ((!creatorIsOllama || !roleplayIsOllama) && !apiKey) {
-          toast({
-            title: "Validation Error",
-            description: "OpenAI API key required for OpenAI models. Please set it in AI Settings.",
-            variant: "destructive",
-          });
-          return;
-        }
-        
-        finalFormula = generateAIAgentsFormula();
-      } else if (mode === 'puppeteer') {
-        // Generate the Puppeteer formula - VALIDATION DISABLED
-        // if (!puppeteerCode.trim()) {
-        //   toast({
-        //     title: "Validation Error",
-        //     description: "Please enter Puppeteer code to execute.",
-        //     variant: "destructive",
-        //   });
-        //   return;
-        // }
-        
-        finalFormula = generatePuppeteerFormula(puppeteerCode, puppeteerTimeout, puppeteerHeadless);
-      } else {
-        // Only validate formula syntax when in code mode
-        const validation = validateFormula(finalFormula, headers);
-        if (!validation.isValid) {
-          toast({
-            title: "Validation Error",
-            description: "Please fix the formula errors before saving.",
-            variant: "destructive",
-          });
-          return;
-        }
-      }
-      
-      console.log('💾 Setting formula for column:', activeColumn);
-      console.log('💾 Final formula length:', finalFormula.length);
-      
-      try {
-        setFormula(activeColumn, finalFormula);
-        console.log('✅ Formula saved successfully');
-        setHasChanges(false);
-        toast({
-          title: "Formula Saved",
-          description: `${mode === 'ai' ? 'AI prompt' : mode === 'firecrawl' ? 'Firecrawl URL template' : mode === 'ai-agents' ? 'AI Copy Agents configuration' : mode === 'puppeteer' ? 'Puppeteer automation code' : 'Formula'} for "${activeColumn}" has been saved.`,
-        });
-        onOpenChange(false);
-      } catch (error) {
-        console.error('❌ Error saving formula:', error);
-        toast({
-          title: "Save Error",
-          description: `Failed to save formula: ${error.message}`,
-          variant: "destructive",
-        });
-      }
-    }
-  };
-
-  const generateAIFormula = (prompt: string, message: string, model: string, temp: number, maxTokens: number, topK: number, customSettings?: {
-    hasCustomTemperature?: boolean;
-    hasCustomMaxTokens?: boolean;
-    hasCustomTopK?: boolean;
-  }) => {
-    // Default to true if customSettings not provided (for backward compatibility)
-    const hasCustomTemperature = customSettings?.hasCustomTemperature ?? true;
-    const hasCustomMaxTokens = customSettings?.hasCustomMaxTokens ?? true;
-    const hasCustomTopK = customSettings?.hasCustomTopK ?? true;
-    // Replace {Column Name} references with actual row data access
-    const processedPrompt = prompt.replace(/\{([^}]+)\}/g, (match, columnName) => {
-      return `\${row["${columnName}"] || ""}`;
-    });
-    
-    const fullPrompt = message ? `${processedPrompt}. Additional context: ${message}` : processedPrompt;
-    
-    // Determine provider type
-    const isOllamaModelLocal = aiProvider === 'ollama';
-    const isGeminiModel = aiProvider === 'gemini';
-    
-    // API endpoint
-    let apiEndpoint = '';
-    if (isOllamaModelLocal) {
-      apiEndpoint = `${ollamaBaseUrl}/v1/chat/completions`;
-    } else if (isGeminiModel) {
-      apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-    } else {
-      apiEndpoint = 'https://api.openai.com/v1/chat/completions';
-    }
-    
-    // API key handling
-    let apiKeyCheck = '';
-    if (isOllamaModelLocal) {
-      apiKeyCheck = '// Ollama runs locally without API key\nconst apiKey = null;';
-    } else if (isGeminiModel) {
-      apiKeyCheck = `const apiKey = localStorage.getItem('gemini_api_key');\n\nif (!apiKey) {\n  return 'Please set your Gemini API key in AI Settings';\n}`;
-    } else {
-      apiKeyCheck = `const apiKey = localStorage.getItem('openai_api_key');\n\nif (!apiKey) {\n  return 'Please set your OpenAI API key in AI Settings';\n}`;
-    }
-    
-    // Authorization header
-    let authHeader = '';
-    if (isOllamaModelLocal) {
-      authHeader = `      'Content-Type': 'application/json',`;
-    } else if (isGeminiModel) {
-      authHeader = `      'x-goog-api-key': apiKey,\n      'Content-Type': 'application/json',`;
-    } else {
-      authHeader = `      'Authorization': \`Bearer \${apiKey}\`,\n      'Content-Type': 'application/json',`;
-    }
-    
-    // Newer models (GPT-5, o-series) use 'max_completion_tokens' and need more tokens for reasoning
-    const useMaxCompletionTokens = model.startsWith('gpt-5') || model.startsWith('o');
-    const tokenParameter = useMaxCompletionTokens 
-      ? `'max_completion_tokens': 4000` 
-      : `'max_tokens': 150`;
-
-    // Check if this is a reasoning model
-    const isReasoningModel = detectThinkingSupport(model);
-
-    // Log the generated code for debugging
-    console.log('🏗️ Generated AI Formula Debug Info:');
-    console.log('- Model:', model);
-    console.log('- Provider:', aiProvider);
-    console.log('- Is Reasoning Model:', isReasoningModel);
-    console.log('- Is Ollama:', isOllamaModelLocal);
-    console.log('- Is Gemini:', isGeminiModel);
-    console.log('- Thinking Mode:', thinkingMode);
-    console.log('- Using native Ollama API with think parameter:', isOllamaModelLocal && isReasoningModel);
-
-    const providerName = isGeminiModel ? 'Gemini' : isOllamaModelLocal ? 'Ollama' : 'OpenAI';
-    const generatedCode = `// ${providerName} Generated Formula${isReasoningModel ? ' (Reasoning Model)' : ''}
-${apiKeyCheck}
-
-// Filter thinking content from response
-const filterThinkingContent = (content) => {
-  if (!content) return content;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeColumn]);
   
-  console.log('🚿 Original content length:', content.length);
-  console.log('🚿 Content preview:', content.substring(0, 200) + '...');
+  // ============================================================
+  // HELPER FUNCTIONS
+  // ============================================================
   
-  // Remove <thinking>...</thinking> blocks (including nested ones)
-  let filtered = content;
-  
-  // Remove thinking tags and content between them
-  const beforeFilter = filtered.length;
-  filtered = filtered.replace(/<thinking[^>]*>[\\s\\S]*?<\\/thinking>/g, '');
-  filtered = filtered.replace(/<think[^>]*>[\\s\\S]*?<\\/think>/g, '');
-  
-  const afterFilter = filtered.length;
-  
-  console.log('🚿 Removed', beforeFilter - afterFilter, 'characters of thinking content');
-  
-  // Remove any remaining thinking markers
-  filtered = filtered.replace(/<\\/thinking>/g, '');
-  filtered = filtered.replace(/<thinking[^>]*>/g, '');
-  filtered = filtered.replace(/<\\/think>/g, '');
-  filtered = filtered.replace(/<think[^>]*>/g, '');
-  
-  // Clean up extra whitespace
-  filtered = filtered.replace(/\\n\\s*\\n\\s*\\n/g, '\\n\\n');
-  filtered = filtered.trim();
-  
-  console.log('🚿 Final filtered content length:', filtered.length);
-  return filtered;
-};
-
-// Use Promise-based approach with timeout control
-console.log('🚀 Making API request with model:', '${model}');
-console.log('📝 Prompt:', \`${fullPrompt.replace(/`/g, '\\`')}\`);
-console.log('🔧 Is reasoning model:', ${isReasoningModel});
-console.log('⚙️ Custom settings - Temperature: ${hasCustomTemperature}, MaxTokens: ${hasCustomMaxTokens}, TopK: ${hasCustomTopK}');
-${isReasoningModel ? `console.log('🧠 Thinking mode:', ${thinkingMode});` : ''}
-
-${isGeminiModel ? `
-// Build Gemini request body
-const generationConfig = {};
-
-// Only include temperature if user explicitly set it
-if (${hasCustomTemperature}) {
-  generationConfig.temperature = ${temp};
-}
-
-// Only include maxOutputTokens if user explicitly set max tokens
-if (${hasCustomMaxTokens}) {
-  generationConfig.maxOutputTokens = ${maxTokens};
-}
-
-const requestBody = {
-  contents: [{
-    parts: [{ text: \`${fullPrompt.replace(/`/g, '\\`')}\` }]
-  }],
-  generationConfig: generationConfig
-};` : isOllamaModelLocal ? `
-// Build Ollama options object conditionally
-const ollamaOptions = {};
-
-// Only include temperature if user explicitly set it
-if (${hasCustomTemperature}) {
-  ollamaOptions.temperature = ${temp};
-}
-
-// Only include num_predict if user explicitly set max tokens
-if (${hasCustomMaxTokens}) {
-  ollamaOptions.num_predict = ${maxTokens};
-}
-
-// Only include top_k if user explicitly set it
-if (${hasCustomTopK}) {
-  ollamaOptions.top_k = ${topK};
-}
-
-const requestBody = {
-  model: '${model}',
-  messages: [
-    {
-      role: 'user',
-      content: \`${fullPrompt.replace(/`/g, '\\`')}\`
-    }
-  ],
-  stream: false,
-  think: ${thinkingMode},  // Use Ollama's native think parameter
-  options: ollamaOptions
-};` : `
-// Build OpenAI request body conditionally
-const requestBody = {
-  model: '${model}',
-  messages: [{
-    role: 'user',
-    content: \`${fullPrompt.replace(/`/g, '\\`')}\`
-  }]
-};
-
-// Only include temperature if user explicitly set it
-if (${hasCustomTemperature}) {
-  requestBody.temperature = ${temp};
-}
-
-// Only include token limit if user explicitly set max tokens
-if (${hasCustomMaxTokens}) {
-  ${useMaxCompletionTokens ? `requestBody.max_completion_tokens = ${maxTokens};` : `requestBody.max_tokens = ${maxTokens};`}
-}
-`}
-
-console.log('📦 Request body:', JSON.stringify(requestBody, null, 2));
-
-return fetch('${apiEndpoint}', {
-  method: 'POST',
-  headers: {
-${authHeader}
-  },
-  body: JSON.stringify(requestBody)
-})
-.then(response => {
-  console.log('📡 Response status:', response.status);
-  console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
-  return response.text();
-})
-.then(responseText => {
-  console.log('📡 Raw response text:', responseText.substring(0, 500) + '...');
-  
-  let data;
-  try {
-    data = JSON.parse(responseText);
-    console.log('✅ Successfully parsed JSON response');
-  } catch (parseError) {
-    console.error('❌ JSON Parse Error:', parseError);
-    console.error('❌ Raw response that failed to parse:', responseText);
-    throw new Error(\`JSON Parse Error: \${parseError.message}. Raw response: \${responseText.substring(0, 200)}...\`);
-  }
-  
-  console.log('📊 API Response structure:', Object.keys(data));
-
-  if (data.error) {
-    console.error('❌ API Error:', data.error);
-    throw new Error(\`API Error: \${data.error.message || JSON.stringify(data.error)}\`);
-  }
-
-  // Handle Gemini API response structure
-  if (data.candidates && data.candidates.length > 0) {
-    const candidate = data.candidates[0];
-    if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
-      const result = candidate.content.parts[0].text;
-      console.log('✅ Found content in Gemini structure');
-      console.log('📄 Result preview:', result.substring(0, 200) + '...');
-      return result;
-    }
-  }
-
-  // Handle OpenAI-compatible API response structure (used by both OpenAI and Ollama v1/chat/completions)
-  if (data.choices && data.choices.length > 0 && data.choices[0].message && data.choices[0].message.content) {
-    let result = data.choices[0].message.content;
-    console.log('✅ Found content in OpenAI-compatible structure');
-    console.log('📄 Raw content preview:', result.substring(0, 200) + '...');
-    
-    // Apply content filtering for reasoning models
-    ${!thinkingMode && isReasoningModel ? 'result = filterThinkingContent(result);' : 'console.log("🧠 Keeping original content");'}
-    console.log('📄 Final result preview:', result.substring(0, 200) + '...');
-    
-    return result;
-  }
-
-  ${isOllamaModelLocal ? `
-  // Fallback: Handle legacy Ollama native API response structure (if still used)
-  if (data.message) {
-    let result;
-    
-    if (data.message.thinking && data.message.content) {
-      // Reasoning model with separate thinking and content
-      console.log('🧠 Found thinking content:', data.message.thinking.substring(0, 200) + '...');
-      console.log('💬 Found response content:', data.message.content.substring(0, 200) + '...');
-      
-      result = ${thinkingMode} ? 
-        \`Thinking:\\n\${data.message.thinking}\\n\\nResponse:\\n\${data.message.content}\` : 
-        data.message.content;
-    } else if (data.message.content) {
-      // Regular response or thinking disabled
-      result = data.message.content;
-      console.log('📄 Found content:', result.substring(0, 200) + '...');
-    } else {
-      throw new Error('No content found in Ollama response');
-    }
-    
-    // Apply content filtering if thinking mode is disabled
-    ${!thinkingMode ? 'result = filterThinkingContent(result);' : 'console.log("🧠 Thinking mode enabled - keeping all content");'}
-    console.log('📄 Final result preview:', result.substring(0, 200) + '...');
-    
-    return result;
-  }` : ``}
-
-  // If standard structure is not found, return the whole response for debugging
-  console.warn('⚠️ Unexpected response structure:', data);
-  throw new Error(\`Unexpected response structure. Keys: \${Object.keys(data).join(', ')}. Data: \${JSON.stringify(data, null, 2)}\`);
-})
-.catch(error => {
-  
-  console.error('💥 Fetch error details:', {
-    name: error.name,
-    message: error.message,
-    stack: error.stack
-  });
-  return \`Error: \${error.name}: \${error.message}\`;
-});`;
-
-    console.log('📝 Generated code preview:');
-    console.log(generatedCode.substring(0, 1000) + '...');
-    
-    return generatedCode;
-  };
-
-  const generateFirecrawlFormula = (urlTemplate: string) => {
-    // Replace {Column Name} references with actual row data access
-    const processedUrl = urlTemplate.replace(/\{([^}]+)\}/g, (match, columnName) => {
-      return `\${row["${columnName}"] || ""}`;
-    });
-    
-    return `// Firecrawl v2 Generated Formula
-const apiKey = localStorage.getItem('firecrawl_api_key');
-
-if (!apiKey) {
-  return 'Please set your Firecrawl API key in AI Settings';
-}
-
-const url = \`${processedUrl}\`;
-
-if (!url) {
-  return 'No URL provided';
-}
-
-return fetch('https://api.firecrawl.dev/v2/scrape', {
-  method: 'POST',
-  headers: {
-    'Authorization': \`Bearer \${apiKey}\`,
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    url: url,
-    formats: ['markdown']
-  })
-})
-.then(response => {
-  if (!response.ok) {
-    throw new Error(\`Firecrawl API error: \${response.status} - \${response.statusText}\`);
-  }
-  return response.json();
-})
-.then(data => {
-  if (data.success && data.data && data.data.markdown) {
-    return data.data.markdown;
-  } else if (data.markdown) {
-    return data.markdown;
-  } else {
-    throw new Error(\`Unexpected response: \${JSON.stringify(data, null, 2)}\`);
-  }
-})
-.catch(error => {
-  return \`Error: \${error.message}\`;
-});`;
-  };
-
-  const generatePuppeteerFormula = (code: string, timeout: number, headless: boolean) => {
-    // Replace {Column Name} references with actual row data access
-    const processedCode = code.replace(/\{([^}]+)\}/g, (match, columnName) => {
-      return `\${row["${columnName}"] || ""}`;
-    });
-
-    return `// Puppeteer Generated Formula (Enhanced Error Handling)  
-const puppeteerCode = ${JSON.stringify(processedCode)};
-const config = {
-  timeout: ${timeout},
-  headless: ${headless}
-};
-
-// Enhanced logging and error handling with UI updates
-const logToUI = (message) => {
-  console.log(message);
-  // Try to update UI logs if available
-  try {
-    if (window.updatePuppeteerLog) {
-      window.updatePuppeteerLog(message);
-    }
-  } catch (e) {
-    // Ignore UI update errors
-  }
-};
-
-logToUI('🤖 Puppeteer Mode: Starting browser automation');
-logToUI('📋 Code length: ' + puppeteerCode.length + ' characters');
-logToUI('⚙️ Config: ' + JSON.stringify(config, null, 2));
-logToUI('📊 Row data keys: ' + Object.keys(row).join(', '));
-
-// Validate inputs before sending - DISABLED FOR TESTING
-// if (!puppeteerCode || puppeteerCode.trim().length === 0) {
-//   console.error('❌ Validation failed: Empty Puppeteer code');
-//   return 'Error: No Puppeteer code provided';
-// }
-
-if (config.timeout < 5000 || config.timeout > 60000) {
-  console.error('❌ Validation failed: Invalid timeout value:', config.timeout);
-  return 'Error: Timeout must be between 5-60 seconds';
-}
-
-// API endpoint - using localhost:3000 for dev server
-const apiEndpoint = 'http://localhost:3000/api/puppeteer';
-logToUI('📡 API endpoint: ' + apiEndpoint);
-
-// Submit job to queue with enhanced error handling
-const startTime = Date.now();
-logToUI('🚀 Submitting job at: ' + new Date(startTime).toISOString());
-
-return fetch(apiEndpoint, {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    code: puppeteerCode,
-    config: config,
-    rowData: row
-  })
-})
-.then(async response => {
-  const responseTime = Date.now() - startTime;
-  logToUI('📡 Response received in ' + responseTime + 'ms');
-  console.log('📊 Response status:', response.status);
-  console.log('📊 Response headers:', Object.fromEntries(response.headers.entries()));
-  
-  // Handle different response statuses
-  if (!response.ok) {
-    let errorMessage = \`API error: \${response.status} - \${response.statusText}\`;
-    
-    try {
-      const errorText = await response.text();
-      console.error('❌ Error response body:', errorText);
-      
-      if (errorText) {
-        try {
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.error || errorMessage;
-        } catch (parseError) {
-          console.warn('⚠️ Could not parse error response as JSON');
-          errorMessage += \`. Response: \${errorText.substring(0, 200)}\`;
-        }
-      }
-    } catch (textError) {
-      console.error('❌ Failed to read error response body:', textError);
-    }
-    
-    throw new Error(errorMessage);
-  }
-  
-  return response.json();
-})
-.then(data => {
-  console.log('📊 Queue response data:', data);
-  
-  if (data.queued && data.jobId) {
-    logToUI('✅ Job successfully queued');
-    console.log('🆔 Job ID:', data.jobId);
-    console.log('🕒 Queue position:', data.position || 'Unknown');
-    console.log('📈 Queue stats:', data.queueStats || 'Not provided');
-    
-    // Start polling for result
-    return pollForResult(data.jobId, startTime);
-  } else {
-    console.error('❌ Invalid queue response structure');
-    console.error('📊 Expected: {queued: true, jobId: string}, Got:', data);
-    throw new Error(\`Invalid queue response: \${JSON.stringify(data)}\`);
-  }
-})
-.catch(error => {
-  const totalTime = Date.now() - startTime;
-  console.error('💥 Puppeteer submission failed after', totalTime, 'ms');
-  console.error('💥 Error details:', {
-    name: error.name,
-    message: error.message,
-    stack: error.stack
-  });
-  
-  // Provide user-friendly error messages
-  if (error.message.includes('Failed to fetch')) {
-    return 'Error: Cannot connect to Puppeteer API. Make sure the dev server is running on localhost:3000';
-  } else if (error.message.includes('Network')) {
-    return 'Error: Network connection failed. Check your internet connection';
-  } else if (error.message.includes('500')) {
-    return 'Error: Server error occurred. Check server logs for details';
-  } else if (error.message.includes('404')) {
-    return 'Error: Puppeteer API endpoint not found. Make sure the API server is running';
-  } else {
-    return \`Error: \${error.message}\`;
-  }
-});
-
-// Enhanced polling function with better logging and error handling
-async function pollForResult(jobId, startTime) {
-  const maxAttempts = 60; // 5 minutes max (5s intervals)
-  const pollInterval = 5000; // 5 seconds
-  let attempts = 0;
-  
-  console.log('🔄 Starting result polling');
-  console.log('🆔 Job ID:', jobId);
-  console.log('⏱️ Max attempts:', maxAttempts);
-  console.log('🕒 Poll interval:', pollInterval, 'ms');
-  
-  while (attempts < maxAttempts) {
-    attempts++;
-    const pollStartTime = Date.now();
-    
-    try {
-      console.log(\`🔄 Poll attempt \${attempts}/\${maxAttempts}\`);
-      
-      const statusEndpoint = \`http://localhost:3000/api/puppeteer/status/\${jobId}\`;
-      const response = await fetch(statusEndpoint);
-      
-      const pollResponseTime = Date.now() - pollStartTime;
-      console.log(\`📡 Status check completed in \${pollResponseTime}ms\`);
-      
-      if (!response.ok) {
-        console.warn(\`⚠️ Status check failed: \${response.status} - \${response.statusText}\`);
-        throw new Error(\`Status API error: \${response.status}\`);
-      }
-      
-      const data = await response.json();
-      console.log(\`📊 Job status: \${data.status}\`);
-      
-      if (data.status === 'completed') {
-        const totalTime = Date.now() - startTime;
-        console.log('✅ Puppeteer job completed successfully');
-        console.log(\`⏱️ Total execution time: \${totalTime}ms\`);
-        console.log('📄 Result preview:', typeof data.result === 'string' ? 
-          data.result.substring(0, 100) + '...' : 
-          JSON.stringify(data.result).substring(0, 100) + '...');
-        
-        // Update UI with success result if available
-        try {
-          if (window.setPuppeteerLastResult) {
-            window.setPuppeteerLastResult({ type: 'success', message: data.result });
-          }
-        } catch (e) {
-          // Ignore UI update errors
-        }
-        
-        return data.result;
-      } else if (data.status === 'failed') {
-        const totalTime = Date.now() - startTime;
-        console.error('❌ Puppeteer job failed');
-        console.error(\`⏱️ Failed after: \${totalTime}ms\`);
-        console.error('❌ Error details:', data.error);
-        console.error('📊 Full error data:', data);
-        
-        // Update UI with error result if available
-        try {
-          if (window.setPuppeteerLastResult) {
-            window.setPuppeteerLastResult({ type: 'error', message: data.error || 'Job failed without specific error message' });
-          }
-        } catch (e) {
-          // Ignore UI update errors
-        }
-        
-        return \`Error: \${data.error || 'Job failed without specific error message'}\`;
-      } else if (data.status === 'pending' || data.status === 'processing') {
-        const elapsed = Date.now() - startTime;
-        console.log(\`⏳ Job \${data.status}, elapsed: \${Math.round(elapsed/1000)}s\`);
-        console.log('🔢 Queue position:', data.position || 'Unknown');
-        
-        if (data.estimatedWaitTime) {
-          console.log('⏰ Estimated wait time:', data.estimatedWaitTime, 'ms');
-        }
-        
-        // Wait before next poll
-        console.log(\`⏸️ Waiting \${pollInterval}ms before next poll...\`);
-        await new Promise(resolve => setTimeout(resolve, pollInterval));
-      } else {
-        console.warn('⚠️ Unknown job status:', data.status);
-        console.warn('📊 Full status data:', data);
-        
-        // Still wait and continue for unknown statuses
-        await new Promise(resolve => setTimeout(resolve, pollInterval));
-      }
-      
-    } catch (pollError) {
-      console.error(\`❌ Poll attempt \${attempts} failed:\`, pollError);
-      
-      // For network errors, wait and retry
-      if (pollError.message.includes('Failed to fetch') || pollError.message.includes('Network')) {
-        console.log('🔄 Network error during polling, will retry...');
-        await new Promise(resolve => setTimeout(resolve, pollInterval));
-        continue;
-      }
-      
-      // For other errors, still retry but log more details
-      console.error('📊 Poll error details:', {
-        name: pollError.name,
-        message: pollError.message,
-        stack: pollError.stack
-      });
-      
-      await new Promise(resolve => setTimeout(resolve, pollInterval));
-    }
-  }
-  
-  // Timeout reached
-  const totalTime = Date.now() - startTime;
-  console.error('⏰ Polling timeout reached');
-  console.error(\`⏱️ Total time elapsed: \${Math.round(totalTime/1000)}s\`);
-  console.error(\`🔄 Total polling attempts: \${attempts}\`);
-  
-  return \`Error: Job timeout - execution took longer than \${Math.round(maxAttempts * pollInterval / 1000)} seconds. Check server performance or increase timeout.\`;
-}`;
-  };
-
-  const generateAIAgentsFormula = () => {
-    const config = {
-      messageCreatorModel,
-      leadRoleplayModel,
-      messageCreatorThinking,
-      leadRoleplayThinking,
-      userOfferDetails,
-      messageCreatorInstructions: messageCreatorInstructions, // Keep user's custom instructions
-      leadRoleplayInstructions: leadRoleplayInstructions, // Keep user's custom instructions
-      maxIterations,
-    };
-
-    return `// AI Copy Agents Formula
-const config = ${JSON.stringify(config, null, 2)};
-return await runAIAgents(config, row);`;
-  };
-
-  const handleModeChange = (newMode: 'code' | 'ai' | 'firecrawl' | 'ai-agents' | 'puppeteer') => {
-    setMode(newMode);
-    setHasChanges(true);
-    
-    if (newMode === 'ai' && !aiPrompt) {
-      setAiPrompt('Analyze this data and provide insights');
-    } else if (newMode === 'ai-agents') {
-      // Initialize AI agents mode with defaults if empty
-      if (!userOfferDetails) {
-        setUserOfferDetails('');
-      }
-      if (!messageCreatorInstructions) {
-        setMessageCreatorInstructions('');
-      }
-      if (!leadRoleplayInstructions) {
-        setLeadRoleplayInstructions('');
-      }
-    } else if (newMode === 'puppeteer') {
-      // Initialize Puppeteer mode with defaults if empty
-      if (!puppeteerCode) {
-        setPuppeteerCode('// Enter your Puppeteer automation code here\n// Example: Get page title\nawait page.goto("{URL}");\nreturn await page.title();');
-      }
-    }
-  };
-
-  const handleFormulaChange = (value: string) => {
-    setFormulaText(value);
-    setHasChanges(value !== getFormula(activeColumn || ''));
-    
-    // Check for slash command
-    const textarea = textareaRef.current;
-    if (textarea && value.endsWith('/')) {
-      const rect = textarea.getBoundingClientRect();
-      const textBeforeCursor = value.substring(0, textarea.selectionStart);
-      const lines = textBeforeCursor.split('\n');
-      const currentLine = lines.length;
-      const lineHeight = 20; // Approximate line height
-      
-      setSlashMenuPosition({
-        top: rect.top + currentLine * lineHeight,
-        left: rect.left + 20
-      });
-      setShowSlashMenu(true);
-    } else if (showSlashMenu && !value.endsWith('/')) {
-      setShowSlashMenu(false);
-    }
-  };
-
   const handleAIInputChange = () => {
     setHasChanges(true);
   };
-
-  const handleFirecrawlInputChange = () => {
-    setHasChanges(true);
+  
+  const handleSlashMenuTrigger = (position: { top: number, left: number }) => {
+    setSlashMenuPosition(position);
+    setShowSlashMenu(true);
   };
+  
+  // ============================================================
+  // MAIN SAVE HANDLER - Orchestrates formula generation
+  // ============================================================
+  
+  const handleSave = () => {
+    if (!activeColumn) return;
+    
+    let finalFormula = '';
+    const mode = formulaModeHook.mode;
+    
+    try {
+      switch (mode) {
+        case 'code': {
+          // Validate formula syntax
+          const validation = validateFormula(formula, headers);
+          if (!validation.isValid) {
+            toast({
+              title: "Validation Error",
+              description: "Please fix the formula errors before saving.",
+              variant: "destructive",
+            });
+            return;
+          }
+          finalFormula = formula;
+          break;
+        }
+          
+        case 'ai': {
+          // Validate AI inputs
+          if (!aiPrompt.trim()) {
+            toast({
+              title: "Validation Error",
+              description: "Please enter a prompt for the AI.",
+              variant: "destructive",
+            });
+            return;
+          }
+          
+          // Generate AI formula using the hook
+          finalFormula = formulaGenerators.generateAIFormula({
+            prompt: aiPrompt,
+            message: aiMessage,
+            model: aiSettings.model,
+            provider: aiSettings.aiProvider,
+            temperature: aiSettings.temperature,
+            maxTokens: aiSettings.maxTokens,
+            topK: aiSettings.topK,
+            thinkingMode: aiSettings.thinkingMode,
+            ollamaBaseUrl: aiSettings.ollamaBaseUrl
+          });
+          break;
+        }
 
+        case 'firecrawl': {
+          // Validate Firecrawl inputs
+          if (!firecrawlUrl.trim()) {
+            toast({
+              title: "Validation Error",
+              description: "Please enter a URL template for Firecrawl.",
+              variant: "destructive",
+            });
+            return;
+          }
+          
+          finalFormula = formulaGenerators.generateFirecrawlFormula(firecrawlUrl);
+          break;
+        }
+          
+        case 'ai-agents': {
+          // Validate AI Agents inputs
+          if (!userOfferDetails.trim()) {
+            toast({
+              title: "Validation Error",
+              description: "Please enter your offer details for the AI agents.",
+              variant: "destructive",
+            });
+            return;
+          }
+          
+          finalFormula = formulaGenerators.generateAIAgentsFormula({
+            userOfferDetails,
+            messageCreatorModel,
+            leadRoleplayModel,
+            messageCreatorThinking,
+            leadRoleplayThinking,
+            messageCreatorInstructions: messageCreatorInstructions || defaultMessageCreatorInstructions,
+            leadRoleplayInstructions: leadRoleplayInstructions || defaultLeadRoleplayInstructions,
+            maxIterations
+          });
+          break;
+        }
+
+        case 'puppeteer': {
+          finalFormula = formulaGenerators.generatePuppeteerFormula({
+            code: puppeteerCode,
+            timeout: puppeteerTimeout,
+            headless: puppeteerHeadless
+          });
+          break;
+        }
+          
+        default:
+          console.error('Unknown mode:', mode);
+          return;
+      }
+      
+      // Save the formula
+      setFormula(activeColumn, finalFormula);
+      onOpenChange(false);
+      
+      toast({
+        title: "Formula Saved",
+        description: `Formula for "${activeColumn}" has been saved.`,
+      });
+      
+    } catch (error) {
+      console.error('Error saving formula:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save formula",
+        variant: "destructive",
+      });
+    }
+  };
+  
   const handleRemoveColumn = () => {
     if (activeColumn) {
       removeColumn(activeColumn);
       setShowRemoveDialog(false);
       onOpenChange(false);
-      
       toast({
         title: "Column Removed",
-        description: `Column "${activeColumn}" has been removed successfully.`,
+        description: `Column "${activeColumn}" has been removed.`,
       });
     }
   };
-
-  const handleSlashMenuSelect = (template: string) => {
-    const textarea = textareaRef.current;
-    if (textarea) {
-      const currentValue = formula;
-      const newValue = currentValue.slice(0, -1) + template; // Remove the '/' and insert template
-      setFormulaText(newValue);
-      setHasChanges(true);
-      setShowSlashMenu(false);
-      
-      // Focus back on textarea
-      setTimeout(() => textarea.focus(), 0);
-    }
-  };
-
-  // Firecrawl API call helper
-  const fetchFirecrawlContent = useCallback(async () => {
-    setFirecrawlLoading(true);
-    setFirecrawlError('');
-    setFirecrawlResult('');
-    const apiKey = localStorage.getItem('firecrawl_api_key');
-    if (!apiKey) {
-      setFirecrawlError('Please set your Firecrawl API key in AI Settings.');
-      setFirecrawlLoading(false);
-      return;
-    }
-    if (!firecrawlUrl.trim()) {
-      setFirecrawlError('Please enter a website URL.');
-      setFirecrawlLoading(false);
-      return;
-    }
-    try {
-      const response = await fetch('https://api.firecrawl.dev/v2/scrape', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url: firecrawlUrl.trim(),
-          formats: ['markdown']
-        })
-      });
-      if (!response.ok) {
-        setFirecrawlError(`Firecrawl API error: ${response.status} - ${response.statusText}`);
-        setFirecrawlLoading(false);
-        return;
-      }
-      const data = await response.json();
-      if (data.success && data.data && data.data.markdown) {
-        setFirecrawlResult(data.data.markdown);
-      } else if (data.markdown) {
-        setFirecrawlResult(data.markdown);
-      } else {
-        setFirecrawlResult(JSON.stringify(data, null, 2));
-      }
-    } catch (err) {
-      setFirecrawlError('Failed to fetch from Firecrawl.');
-    } finally {
-      setFirecrawlLoading(false);
-    }
-  }, [firecrawlUrl]);
-
-  if (!activeColumn) return null;
-
+  
+  // ============================================================
+  // JSX RENDER - Clean orchestration of sub-components
+  // ============================================================
+  
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl h-full overflow-y-scroll">
-        <SheetHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <SheetTitle className="flex items-center gap-2">
-                <Code className="h-5 w-5" />
-                Edit Formula: {activeColumn}
-              </SheetTitle>
-              <SheetDescription>
-                Write JavaScript code to process each row. The current row data is available as the `row` object.
-                Use bracket notation to access columns: row['Column Name']. Use `return` to specify the value for this column.
-              </SheetDescription>
-            </div>
-           
-          </div>
-        </SheetHeader>
-
-        <div className="space-y-6 py-6">
-          {/* Mode Selection */}
-          <Tabs value={mode} onValueChange={handleModeChange} className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="code" className="flex items-center gap-2">
-                <Code className="h-4 w-4" />
-                Code Mode
-              </TabsTrigger>
-              <TabsTrigger value="ai" className="flex items-center gap-2">
-                <Brain className="h-4 w-4" />
-                AI Mode
-              </TabsTrigger>
-              <TabsTrigger value="firecrawl" className="flex items-center gap-2">
-                <Wand2 className="h-4 w-4" />
-                Firecrawl Mode
-              </TabsTrigger>
-              <TabsTrigger value="ai-agents" className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                AI Copy Agents
-              </TabsTrigger>
-              <TabsTrigger value="puppeteer" className="flex items-center gap-2">
-                <Bot className="h-4 w-4" />
-                Puppeteer Mode
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="firecrawl" className="space-y-6">
-              {/* Firecrawl Section */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Wand2 className="h-4 w-4" />
-                    Firecrawl Website Scraper
-                  </CardTitle>
-                  <CardDescription>
-                    Build a formula that fetches website content using Firecrawl. The result will be LLM-ready markdown content.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Available columns for Firecrawl */}
-                  <div>
-                    <h4 className="font-semibold mb-3 flex items-center gap-2">
-                      <Info className="h-4 w-4" />
-                      Available Columns
-                    </h4>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Click on a column to add it to your URL. Use column data to build dynamic URLs:
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {headers.map((header) => (
-                        <Badge 
-                          key={header} 
-                          variant="outline" 
-                          className="cursor-pointer hover:bg-muted"
-                          onClick={() => {
-                            const insertion = `{${header}}`;
-                            const currentUrl = firecrawlUrl;
-                            const newUrl = currentUrl + insertion;
-                            setFirecrawlUrl(newUrl);
-                          }}
-                        >
-                          {header}
-                        </Badge>
-                      ))}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      💡 Tip: Use {`{Column Name}`} in your URL to reference data from each row. Example: https://company.com/profile/{`{Company}`}
-                    </p>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="firecrawl-url" className="text-base font-semibold mb-3 block">
-                      Website URL Template
-                    </Label>
-                    <Input
-                      id="firecrawl-url"
-                      type="text"
-                      placeholder="https://example.com/{Company} or https://linkedin.com/in/{Username}"
-                      value={firecrawlUrl}
-                      onChange={e => {
-                        setFirecrawlUrl(e.target.value);
-                        handleFirecrawlInputChange();
-                      }}
-                      className="w-full"
-                    />
-                  </div>
-
-                  {/* Preview with actual data */}
-                  {firecrawlUrl && firstRow && (
-                    <div>
-                      <Label className="text-sm font-medium">Preview with actual data:</Label>
-                      <div className="mt-1 p-2 bg-muted rounded border text-sm font-mono">
-                        {firecrawlUrl.replace(/\{([^}]+)\}/g, (match, columnName) => {
-                          const value = firstRow[columnName.trim()];
-                          return value || `[${columnName.trim()} not found]`;
-                        })}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        This shows how the URL will look for the first row in your data
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="code" className="space-y-6">
-              {/* Available columns */}
-              <div>
-                <h4 className="font-semibold mb-3 flex items-center gap-2">
-                  <Info className="h-4 w-4" />
-                  Available Columns
-                </h4>
-                <div className="flex flex-wrap gap-1">
-                  {headers.map((header) => (
-                    <Badge 
-                      key={header} 
-                      variant="outline" 
-                      className="cursor-pointer hover:bg-muted"
-                      onClick={() => {
-                        const insertion = `row['${header}']`;
-                        const textarea = document.querySelector('.formula-editor') as HTMLTextAreaElement;
-                        if (textarea) {
-                          const start = textarea.selectionStart;
-                          const end = textarea.selectionEnd;
-                          const newValue = formula.substring(0, start) + insertion + formula.substring(end);
-                          setFormulaText(newValue);
-                          setHasChanges(true);
-                          
-                          // Restore cursor position
-                          setTimeout(() => {
-                            textarea.focus();
-                            textarea.setSelectionRange(start + insertion.length, start + insertion.length);
-                          }, 0);
-                        }
-                      }}
-                    >
-                      {header}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              {/* Formula editor */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-semibold">JavaScript Formula</h4>
-                  <Badge variant="outline" className="flex items-center gap-1 text-xs">
-                    <Sparkles className="h-3 w-3" />
-                    Type / for AI templates
-                  </Badge>
-                </div>
-                <Textarea
-                  ref={textareaRef}
-                  value={formula}
-                  onChange={(e) => handleFormulaChange(e.target.value)}
-                  placeholder="// Enter your JavaScript code here
-// Type '/' to access AI templates
-// Example:
-return row['email']?.includes('@gmail.com') ? 'Gmail User' : 'Other';"
-                  className="formula-editor"
-                  rows={12}
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent className="w-full sm:max-w-[800px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Edit Formula: {activeColumn}</SheetTitle>
+            <SheetDescription>
+              Write JavaScript formulas, use AI to generate content, or automate with Puppeteer
+            </SheetDescription>
+          </SheetHeader>
+          
+          <div className="mt-6">
+            <Tabs value={formulaModeHook.mode} onValueChange={(value) => formulaModeHook.setMode(value as FormulaMode)}>
+              <ModeSelector
+                mode={formulaModeHook.mode}
+                onModeChange={(mode) => formulaModeHook.setMode(mode)}
+              />
+              
+              <TabsContent value="code" className="space-y-4">
+                <CodeModeEditor
+                  formula={formula}
+                  headers={headers}
+                  savedFormulas={savedFormulasHook.savedFormulas}
+                  formulaName={formulaName}
+                  onFormulaChange={(value) => {
+                    setFormulaText(value);
+                    setHasChanges(true);
+                  }}
+                  onFormulaNameChange={setFormulaName}
+                  onSaveFormula={() => {
+                    savedFormulasHook.saveFormula(formulaName, formula);
+                    setFormulaName('');
+                  }}
+                  onLoadFormula={(savedFormula) => {
+                    setFormulaText(savedFormula.code);
+                    setHasChanges(true);
+                  }}
+                  onDeleteFormula={savedFormulasHook.deleteFormula}
+                  onClearFormula={() => {
+                    setFormulaText('');
+                    setFormulaName('');
+                    setHasChanges(true);
+                  }}
+                  onSlashMenuTrigger={handleSlashMenuTrigger}
                 />
-              </div>
-
-              {/* Formula validation */}
-              <FormulaValidator formula={formula} availableColumns={headers} />
-
-              {/* Saved Formulas */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-semibold">Saved Formulas</h4>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline" 
-                      size="sm"
-                      onClick={clearCurrentFormula}
-                    >
-                      Clear
-                    </Button>
-                  </div>
-                </div>
-                
-                {/* Save current formula */}
-                <div className="flex gap-2 mb-4">
-                  <Input
-                    placeholder="Enter formula name to save..."
-                    value={formulaName}
-                    onChange={(e) => setFormulaName(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={saveCurrentFormula}
-                    disabled={!formulaName.trim() || !formula.trim()}
-                  >
-                    Save Formula
-                  </Button>
-                </div>
-
-                {/* List of saved formulas */}
-                {savedFormulas.length > 0 ? (
-                  <div className="grid gap-2">
-                    {savedFormulas.map((savedFormula, index) => (
-                      <Card key={index} className="p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1">
-                            <p className="font-medium text-sm mb-1">{savedFormula.name}</p>
-                            <code className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded block overflow-x-auto">
-                              {savedFormula.code.length > 100 
-                                ? savedFormula.code.substring(0, 100) + '...' 
-                                : savedFormula.code}
-                            </code>
-                          </div>
-                          <div className="flex gap-1">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setFormulaText(savedFormula.code);
-                                setHasChanges(true);
-                              }}
-                            >
-                              Use
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => deleteSavedFormula(savedFormula.name)}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    No saved formulas yet. Create a formula and save it for reuse.
-                  </p>
-                )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="ai" className="space-y-6">
-              <div className="space-y-6">
-                {/* Provider Selection */}
-                <div>
-                  <Label className="text-base font-semibold flex items-center gap-2 mb-3">
-                    <Server className="h-4 w-4" />
-                    AI Provider
-                  </Label>
-                  <Select value={aiProvider} onValueChange={(value: 'openai' | 'ollama' | 'gemini') => {
-                    setAiProvider(value);
-                    if (value === 'ollama') {
-                      checkOllamaConnection();
-                    }
-                    handleAIInputChange();
-                  }}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select AI provider" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="openai">
-                        <div className="flex items-center gap-2">
-                          <Key className="h-4 w-4" />
-                          OpenAI (Cloud)
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="gemini">
-                        <div className="flex items-center gap-2">
-                          <Sparkles className="h-4 w-4" />
-                          Google Gemini (Cloud)
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="ollama">
-                        <div className="flex items-center gap-2">
-                          <Server className="h-4 w-4" />
-                          Ollama (Local)
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {aiProvider === 'ollama' && (
-                    <div className="mt-2 flex items-center gap-2 text-sm">
-                      {ollamaConnected ? (
-                        <div className="flex items-center gap-2 text-green-700">
-                          <div className="w-2 h-2 bg-green-500 rounded-full" />
-                          Connected ({ollamaModels.length} models)
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 text-red-700">
-                          <div className="w-2 h-2 bg-red-500 rounded-full" />
-                          Ollama not running
-                        </div>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={checkOllamaConnection}
-                        className="ml-auto h-6 px-2 text-xs"
-                      >
-                        Refresh
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Ollama Base URL Configuration */}
-                {aiProvider === 'ollama' && (
-                  <div>
-                    <Label className="text-base font-semibold flex items-center gap-2 mb-3">
-                      <Server className="h-4 w-4" />
-                      Ollama Base URL
-                    </Label>
-                    <Input
-                      type="url"
-                      placeholder="http://localhost:11434"
-                      value={ollamaBaseUrl}
-                      onChange={(e) => {
-                        setOllamaBaseUrl(e.target.value);
-                        localStorage.setItem('ollama_base_url', e.target.value);
-                        handleAIInputChange();
-                        // Automatically check connection after URL change
-                        setTimeout(() => {
-                          checkOllamaConnection();
-                        }, 500);
-                      }}
-                      className="mb-2"
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      The base URL where your Ollama server is running. Change this if Ollama is running on a different port or remote server.
-                    </p>
-                  </div>
-                )}
-
-                {/* Available columns for AI mode */}
-                <div>
-                  <h4 className="font-semibold mb-3 flex items-center gap-2">
-                    <Info className="h-4 w-4" />
-                    Available Columns
-                  </h4>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Click on a column to add it to your prompt. The AI will have access to all this data for each row:
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    {headers.map((header) => (
-                      <Badge 
-                        key={header} 
-                        variant="outline" 
-                        className="cursor-pointer hover:bg-muted"
-                        onClick={() => {
-                          const insertion = `{${header}}`;
-                          const currentPrompt = aiPrompt;
-                          const newPrompt = currentPrompt + (currentPrompt ? ' ' : '') + insertion;
-                          setAiPrompt(newPrompt);
-                          handleAIInputChange();
-                        }}
-                      >
-                        {header}
-                      </Badge>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    💡 Tip: Use {`{Column Name}`} in your prompt to reference specific data from each row
-                  </p>
-                </div>
-
-                {/* AI Model Selection */}
-                <div>
-                  <Label htmlFor="ai-model" className="text-base font-semibold flex items-center gap-2 mb-3">
-                    <Wand2 className="h-4 w-4" />
-                    AI Model
-                  </Label>
-                  <Select 
-                    value={availableModels.length > 0 ? aiModel : undefined} 
-                    onValueChange={(value) => { 
-                      setAiModel(value); 
-                      handleAIInputChange(); 
-                    }}
-                    disabled={availableModels.length === 0}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select AI model" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableModels.map((model) => (
-                        <SelectItem key={model.id} value={model.id}>
-                          <div className="flex items-center gap-2">
-                            {model.name}
-                            {model.supportsThinking && <Brain className="h-3 w-3" />}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {availableModels.length === 0 && (
-                    <p className="text-sm text-orange-600 mt-2 p-2 bg-orange-50 rounded border border-orange-200">
-                      {aiProvider === 'ollama' 
-                        ? (ollamaConnected ? 'No models installed. Run: ollama pull llama2' : 'Connect to Ollama first')
-                        : 'No models available'
-                      }
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {availableModels.length > 0 && aiProvider === 'openai' ? (
-                      <>💡 Cost: {availableModels.find(m => m.id === aiModel)?.cost || 'Select a model to see pricing'}
-                      <br />
-                      Choose based on your needs: GPT-4o Mini for cost efficiency, GPT-4o for multimodal tasks, o1/o3 for complex reasoning, GPT-5 for cutting-edge performance.</>
-                    ) : availableModels.length > 0 && aiProvider === 'ollama' ? (
-                      <>💡 {ollamaConnected 
-                        ? `${ollamaModels.length} local models available. No API costs.`
-                        : 'Install models with: ollama pull llama2'
-                      }</>
-                    ) : null}
-                  </p>
-                </div>
-
-                {/* Temperature Control */}
-                <div>
-                  <Label className="text-base font-semibold flex items-center gap-2 mb-3">
-                    <Zap className="h-4 w-4" />
-                    Temperature ({temperature})
-                  </Label>
-                  <div className="space-y-2">
-                    <Slider
-                      value={[temperature]}
-                      onValueChange={(value) => {
-                        setTemperature(value[0]);
-                        localStorage.setItem('ai_temperature', value[0].toString());
-                        handleAIInputChange();
-                      }}
-                      max={2}
-                      min={0}
-                      step={0.1}
-                      className="w-full"
-                    />
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>0 (Deterministic)</span>
-                      <span>1 (Balanced)</span>
-                      <span>2 (Creative)</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Higher values make output more random and creative, lower values make it more focused and deterministic.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Advanced Settings for Ollama */}
-                {aiProvider === 'ollama' && (
-                  <Collapsible open={showAdvancedSettings} onOpenChange={setShowAdvancedSettings}>
-                    <CollapsibleTrigger asChild>
-                      <Button variant="ghost" className="w-full justify-between p-0 h-auto">
-                        <Label className="text-base font-semibold flex items-center gap-2 cursor-pointer">
-                          <Settings className="h-4 w-4" />
-                          Advanced Settings
-                        </Label>
-                        <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showAdvancedSettings ? 'rotate-180' : ''}`} />
-                      </Button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="space-y-4 mt-3">
-                      {/* Max Tokens Control */}
-                      <div>
-                        <Label className="text-sm font-medium flex items-center gap-2 mb-2">
-                          <FileSpreadsheet className="h-3 w-3" />
-                          Max Tokens ({maxTokens})
-                        </Label>
-                        <div className="space-y-2">
-                          <Slider
-                            value={[maxTokens]}
-                            onValueChange={(value) => {
-                              setMaxTokens(value[0]);
-                              localStorage.setItem('ai_max_tokens', value[0].toString());
-                              handleAIInputChange();
-                            }}
-                            max={8192}
-                            min={128}
-                            step={128}
-                            className="w-full"
-                          />
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>128 (Short)</span>
-                            <span>2048 (Balanced)</span>
-                            <span>8192 (Long)</span>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Maximum number of tokens to generate. Higher values allow longer responses but may be slower.
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Top-K Control */}
-                      <div>
-                        <Label className="text-sm font-medium flex items-center gap-2 mb-2">
-                          <Sparkles className="h-3 w-3" />
-                          Top-K Sampling ({topK})
-                        </Label>
-                        <div className="space-y-2">
-                          <Slider
-                            value={[topK]}
-                            onValueChange={(value) => {
-                              setTopK(value[0]);
-                              localStorage.setItem('ai_top_k', value[0].toString());
-                              handleAIInputChange();
-                            }}
-                            max={100}
-                            min={1}
-                            step={1}
-                            className="w-full"
-                          />
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>1 (Very Focused)</span>
-                            <span>40 (Balanced)</span>
-                            <span>100 (Diverse)</span>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Controls vocabulary diversity. Lower values focus on likely words, higher values allow more variety.
-                          </p>
-                        </div>
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-                )}
-
-                {/* Thinking Controls for Reasoning Models */}
-                {availableModels.find(m => m.id === aiModel)?.supportsThinking && (
-                  <Card className="p-4 border-orange-200 bg-orange-50/50">
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Brain className="h-4 w-4 text-orange-600" />
-                        <h4 className="font-semibold text-orange-800">Reasoning Model Controls</h4>
-                        <Badge variant="outline" className="text-orange-700 border-orange-300">
-                          {aiModel}
-                        </Badge>
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label className="text-sm font-medium text-orange-800">Enable Thinking Mode</Label>
-                          <p className="text-xs text-orange-600">
-                            Allow model to show reasoning process (may include &lt;thinking&gt; tags)
-                          </p>
-                        </div>
-                        <Switch
-                          checked={thinkingMode}
-                          onCheckedChange={(checked) => {
-                            setThinkingMode(checked);
-                            localStorage.setItem('thinking_mode', checked.toString());
-                            handleAIInputChange();
-                          }}
-                        />
-                      </div>
-
-                      {!thinkingMode && (
-                        <div className="p-3 bg-blue-50 border border-blue-200 rounded">
-                          <p className="text-xs text-blue-700">
-                            💡 <strong>Recommendation:</strong> Keep thinking mode disabled for faster responses. 
-                            The output will be automatically filtered to remove &lt;thinking&gt; content.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </Card>
-                )}
-
-                {/* AI Prompt */}
-                <div>
-                  <Label htmlFor="ai-prompt" className="text-base font-semibold flex items-center gap-2 mb-3">
-                    <Brain className="h-4 w-4" />
-                    Prompt
-                  </Label>
-                  <Textarea
-                    id="ai-prompt"
-                    value={aiPrompt}
-                    onChange={(e) => { setAiPrompt(e.target.value); handleAIInputChange(); }}
-                    placeholder="What do you want the AI to do with this row data? For example:
-- Generate a personalized message for {Full Name}
-- Analyze the sentiment of {Feedback}
-- Create an email subject line for {Company}
-- Classify this lead based on {Industry} and {Company Size}"
-                    rows={4}
-                  />
-                </div>
-
-                {/* Additional Message/Context */}
-                <div>
-                  <Label htmlFor="ai-message" className="text-base font-semibold mb-3 block">
-                    Additional Context (Optional)
-                  </Label>
-                  <Textarea
-                    id="ai-message"
-                    value={aiMessage}
-                    onChange={(e) => { setAiMessage(e.target.value); handleAIInputChange(); }}
-                    placeholder="Add any additional context or instructions for the AI..."
-                    rows={3}
-                  />
-                </div>
-
-                {/* AI Prompt Examples
-                
-                     <div>
-                  <h4 className="font-semibold mb-3">Example Prompts</h4>
-                  <div className="grid gap-2">
-                    {[
-                      {
-                        name: 'Personalized Outreach',
-                        prompt: 'Write a friendly LinkedIn connection message for {Full Name} who works at {Company}'
-                      },
-                      {
-                        name: 'Email Subject Line',
-                        prompt: 'Create an engaging email subject line for {Full Name} based on their role at {Company}'
-                      },
-                      {
-                        name: 'Lead Classification',
-                        prompt: 'Classify this lead as Hot, Warm, or Cold based on {Company Size}, {Industry}, and {Title}'
-                      },
-                      {
-                        name: 'Sentiment Analysis',
-                        prompt: 'Analyze the sentiment of this feedback and return only: positive, negative, or neutral. Feedback: {Feedback}'
-                      }
-                    ].map((example, index) => (
-                      <Card key={index} className="p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1">
-                            <p className="font-medium text-sm mb-1">{example.name}</p>
-                            <code className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded block">
-                              {example.prompt}
-                            </code>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setAiPrompt(example.prompt);
-                              handleAIInputChange();
-                            }}
-                          >
-                            Use
-                          </Button>
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-
-                
-                
-                
-                */}
-           
-                {/* Preview */}
-                {aiPrompt && (
-                  <Card className="p-4 bg-muted/50">
-                    <h4 className="font-semibold mb-2 flex items-center gap-2">
-                      <Sparkles className="h-4 w-4" />
-                      Preview
-                    </h4>
-                    <div className="space-y-2">
-                  
-                      {firstRow && aiPrompt.includes('{') && (
-                        <div>
-                          <p className="text-sm text-muted-foreground">
-                            Example with actual data from the first row:
-                          </p>
-                          <span className="font-mono bg-background px-2 py-1 rounded text-sm block">
-                            "{aiPrompt.replace(/\{([^}]+)\}/g, (match, columnName) => firstRow[columnName.trim()] || `[${columnName.trim()} not found]`)}{aiMessage ? `. Additional context: ${aiMessage}` : ''}"
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      Column references like {`{Column Name}`} will be replaced with actual values from each row.
-                    </div>
-                  </Card>
-                )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="ai-agents" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    AI Copy Agents Configuration
-                  </CardTitle>
-                  <CardDescription>
-                    Two AI agents collaborate to create perfect DM messages through iterative refinement
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  
-                  {/* Available columns for AI Agents */}
-                  <div>
-                    <h4 className="font-semibold mb-3 flex items-center gap-2">
-                      <Info className="h-4 w-4" />
-                      Available Columns
-                    </h4>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Click on a column to add it to your instructions. The AI agents will have access to all this data:
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {headers.map((header) => (
-                        <Badge 
-                          key={header} 
-                          variant="outline" 
-                          className="cursor-pointer hover:bg-muted"
-                          onClick={() => {
-                            const insertion = `{${header}}`;
-                            setUserOfferDetails(prev => prev + (prev ? ' ' : '') + insertion);
-                          }}
-                        >
-                          {header}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* User Offer Details */}
-                  <div>
-                    <Label className="text-base font-semibold mb-3 block">
-                      Your Offer Details
-                    </Label>
-                    <Textarea 
-                      placeholder="Describe your product/service/offer that will be mentioned in messages..."
-                      value={userOfferDetails}
-                      onChange={(e) => {
-                        setUserOfferDetails(e.target.value);
-                        setHasChanges(true);
-                      }}
-                      rows={3}
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      💡 Tip: Use {`{Column Name}`} to reference lead data in your offer description
-                    </p>
-                  </div>
-
-                  {/* Agent Configuration Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Message Creator Agent */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-lg">
-                          <PenTool className="h-4 w-4" />
-                          Message Creator Agent
-                        </CardTitle>
-                        <CardDescription>
-                          Creates personalized DM messages
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div>
-                          <Label className="text-sm font-medium">Model</Label>
-                          <Select value={messageCreatorModel} onValueChange={(value) => {
-                            setMessageCreatorModel(value);
-                            setHasChanges(true);
-                          }}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {allAvailableModels.map((model) => (
-                                <SelectItem key={model.id} value={model.id}>
-                                  <div className="flex items-center gap-2">
-                                    {model.name}
-                                    {model.supportsThinking && <Brain className="h-3 w-3" />}
-                                    {isOllamaModel(model.id) && <Server className="h-3 w-3 text-green-600" />}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {isOllamaModel(messageCreatorModel) ? (
-                              <span className="flex items-center gap-1">
-                                <Server className="h-3 w-3 text-green-600" />
-                                Ollama (Local) - {allAvailableModels.find(m => m.id === messageCreatorModel)?.cost}
-                              </span>
-                            ) : (
-                              <span className="flex items-center gap-1">
-                                <Key className="h-3 w-3 text-blue-600" />
-                                OpenAI (Cloud) - {allAvailableModels.find(m => m.id === messageCreatorModel)?.cost}
-                              </span>
-                            )}
-                          </p>
-                        </div>
-
-                        {/* Thinking Mode Toggle */}
-                        {availableModels.find(m => m.id === messageCreatorModel)?.supportsThinking && (
-                          <div className="flex items-center justify-between">
-                            <div className="space-y-0.5">
-                              <Label className="text-sm font-medium">Thinking Mode</Label>
-                              <p className="text-xs text-muted-foreground">Enable advanced reasoning</p>
-                            </div>
-                            <Switch
-                              checked={messageCreatorThinking}
-                              onCheckedChange={(checked) => {
-                                setMessageCreatorThinking(checked);
-                                setHasChanges(true);
-                              }}
-                            />
-                          </div>
-                        )}
-
-                        <div>
-                          <Label className="text-sm font-medium">Custom Instructions (Optional)</Label>
-                          <Textarea
-                            placeholder="Additional instructions for the message creator..."
-                            value={messageCreatorInstructions}
-                            onChange={(e) => {
-                              setMessageCreatorInstructions(e.target.value);
-                              setHasChanges(true);
-                            }}
-                            rows={3}
-                          />
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {/* Lead Roleplay Agent */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-lg">
-                          <UserCheck className="h-4 w-4" />
-                          Lead Roleplay Agent
-                        </CardTitle>
-                        <CardDescription>
-                          Acts as the lead and evaluates messages
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div>
-                          <Label className="text-sm font-medium">Model</Label>
-                          <Select value={leadRoleplayModel} onValueChange={(value) => {
-                            setLeadRoleplayModel(value);
-                            setHasChanges(true);
-                          }}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {allAvailableModels.map((model) => (
-                                <SelectItem key={model.id} value={model.id}>
-                                  <div className="flex items-center gap-2">
-                                    {model.name}
-                                    {model.supportsThinking && <Brain className="h-3 w-3" />}
-                                    {isOllamaModel(model.id) && <Server className="h-3 w-3 text-green-600" />}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {isOllamaModel(leadRoleplayModel) ? (
-                              <span className="flex items-center gap-1">
-                                <Server className="h-3 w-3 text-green-600" />
-                                Ollama (Local) - {allAvailableModels.find(m => m.id === leadRoleplayModel)?.cost}
-                              </span>
-                            ) : (
-                              <span className="flex items-center gap-1">
-                                <Key className="h-3 w-3 text-blue-600" />
-                                OpenAI (Cloud) - {allAvailableModels.find(m => m.id === leadRoleplayModel)?.cost}
-                              </span>
-                            )}
-                          </p>
-                        </div>
-
-                        {/* Thinking Mode Toggle */}
-                        {availableModels.find(m => m.id === leadRoleplayModel)?.supportsThinking && (
-                          <div className="flex items-center justify-between">
-                            <div className="space-y-0.5">
-                              <Label className="text-sm font-medium">Thinking Mode</Label>
-                              <p className="text-xs text-muted-foreground">Enable advanced reasoning</p>
-                            </div>
-                            <Switch
-                              checked={leadRoleplayThinking}
-                              onCheckedChange={(checked) => {
-                                setLeadRoleplayThinking(checked);
-                                setHasChanges(true);
-                              }}
-                            />
-                          </div>
-                        )}
-
-                        <div>
-                          <Label className="text-sm font-medium">Custom Instructions (Optional)</Label>
-                          <Textarea
-                            placeholder="Additional instructions for the lead roleplay..."
-                            value={leadRoleplayInstructions}
-                            onChange={(e) => {
-                              setLeadRoleplayInstructions(e.target.value);
-                              setHasChanges(true);
-                            }}
-                            rows={3}
-                          />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* Settings */}
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label className="text-sm font-medium">Max Iterations</Label>
-                            <p className="text-xs text-muted-foreground">Prevent infinite loops</p>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-sm text-muted-foreground">{maxIterations}</span>
-                            <div className="w-32">
-                              <Slider 
-                                value={[maxIterations]} 
-                                onValueChange={(value) => {
-                                  setMaxIterations(value[0]);
-                                  setHasChanges(true);
-                                }}
-                                max={10} 
-                                min={1} 
-                                step={1} 
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Preview */}
-                  {userOfferDetails && firstRow && (
-                    <Card className="p-4 bg-muted/50">
-                      <h4 className="font-semibold mb-2 flex items-center gap-2">
-                        <Sparkles className="h-4 w-4" />
-                        Preview with First Row Data
-                      </h4>
-                      <div className="space-y-2">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Lead Profile:</p>
-                          <code className="text-xs bg-background px-2 py-1 rounded block overflow-x-auto">
-                            {JSON.stringify(firstRow, null, 2)}
-                          </code>
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">Your Offer (processed):</p>
-                          <span className="font-mono bg-background px-2 py-1 rounded text-sm block">
-                            {userOfferDetails.replace(/\{([^}]+)\}/g, (match, columnName) => {
-                              const value = firstRow[columnName.trim()];
-                              return value || `[${columnName.trim()} not found]`;
-                            })}
-                          </span>
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">Provider Configuration:</p>
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-mono">Creator:</span>
-                              {isOllamaModel(messageCreatorModel) ? (
-                                <Badge variant="outline" className="text-green-700">
-                                  <Server className="h-3 w-3 mr-1" />
-                                  Ollama Local
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline" className="text-blue-700">
-                                  <Key className="h-3 w-3 mr-1" />
-                                  OpenAI Cloud
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-mono">Roleplay:</span>
-                              {isOllamaModel(leadRoleplayModel) ? (
-                                <Badge variant="outline" className="text-green-700">
-                                  <Server className="h-3 w-3 mr-1" />
-                                  Ollama Local
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline" className="text-blue-700">
-                                  <Key className="h-3 w-3 mr-1" />
-                                  OpenAI Cloud
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">API Key Status:</p>
-                          <div className="space-y-1">
-                            <Badge variant={localStorage.getItem('openai_api_key') ? "default" : "destructive"}>
-                              {localStorage.getItem('openai_api_key') ? "✅ OpenAI API Key Found" : "❌ No OpenAI API Key"}
-                            </Badge>
-                            <Badge variant={ollamaConnected ? "default" : "destructive"}>
-                              {ollamaConnected ? "✅ Ollama Connected" : "❌ Ollama Disconnected"}
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="mt-2 text-xs text-muted-foreground">
-                        The AI agents will use this data to create and evaluate personalized messages.
-                      </div>
-                    </Card>
-                  )}
-
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="puppeteer" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Bot className="h-4 w-4" />
-                    Puppeteer Browser Automation
-                  </CardTitle>
-                  <CardDescription>
-                    Write Puppeteer code to automate browser interactions. Code runs on the server with stealth plugin for anti-detection.
-                    <div className="flex items-center gap-2 mt-2">
-                      <Badge variant="outline" className="text-xs">
-                        API: localhost:3000
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        Queue-based processing
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        Enhanced logging
-                      </Badge>
-                    </div>
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  
-                  {/* System Status Check */}
-                  <Card className="p-4 bg-blue-50/50 border-blue-200">
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <Bot className="h-4 w-4 text-blue-600" />
-                        <h4 className="font-semibold text-blue-800">Puppeteer API Status</h4>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
-                          <span className="text-blue-700">Server: localhost:3000</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-green-500 rounded-full" />
-                          <span className="text-blue-700">Queue: Ready</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-green-500 rounded-full" />
-                          <span className="text-blue-700">Browser Pool: Active</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-green-500 rounded-full" />
-                          <span className="text-blue-700">Stealth Mode: Enabled</span>
-                        </div>
-                      </div>
-                      <div className="text-xs text-blue-600 bg-blue-100 p-2 rounded">
-                        💡 <strong>Ultra Simple Test:</strong> Try this code: <code className="bg-white px-1 rounded">await page.goto('https://example.com'); return await page.title();</code>
-                      </div>
-                      <div className="text-xs text-green-600 bg-green-100 p-2 rounded">
-                        ✅ <strong>CORS Fixed:</strong> API now supports cross-origin requests from port 8080 to port 3000
-                      </div>
-                      <div className="text-xs text-green-600 bg-green-100 p-2 rounded">
-                        🔍 <strong>Debug Tip:</strong> Open browser console (F12) to see detailed execution logs and error details
-                      </div>
-                    </div>
-                  </Card>
-                  
-                  {/* Available columns for Puppeteer mode */}
-                  <div>
-                    <h4 className="font-semibold mb-3 flex items-center gap-2">
-                      <Info className="h-4 w-4" />
-                      Available Columns
-                    </h4>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Click on a column to add it to your code. The data will be available in your Puppeteer script:
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {headers.map((header) => (
-                        <Badge 
-                          key={header} 
-                          variant="outline" 
-                          className="cursor-pointer hover:bg-muted"
-                          onClick={() => {
-                            const insertion = `{${header}}`;
-                            const currentCode = puppeteerCode;
-                            const newCode = currentCode + (currentCode ? ' ' : '') + insertion;
-                            setPuppeteerCode(newCode);
-                            setHasChanges(true);
-                          }}
-                        >
-                          {header}
-                        </Badge>
-                      ))}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      💡 Tip: Use {`{Column Name}`} in your code to reference data from each row
-                    </p>
-                  </div>
-
-                  {/* Puppeteer Configuration */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-sm font-medium mb-2 block">
-                        Execution Timeout (ms)
-                      </Label>
-                      <Input
-                        type="number"
-                        min="5000"
-                        max="60000"
-                        step="1000"
-                        value={puppeteerTimeout}
-                        onChange={(e) => {
-                          setPuppeteerTimeout(parseInt(e.target.value));
-                          setHasChanges(true);
-                        }}
-                        className="w-full"
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Timeout for Puppeteer execution (5-60 seconds)
-                      </p>
-                    </div>
-
-                    <div>
-                      <Label className="text-sm font-medium mb-2 block">
-                        Browser Mode
-                      </Label>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          checked={puppeteerHeadless}
-                          onCheckedChange={(checked) => {
-                            setPuppeteerHeadless(checked);
-                            setHasChanges(true);
-                          }}
-                        />
-                        <Label className="text-sm">
-                          Headless Mode {puppeteerHeadless ? '(Recommended)' : '(Debug)'}
-                        </Label>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Headless mode is faster and uses less resources
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Puppeteer Code Editor */}
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-semibold">Puppeteer Code</h4>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="flex items-center gap-1 text-xs">
-                          <Bot className="h-3 w-3" />
-                          Server-side execution
-                        </Badge>
-                        <Badge variant="outline" className="flex items-center gap-1 text-xs">
-                          <Info className="h-3 w-3" />
-                          Enhanced logging
-                        </Badge>
-                      </div>
-                    </div>
-                    <Textarea
-                      value={puppeteerCode}
-                      onChange={(e) => {
-                        setPuppeteerCode(e.target.value);
-                        setHasChanges(true);
-                      }}
-                      placeholder="// Enter your Puppeteer automation code here
-// Example: Get page title
-await page.goto('{URL}');
-return await page.title();
-
-// Available objects:
-// - page: Puppeteer page instance
-// - browser: Puppeteer browser instance  
-// - rowData: Current row data
-// - console: For logging (console.log)
-
-// Error handling is automatic - check browser console for detailed logs
-// Queue position and timing information will be displayed automatically"
-                      className="font-mono text-sm"
-                      rows={12}
-                    />
-                  </div>
-
-                  {/* Enhanced Code Templates */}
-                  <div>
-                    <h4 className="font-semibold mb-3">Code Templates</h4>
-                    <div className="grid gap-2">
-                      {[
-                        {
-                          name: 'Get Page Title (Ultra Simple Test)',
-                          description: 'Test with example.com - should return "Example Domain"',
-                          code: 'await page.goto(\'https://example.com\');\nreturn await page.title();'
-                        },
-                        {
-                          name: 'Extract Text Content',
-                          description: 'Extract text from specific elements',
-                          code: 'await page.goto(\'{URL}\');\nawait page.waitForSelector(\'h1\', { timeout: 10000 });\nreturn await page.$eval(\'h1\', el => el.textContent);'
-                        },
-                        {
-                          name: 'Take Screenshot',
-                          description: 'Capture page screenshot as base64',
-                          code: 'await page.goto(\'{URL}\');\nawait page.setViewport({ width: 1200, height: 800 });\nconst screenshot = await page.screenshot({ encoding: \'base64\' });\nreturn `data:image/png;base64,${screenshot}`;'
-                        },
-                        {
-                          name: 'Get All Links',
-                          description: 'Extract all links from a page',
-                          code: 'await page.goto(\'{URL}\');\nconst links = await page.$$eval(\'a\', anchors => \n  anchors.map(a => ({ text: a.textContent, href: a.href })).filter(link => link.href)\n);\nreturn JSON.stringify(links, null, 2);'
-                        },
-                        {
-                          name: 'Form Interaction',
-                          description: 'Fill and submit forms',
-                          code: 'await page.goto(\'{URL}\');\nawait page.waitForSelector(\'#search\', { timeout: 5000 });\nawait page.type(\'#search\', \'{Search Term}\');\nawait page.click(\'#submit\');\nawait page.waitForNavigation();\nreturn await page.url();'
-                        },
-                        {
-                          name: 'Wait for Element',
-                          description: 'Wait for dynamic content to load',
-                          code: 'await page.goto(\'{URL}\');\n// Wait for dynamic content\nawait page.waitForSelector(\'.dynamic-content\', { timeout: 15000 });\nconst content = await page.$eval(\'.dynamic-content\', el => el.textContent);\nreturn content;'
-                        }
-                      ].map((template, index) => (
-                        <Card key={index} className="p-3 hover:bg-muted/50 transition-colors">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <p className="font-medium text-sm">{template.name}</p>
-                                <Badge variant="secondary" className="text-xs">
-                                  {template.description}
-                                </Badge>
-                              </div>
-                              <code className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded block overflow-x-auto">
-                                {template.code.length > 100 
-                                  ? template.code.substring(0, 100) + '...' 
-                                  : template.code}
-                              </code>
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setPuppeteerCode(template.code);
-                                setHasChanges(true);
-                              }}
-                            >
-                              Use
-                            </Button>
-                          </div>
-                        </Card>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Execution Logs and Results */}
-                  {puppeteerLastResult && (
-                    <Card className={`p-4 ${puppeteerLastResult.type === 'success' ? 'bg-green-50/50 border-green-200' : 'bg-red-50/50 border-red-200'}`}>
-                      <h4 className="font-semibold mb-2 flex items-center gap-2">
-                        {puppeteerLastResult.type === 'success' ? (
-                          <>
-                            <Sparkles className="h-4 w-4 text-green-600" />
-                            <span className="text-green-800">Last Execution Result</span>
-                          </>
-                        ) : (
-                          <>
-                            <X className="h-4 w-4 text-red-600" />
-                            <span className="text-red-800">Execution Error</span>
-                          </>
-                        )}
-                      </h4>
-                      <div className={`p-3 rounded ${puppeteerLastResult.type === 'success' ? 'bg-green-100' : 'bg-red-100'}`}>
-                        <pre className={`text-xs whitespace-pre-wrap ${puppeteerLastResult.type === 'success' ? 'text-green-800' : 'text-red-800'}`}>
-                          {puppeteerLastResult.message}
-                        </pre>
-                      </div>
-                    </Card>
-                  )}
-
-                  {/* Execution Logs */}
-                  {puppeteerExecutionLog.length > 0 && (
-                    <Card className="p-4 bg-gray-50/50 border-gray-200">
-                      <h4 className="font-semibold mb-2 flex items-center gap-2">
-                        <Info className="h-4 w-4 text-gray-600" />
-                        <span className="text-gray-800">Execution Log</span>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => setPuppeteerExecutionLog([])}
-                          className="ml-auto h-6 px-2 text-xs"
-                        >
-                          Clear
-                        </Button>
-                      </h4>
-                      <div className="bg-gray-100 p-3 rounded max-h-40 overflow-y-auto">
-                        {puppeteerExecutionLog.map((log, index) => (
-                          <div key={index} className="text-xs text-gray-700 mb-1 font-mono">
-                            {log}
-                          </div>
-                        ))}
-                      </div>
-                    </Card>
-                  )}
-
-                  {/* Preview */}
-                  {puppeteerCode && firstRow && (
-                    <Card className="p-4 bg-muted/50">
-                      <h4 className="font-semibold mb-2 flex items-center gap-2">
-                        <Sparkles className="h-4 w-4" />
-                        Preview with First Row Data
-                      </h4>
-                      <div className="space-y-3">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Code with actual data from the first row:</p>
-                          <code className="text-xs bg-background px-2 py-1 rounded block overflow-x-auto mt-1">
-                            {puppeteerCode.replace(/\{([^}]+)\}/g, (match, columnName) => {
-                              const value = firstRow[columnName.trim()];
-                              return value || `[${columnName.trim()} not found]`;
-                            })}
-                          </code>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-muted-foreground">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">Execution Mode:</span>
-                            <Badge variant="outline" className="text-xs">
-                              {puppeteerHeadless ? 'Headless' : 'GUI Debug'}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">Timeout:</span>
-                            <Badge variant="outline" className="text-xs">
-                              {puppeteerTimeout}ms
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">Queue Processing:</span>
-                            <Badge variant="outline" className="text-xs">
-                              Server-side
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">Anti-Detection:</span>
-                            <Badge variant="outline" className="text-xs">
-                              Stealth enabled
-                            </Badge>
-                          </div>
-                        </div>
-                        <div className="p-3 bg-green-50 border border-green-200 rounded">
-                          <p className="text-xs text-green-700">
-                            ✅ <strong>Ready to execute:</strong> Your code will be sent to the queue and processed on the server. 
-                            Execution logs and results will appear above in real-time.
-                          </p>
-                        </div>
-                      </div>
-                    </Card>
-                  )}
-
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </div>
-
-        <SheetFooter>
-          <div className="flex items-center justify-between w-full">
-            <AlertDialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm">
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Remove Column
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Remove Column</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to remove the column "{activeColumn}"? This action cannot be undone and will delete all data in this column including any formulas.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction 
-                    onClick={handleRemoveColumn}
-                    className="bg-red-600 hover:bg-red-700"
-                  >
-                    Remove Column
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+              </TabsContent>
+              
+              <TabsContent value="ai" className="space-y-4">
+                <AIModeEditor
+                  headers={headers}
+                  firstRow={firstRow}
+                  provider={aiSettings.aiProvider}
+                  onProviderChange={aiSettings.setAiProvider}
+                  ollamaConnected={ollamaConnection.connected}
+                  ollamaModels={ollamaConnection.models}
+                  ollamaBaseUrl={aiSettings.ollamaBaseUrl}
+                  onRefreshConnection={ollamaConnection.checkConnection}
+                  onBaseUrlChange={aiSettings.setOllamaBaseUrl}
+                  availableModels={aiSettings.availableModels}
+                  selectedModel={aiSettings.model}
+                  onModelChange={aiSettings.setModel}
+                  temperature={aiSettings.temperature}
+                  onTemperatureChange={aiSettings.setTemperature}
+                  maxTokens={aiSettings.maxTokens}
+                  onMaxTokensChange={aiSettings.setMaxTokens}
+                  topK={aiSettings.topK}
+                  onTopKChange={aiSettings.setTopK}
+                  thinkingMode={aiSettings.thinkingMode}
+                  onThinkingModeChange={aiSettings.setThinkingMode}
+                  prompt={aiPrompt}
+                  onPromptChange={setAiPrompt}
+                  message={aiMessage}
+                  onMessageChange={setAiMessage}
+                  showAdvancedSettings={showAdvancedSettings}
+                  onAdvancedSettingsChange={setShowAdvancedSettings}
+                  onInputChange={handleAIInputChange}
+                />
+              </TabsContent>
+              
+              <TabsContent value="firecrawl" className="space-y-4">
+                <FirecrawlModeEditor
+                  headers={headers}
+                  firstRow={firstRow}
+                  url={firecrawlUrl}
+                  onUrlChange={setFirecrawlUrl}
+                  onInputChange={handleAIInputChange}
+                />
+              </TabsContent>
+              
+              <TabsContent value="ai-agents" className="space-y-4">
+                <AIAgentsModeEditor
+                  headers={headers}
+                  firstRow={firstRow}
+                  userOfferDetails={userOfferDetails}
+                  onUserOfferDetailsChange={setUserOfferDetails}
+                  messageCreatorModel={messageCreatorModel}
+                  onMessageCreatorModelChange={setMessageCreatorModel}
+                  leadRoleplayModel={leadRoleplayModel}
+                  onLeadRoleplayModelChange={setLeadRoleplayModel}
+                  messageCreatorThinking={messageCreatorThinking}
+                  onMessageCreatorThinkingChange={setMessageCreatorThinking}
+                  leadRoleplayThinking={leadRoleplayThinking}
+                  onLeadRoleplayThinkingChange={setLeadRoleplayThinking}
+                  messageCreatorInstructions={messageCreatorInstructions}
+                  onMessageCreatorInstructionsChange={setMessageCreatorInstructions}
+                  leadRoleplayInstructions={leadRoleplayInstructions}
+                  onLeadRoleplayInstructionsChange={setLeadRoleplayInstructions}
+                  maxIterations={maxIterations}
+                  onMaxIterationsChange={setMaxIterations}
+                  allAvailableModels={allAvailableModels}
+                  ollamaConnected={ollamaConnection.connected}
+                  onInputChange={handleAIInputChange}
+                />
+              </TabsContent>
+              
+              <TabsContent value="puppeteer" className="space-y-4">
+                <PuppeteerModeEditor
+                  headers={headers}
+                  firstRow={firstRow}
+                  code={puppeteerCode}
+                  onCodeChange={setPuppeteerCode}
+                  timeout={puppeteerTimeout}
+                  onTimeoutChange={setPuppeteerTimeout}
+                  headless={puppeteerHeadless}
+                  onHeadlessChange={setPuppeteerHeadless}
+                  executionLog={puppeteerExecutionLog}
+                  onClearLog={() => setPuppeteerExecutionLog([])}
+                  lastResult={puppeteerLastResult}
+                  onInputChange={handleAIInputChange}
+                />
+              </TabsContent>
+            </Tabs>
             
-            <div className="flex gap-2">
+            {/* Footer Actions */}
+            <div className="flex justify-between items-center mt-6 pt-4 border-t">
               <Button
-                variant="outline"
-                onClick={() => onOpenChange(false)}
+                variant="destructive"
+                onClick={() => setShowRemoveDialog(true)}
               >
-                <X className="h-4 w-4 mr-2" />
-                Cancel
+                Remove Column
               </Button>
-              <Button
-                onClick={handleSave}
-                disabled={
-                  !hasChanges || 
-                  (mode === 'code' && !validateFormula(formula, headers).isValid) || 
-                  (mode === 'ai' && !aiPrompt.trim()) ||
-                  (mode === 'firecrawl' && !firecrawlUrl.trim()) ||
-                  (mode === 'ai-agents' && !userOfferDetails.trim())
-                  // (mode === 'puppeteer' && !puppeteerCode.trim()) // DISABLED
-                }
-              >
-                <Save className="h-4 w-4 mr-2" />
-                Save {mode === 'ai' ? 'AI Prompt' : mode === 'firecrawl' ? 'Firecrawl Template' : mode === 'ai-agents' ? 'AI Copy Agents' : mode === 'puppeteer' ? 'Puppeteer Code' : 'Formula'}
-              </Button>
+              
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => onOpenChange(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSave} disabled={!hasChanges && formulaModeHook.mode === 'code'}>
+                  Save Formula
+                </Button>
+              </div>
             </div>
           </div>
-        </SheetFooter>
-      </SheetContent>
-
+        </SheetContent>
+      </Sheet>
+      
+      {/* Slash Menu for Code Mode */}
       <SlashMenu
         isVisible={showSlashMenu}
         position={slashMenuPosition}
-        onSelect={handleSlashMenuSelect}
         onClose={() => setShowSlashMenu(false)}
+        onSelect={(value) => {
+          if (textareaRef.current) {
+            const start = textareaRef.current.selectionStart;
+            const newFormula = formula.substring(0, start - 1) + value + formula.substring(start);
+            setFormulaText(newFormula);
+            setHasChanges(true);
+          }
+          setShowSlashMenu(false);
+        }}
         availableColumns={headers}
       />
-    </Sheet>
+      
+      {/* Remove Column Confirmation Dialog */}
+      <AlertDialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Column?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove the column "{activeColumn}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRemoveColumn}>
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };
