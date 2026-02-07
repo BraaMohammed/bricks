@@ -209,7 +209,7 @@ export async function testGeminiConnection(): Promise<{ success: boolean; messag
       };
     }
 
-    // Use the most cost-effective model for testing
+    // Use the most cost-effective stable model for testing
     const testModel: GeminiModel = 'gemini-2.5-flash-lite';
     
     const testMessages = [

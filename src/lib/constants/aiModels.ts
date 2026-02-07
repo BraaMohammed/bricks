@@ -89,10 +89,11 @@ export const openAIModels: ModelDefinition[] = [
 
 /**
  * Available Gemini models with metadata
+ * Note: Gemini 3 models are in preview as of Feb 2026
  */
 export const geminiModels: ModelDefinition[] = [
-  { id: 'gemini-3-pro', name: 'Gemini 3 Pro (Latest)', supportsThinking: false, cost: 'Variable pricing' },
-  { id: 'gemini-3-flash', name: 'Gemini 3 Flash', supportsThinking: false, cost: 'Variable pricing' },
+  { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro (Preview)', supportsThinking: false, cost: 'Variable pricing' },
+  { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash (Preview)', supportsThinking: false, cost: 'Variable pricing' },
   { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', supportsThinking: false, cost: '$1.25/M tokens' },
   { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', supportsThinking: false, cost: '$0.40/M tokens' },
   { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite', supportsThinking: false, cost: '$0.10/M tokens' },
@@ -278,8 +279,8 @@ export const OPENAI_MODELS = [
  * Legacy Gemini models list (kept for backwards compatibility)
  */
 export const GEMINI_MODELS = [
-  'gemini-3-pro',
-  'gemini-3-flash',
+  'gemini-3-pro-preview',
+  'gemini-3-flash-preview',
   'gemini-2.5-pro',
   'gemini-2.5-flash',
   'gemini-2.5-flash-lite'
@@ -289,19 +290,19 @@ export const GEMINI_MODELS = [
  * Gemini model information with metadata
  */
 export const GEMINI_MODEL_INFO = {
-  'gemini-3-pro': {
+  'gemini-3-pro-preview': {
     name: 'Gemini 3 Pro',
-    description: 'Most capable model, 50%+ better than 2.5 Pro',
+    description: 'Most capable model, 50%+ better than 2.5 Pro (Preview)',
     contextWindow: '2M tokens',
     pricing: 'Variable pricing',
-    tier: 'latest'
+    tier: 'preview'
   },
-  'gemini-3-flash': {
+  'gemini-3-flash-preview': {
     name: 'Gemini 3 Flash',
-    description: 'Fast with advanced reasoning',
+    description: 'Fast with advanced reasoning (Preview)',
     contextWindow: '1M tokens',
     pricing: 'Variable pricing',
-    tier: 'latest'
+    tier: 'preview'
   },
   'gemini-2.5-pro': {
     name: 'Gemini 2.5 Pro',
