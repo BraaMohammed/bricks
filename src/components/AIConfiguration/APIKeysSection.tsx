@@ -5,7 +5,7 @@
  * Provides input fields with clear buttons and help links.
  */
 
-import { Key, Sparkles } from 'lucide-react';
+import { Key, Sparkles, Zap, X, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,6 +22,11 @@ export interface APIKeysSectionProps {
   clearGeminiKey: () => void;
   hasGeminiKey: boolean;
   
+  groqKey: string;
+  setGroqKey: (key: string) => void;
+  clearGroqKey: () => void;
+  hasGroqKey: boolean;
+  
   firecrawlKey: string;
   setFirecrawlKey: (key: string) => void;
   clearFirecrawlKey: () => void;
@@ -37,6 +42,10 @@ export const APIKeysSection = ({
   setGeminiKey,
   clearGeminiKey,
   hasGeminiKey,
+  groqKey,
+  setGroqKey,
+  clearGroqKey,
+  hasGroqKey,
   firecrawlKey,
   setFirecrawlKey,
   clearFirecrawlKey,
@@ -115,6 +124,42 @@ export const APIKeysSection = ({
               Google AI Studio
             </a>
             {' '}(Free tier available)
+          </p>
+        </div>
+
+        {/* Groq API Key */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="groq-key" className="flex items-center gap-2">
+              <Zap className="h-4 w-4" />
+              Groq API Key
+              {hasGroqKey && <div className="w-2 h-2 bg-green-500 rounded-full" />}
+            </Label>
+            <a 
+              href="https://console.groq.com/keys" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-xs text-blue-500 hover:underline flex items-center gap-1"
+            >
+              Get API Key <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+          <div className="flex gap-2">
+            <Input
+              id="groq-key"
+              type="password"
+              placeholder={hasGroqKey ? "API key is saved" : "Enter your Groq API key"}
+              value={groqKey}
+              onChange={(e) => setGroqKey(e.target.value)}
+            />
+            {hasGroqKey && (
+              <Button variant="outline" onClick={clearGroqKey}>
+                Clear
+              </Button>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Ultra-fast inference with LPU technology. Free tier: 30-60 req/min
           </p>
         </div>
 

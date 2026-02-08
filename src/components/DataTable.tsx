@@ -36,7 +36,7 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
   
   // Custom Hooks - Business Logic
   const { sortColumn, sortDirection, sortedRows, handleSort } = useTableSort(rows);
-  const { executingColumn, executingCells, executeFormula, executeCellFormula } = useFormulaExecution();
+  const { executingColumn, executingCells, executeFormula, executeCellFormula, executionProgress } = useFormulaExecution();
   const { handleCSVUpload } = useCSVUpload();
   const { 
     showAddColumnDialog, 
@@ -68,6 +68,7 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
       <TableToolbar 
         onUploadCSV={handleCSVUpload}
         onAddColumn={() => setShowAddColumnDialog(true)}
+        executionProgress={executionProgress}
       />
       
       {/* Horizontal scroll container with mirrored scroll bars */}

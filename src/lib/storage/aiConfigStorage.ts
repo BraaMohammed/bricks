@@ -14,6 +14,7 @@ import { STORAGE_KEYS, DEFAULT_OPENAI_MODEL, DEFAULT_OLLAMA_BASE_URL, AIProvider
 export interface AIConfig {
   openaiKey: string;
   geminiKey: string;
+  groqKey: string;
   firecrawlKey: string;
   provider: AIProvider;
   model: string;
@@ -103,6 +104,29 @@ export const aiConfigStorage = {
    */
   clearGeminiKey: (): void => {
     removeItem(STORAGE_KEYS.GEMINI_KEY);
+  },
+
+  // ==================== Groq API Key ====================
+  
+  /**
+   * Get the stored Groq API key
+   */
+  getGroqKey: (): string | null => {
+    return getItem(STORAGE_KEYS.GROQ_KEY);
+  },
+
+  /**
+   * Store the Groq API key
+   */
+  setGroqKey: (key: string): void => {
+    setItem(STORAGE_KEYS.GROQ_KEY, key.trim());
+  },
+
+  /**
+   * Clear the stored Groq API key
+   */
+  clearGroqKey: (): void => {
+    removeItem(STORAGE_KEYS.GROQ_KEY);
   },
 
   // ==================== Firecrawl API Key ====================
@@ -217,6 +241,14 @@ export const aiConfigStorage = {
       }
     }
     
+    if (config.groqKey !== undefined) {
+      if (config.groqKey) {
+        aiConfigStorage.setGroqKey(config.groqKey);
+      } else {
+        aiConfigStorage.clearGroqKey();
+      }
+    }
+    
     if (config.firecrawlKey !== undefined) {
       if (config.firecrawlKey) {
         aiConfigStorage.setFirecrawlKey(config.firecrawlKey);
@@ -249,6 +281,7 @@ export const aiConfigStorage = {
     return {
       openaiKey: aiConfigStorage.getOpenAIKey() || '',
       geminiKey: aiConfigStorage.getGeminiKey() || '',
+      groqKey: aiConfigStorage.getGroqKey() || '',
       firecrawlKey: aiConfigStorage.getFirecrawlKey() || '',
       provider: aiConfigStorage.getProvider(),
       model: aiConfigStorage.getModel() || DEFAULT_OPENAI_MODEL,
@@ -263,6 +296,7 @@ export const aiConfigStorage = {
   clearAll: (): void => {
     aiConfigStorage.clearOpenAIKey();
     aiConfigStorage.clearGeminiKey();
+    aiConfigStorage.clearGroqKey();
     aiConfigStorage.clearFirecrawlKey();
     removeItem(STORAGE_KEYS.AI_MODEL);
     removeItem(STORAGE_KEYS.AI_PROVIDER);

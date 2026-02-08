@@ -10,7 +10,7 @@ import { Sparkles } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AIProvider, GEMINI_MODELS, GEMINI_MODEL_INFO } from '@/lib/constants/aiModels';
+import { AIProvider, GEMINI_MODELS, GEMINI_MODEL_INFO, groqModels } from '@/lib/constants/aiModels';
 
 export interface ModelSelectorProps {
   provider: AIProvider;
@@ -38,6 +38,10 @@ export const ModelSelector = ({
     
     if (provider === 'gemini') {
       return 'Gemini 3 series are latest models. Gemini 2.5 Flash Lite offers best value at $0.10/M tokens.';
+    }
+    
+    if (provider === 'groq') {
+      return 'Groq provides ultra-fast inference. Llama 3.3 70B recommended for best quality. Free tier: 30-60 req/min.';
     }
     
     // Ollama provider
@@ -72,6 +76,8 @@ export const ModelSelector = ({
             ? 'Choose which OpenAI model to use for AI operations.'
             : provider === 'gemini'
             ? 'Choose which Google Gemini model to use for AI operations.'
+            : provider === 'groq'
+            ? 'Choose which Groq model to use for AI operations.'
             : 'Choose which local Ollama model to use for AI operations.'
           }
         </CardDescription>
@@ -109,6 +115,18 @@ export const ModelSelector = ({
                     </SelectItem>
                   );
                 })
+              ) : provider === 'groq' ? (
+                // Groq models
+                groqModels.map((modelDef) => (
+                  <SelectItem key={modelDef.id} value={modelDef.id}>
+                    <div className="flex items-center justify-between w-full">
+                      <span>{modelDef.name}</span>
+                      <span className="text-xs text-muted-foreground ml-2">
+                        {modelDef.cost}
+                      </span>
+                    </div>
+                  </SelectItem>
+                ))
               ) : (
                 // Ollama models
                 availableModels && availableModels.length > 0 ? (

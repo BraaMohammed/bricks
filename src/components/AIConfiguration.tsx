@@ -24,11 +24,13 @@ import { APIKeysSection } from '@/components/AIConfiguration/APIKeysSection';
 import { ProviderSelector } from '@/components/AIConfiguration/ProviderSelector';
 import { OllamaConfiguration } from '@/components/AIConfiguration/OllamaConfiguration';
 import { GeminiConfiguration } from '@/components/AIConfiguration/GeminiConfiguration';
+import { GroqConfiguration } from '@/components/AIConfiguration/GroqConfiguration';
 import { ModelSelector } from '@/components/AIConfiguration/ModelSelector';
 import { CustomPromptSection } from '@/components/AIConfiguration/CustomPromptSection';
 
 // Utilities
 import { testGeminiConnection } from '@/lib/gemini';
+import { testGroqConnection } from '@/lib/groq';
 
 // Constants
 import { OPENAI_MODELS } from '@/lib/constants/aiModels';
@@ -74,7 +76,11 @@ export const AIConfiguration = () => {
     return await testGeminiConnection();
   };
 
-  const handleProviderChange = (provider: 'openai' | 'ollama' | 'gemini') => {
+  const handleTestGroq = async () => {
+    return await testGroqConnection();
+  };
+
+  const handleProviderChange = (provider: 'openai' | 'ollama' | 'gemini' | 'groq') => {
     settings.setAiProvider(provider);
     
     // Trigger Ollama connection check if switching to Ollama
@@ -91,7 +97,7 @@ export const AIConfiguration = () => {
         <Button variant="outline" size="sm" className="flex items-center gap-2">
           <KeyRound className="h-4 w-4" />
           API Keys
-          {(settings.hasApiKey || settings.hasGeminiKey) && <div className="w-2 h-2 bg-green-500 rounded-full" />}
+          {(settings.hasApiKey || settings.hasGeminiKey || settings.hasGroqKey) && <div className="w-2 h-2 bg-green-500 rounded-full" />}
         </Button>
       </DialogTrigger>
       
@@ -114,6 +120,10 @@ export const AIConfiguration = () => {
             setGeminiKey={settings.setGeminiKey}
             clearGeminiKey={settings.clearGeminiKey}
             hasGeminiKey={settings.hasGeminiKey}
+            groqKey={settings.groqKey}
+            setGroqKey={settings.setGroqKey}
+            clearGroqKey={settings.clearGroqKey}
+            hasGroqKey={settings.hasGroqKey}
             firecrawlKey={settings.firecrawlKey}
             setFirecrawlKey={settings.setFirecrawlKey}
             clearFirecrawlKey={settings.clearFirecrawlKey}
@@ -146,6 +156,16 @@ export const AIConfiguration = () => {
               hasApiKey={settings.hasGeminiKey}
               onTestConnection={handleTestGemini}
             />
+          )}
+
+          {/* Groq Configuration - only shown when Groq is selected */}
+          {settings.aiProvider === 'groq' && (
+            <Card>
+              <GroqConfiguration
+                hasApiKey={settings.hasGroqKey}
+                onTestConnection={handleTestGroq}
+              />
+            </Card>
           )}
 
           {/* Model Selection */}

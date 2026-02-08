@@ -6,6 +6,7 @@
  */
 
 import { detectThinkingSupport, isOllamaModel } from '../providers/aiProviders';
+import { isGroqModel } from '../groq';
 
 /**
  * AI Formula generation parameters
@@ -14,7 +15,7 @@ export interface AIFormulaParams {
   prompt: string;
   message: string;
   model: string;
-  provider: 'openai' | 'ollama' | 'gemini';
+  provider: 'openai' | 'ollama' | 'gemini' | 'groq';
   temperature: number;
   maxTokens: number;
   topK: number;
@@ -89,6 +90,7 @@ export const generateAIFormulaCode = (params: AIFormulaParams): string => {
   // Determine provider type
   const isOllamaProvider = provider === 'ollama';
   const isGeminiModel = provider === 'gemini';
+  const isGroqProvider = provider === 'groq';
 
   // API endpoint
   let apiEndpoint = '';
@@ -96,6 +98,8 @@ export const generateAIFormulaCode = (params: AIFormulaParams): string => {
     apiEndpoint = `${ollamaBaseUrl}/v1/chat/completions`;
   } else if (isGeminiModel) {
     apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+  } else if (isGroqProvider) {
+    apiEndpoint = 'https://api.groq.com/openai/v1/chat/completions';
   } else {
     apiEndpoint = 'https://api.openai.com/v1/chat/completions';
   }
@@ -106,6 +110,8 @@ export const generateAIFormulaCode = (params: AIFormulaParams): string => {
     apiKeyCheck = '// Ollama runs locally without API key\nconst apiKey = null;';
   } else if (isGeminiModel) {
     apiKeyCheck = `const apiKey = localStorage.getItem('gemini_api_key');\n\nif (!apiKey) {\n  return 'Please set your Gemini API key in AI Settings';\n}`;
+  } else if (isGroqProvider) {
+    apiKeyCheck = `const apiKey = localStorage.getItem('groq_api_key');\n\nif (!apiKey) {\n  return 'Please set your Groq API key in AI Settings';\n}`;
   } else {
     apiKeyCheck = `const apiKey = localStorage.getItem('openai_api_key');\n\nif (!apiKey) {\n  return 'Please set your OpenAI API key in AI Settings';\n}`;
   }
@@ -116,6 +122,8 @@ export const generateAIFormulaCode = (params: AIFormulaParams): string => {
     authHeader = `      'Content-Type': 'application/json',`;
   } else if (isGeminiModel) {
     authHeader = `      'x-goog-api-key': apiKey,\n      'Content-Type': 'application/json',`;
+  } else if (isGroqProvider) {
+    authHeader = `      'Authorization': \`Bearer \${apiKey}\`,\n      'Content-Type': 'application/json',`;
   } else {
     authHeader = `      'Authorization': \`Bearer \${apiKey}\`,\n      'Content-Type': 'application/json',`;
   }
@@ -126,7 +134,7 @@ export const generateAIFormulaCode = (params: AIFormulaParams): string => {
   // Newer models (GPT-5, o-series) use 'max_completion_tokens'
   const useMaxCompletionTokens = model.startsWith('gpt-5') || model.startsWith('o');
 
-  const providerName = isGeminiModel ? 'Gemini' : isOllamaProvider ? 'Ollama' : 'OpenAI';
+  const providerName = isGeminiModel ? 'Gemini' : isGroqProvider ? 'Groq' : isOllamaProvider ? 'Ollama' : 'OpenAI';
 
   // Build request body based on provider
   let requestBodyCode = '';
@@ -184,8 +192,9 @@ const requestBody = {
   options: ollamaOptions
 };`;
   } else {
+    // OpenAI and Groq use same request format
     requestBodyCode = `
-// Build OpenAI request body conditionally
+// Build ${isGroqProvider ? 'Groq' : 'OpenAI'} request body conditionally
 const requestBody = {
   model: '${model}',
   messages: [{
@@ -413,12 +422,16 @@ return await runAIAgents(config, row);`;
 
 /**
  * Generates Puppeteer formula code
+ * NOTE: Does NOT process column references - users should access rowData directly
+ * (e.g., rowData.URL instead of {URL}) to avoid conflicts with JavaScript object literals
  */
 export const generatePuppeteerFormulaCode = (code: string, timeout: number, headless: boolean): string => {
-  const processedCode = processColumnReferences(code);
+  // DO NOT process column references for Puppeteer code
+  // Users should use rowData.ColumnName directly to avoid { } conflicts
+  const puppeteerCode = code;
 
   return `// Puppeteer Generated Formula (Enhanced Error Handling)  
-const puppeteerCode = ${JSON.stringify(processedCode)};
+const puppeteerCodeString = ${JSON.stringify(puppeteerCode)};
 const config = {
   timeout: ${timeout},
   headless: ${headless}
@@ -438,7 +451,7 @@ const logToUI = (message) => {
 };
 
 logToUI('🤖 Puppeteer Mode: Starting browser automation');
-logToUI('📋 Code length: ' + puppeteerCode.length + ' characters');
+logToUI('📋 Code length: ' + puppeteerCodeString.length + ' characters');
 logToUI('⚙️ Config: ' + JSON.stringify(config, null, 2));
 logToUI('📊 Row data keys: ' + Object.keys(row).join(', '));
 
@@ -462,7 +475,7 @@ return fetch(apiEndpoint, {
     'Content-Type': 'application/json',
   },
   body: JSON.stringify({
-    code: puppeteerCode,
+    code: puppeteerCodeString,
     config: config,
     rowData: row
   })

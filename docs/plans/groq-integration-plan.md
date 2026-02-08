@@ -146,15 +146,15 @@ src/
 
 ### Phase 1: Core Infrastructure
 
-#### Step 1.1: Add Groq Constants ⏳ TODO
+#### Step 1.1: Add Groq Constants ✅ COMPLETED
 **File:** `src/lib/constants/aiModels.ts`
 
 **Tasks:**
-- [ ] Add Groq to `PROVIDERS` array
-- [ ] Create `groqModels` array with model definitions
-- [ ] Add `GROQ_KEY` to `STORAGE_KEYS`
-- [ ] Update `getProviderModels()` to include Groq case
-- [ ] Add Groq icon import (use Zap icon from lucide-react)
+- [x] Add Groq to `PROVIDERS` array
+- [x] Create `groqModels` array with model definitions
+- [x] Add `GROQ_KEY` to `STORAGE_KEYS`
+- [x] Update `getProviderModels()` to include Groq case
+- [x] Add Groq icon import (use Zap icon from lucide-react)
 
 **Code Changes:**
 ```typescript
@@ -213,17 +213,19 @@ case 'groq':
 
 ---
 
-#### Step 1.2: Create Groq Utilities Module ⏳ TODO
+#### Step 1.2: Create Groq Utilities Module ✅ COMPLETED
 **File:** `src/lib/groq.ts` (NEW)
 
 **Tasks:**
-- [ ] Create new file with TypeScript interfaces
-- [ ] Add `getGroqApiKey()` function
-- [ ] Add `hasGroqApiKey()` function
-- [ ] Add `isGroqModel()` helper function
-- [ ] Add `sendGroqChatRequest()` function
-- [ ] Add `testGroqConnection()` function
-- [ ] Add proper error handling and type safety
+- [x] Create new file with TypeScript interfaces
+- [x] Import GroqModel type and GROQ_MODELS from aiModels.ts (single source of truth)
+- [x] Add `getGroqApiKey()` function
+- [x] Add `hasGroqApiKey()` function
+- [x] Add `isGroqModel()` helper function
+- [x] Add `sendGroqChatRequest()` function
+- [x] Add rate limiting error handling (429 status code)
+- [x] Add `testGroqConnection()` function
+- [x] Add proper error handling and type safety
 
 **Implementation:**
 ```typescript
@@ -234,22 +236,12 @@ case 'groq':
  * Compatible with OpenAI API format for easy integration.
  */
 
-import { STORAGE_KEYS } from './constants/aiModels';
+import { STORAGE_KEYS, GROQ_MODELS, type GroqModel } from './constants/aiModels';
 
 /**
  * Groq API base configuration
  */
 const GROQ_API_BASE_URL = 'https://api.groq.com/openai/v1';
-
-/**
- * Groq model type
- * Note: Free tier has 30 req/min rate limit for most models
- */
-export type GroqModel = 
-  | 'llama-3.3-70b-versatile'
-  | 'qwen/qwen3-32b'
-  | 'moonshotai/kimi-k2-instruct'
-  | 'openai/gpt-oss-120b';
 
 /**
  * Get the stored Groq API key
@@ -267,16 +259,12 @@ export function hasGroqApiKey(): boolean {
 
 /**
  * Check if a model is a Groq model
+ * Rate limits (Free tier):
+ * - Most models: 30 requests/min, 1K requests/day
+ * - Qwen/Kimi models: 60 requests/min, 1K requests/day
  */
-ex// Free tier: 30 req/min for most models, 60 req/min for Qwen/Kimi
-  const groqModels: GroqModel[] = [
-    'llama-3.3-70b-versatile',
-    'qwen/qwen3-32b',
-    'moonshotai/kimi-k2-instruct',
-    'openai/gpt-oss-120b-32768',
-    'gemma2-9b-it',
-  ];
-  return groqModels.includes(model as GroqModel);
+export function isGroqModel(model: string): boolean {
+  return GROQ_MODELS.includes(model as GroqModel);
 }
 
 /**
@@ -325,6 +313,14 @@ export async function sendGroqChatRequest(
         `Groq API error: ${response.status} ${response.statusText}`
       );
     }
+      // Handle rate limiting specifically
+      if (response.status === 429) {
+        throw new Error(
+          'Groq rate limit exceeded. Free tier: 30-60 req/min, 1K req/day. Please wait before retrying.'
+        );
+      }
+      
+      
 
     const data = await response.json();
     
@@ -383,15 +379,15 @@ export async function testGroqConnection(): Promise<{
 
 ---
 
-#### Step 1.3: Update AI Providers Helper ⏳ TODO
+#### Step 1.3: Update AI Providers Helper ✅ COMPLETED
 **File:** `src/lib/providers/aiProviders.ts`
 
 **Tasks:**
-- [ ] Import Groq utilities
-- [ ] Update `getAPIEndpoint()` to handle Groq
-- [ ] Update `buildRequestBody()` to handle Groq
-- [ ] Update `getAuthHeader()` to handle Groq
-- [ ] Add Groq to all type unions
+- [x] Import Groq utilities
+- [x] Update `getAPIEndpoint()` to handle Groq
+- [x] Update `buildRequestBody()` to handle Groq
+- [x] Update `getAuthHeader()` to handle Groq
+- [x] Add Groq to all type unions
 
 **Code Changes:**
 ```typescript
@@ -463,16 +459,16 @@ export const getAuthHeader = (
 
 ---
 
-#### Step 1.4: Update AI Agents Module ⏳ TODO
+#### Step 1.4: Update AI Agents Module ✅ COMPLETED
 **File:** `src/lib/aiAgents.ts`
 
 **Tasks:**
-- [ ] Import Groq utilities (`isGroqModel`, `sendGroqChatRequest`)
-- [ ] Update `getModelProvider()` to detect Groq models
-- [ ] Update `getApiConfig()` to handle Groq provider
-- [ ] Update `callMessageCreator()` - add Groq branch for API calls
-- [ ] Update `callLeadRoleplay()` - add Groq branch for API calls
-- [ ] Test with Groq models in both agents
+- [x] Import Groq utilities (`isGroqModel`, `sendGroqChatRequest`)
+- [x] Update `getModelProvider()` to detect Groq models
+- [x] Update `getApiConfig()` to handle Groq provider
+- [x] Update `callMessageCreator()` - add Groq branch for API calls
+- [x] Update `callLeadRoleplay()` - add Groq branch for API calls
+- [x] Test with Groq models in both agents
 
 **Code Changes:**
 ```typescript
@@ -551,16 +547,16 @@ if (apiConfig.provider === 'groq') {
 
 ### Phase 2: Storage & State Management
 
-#### Step 2.1: Update AI Config Storage ⏳ TODO
+#### Step 2.1: Update AI Config Storage ✅ COMPLETED
 **File:** `src/lib/storage/aiConfigStorage.ts`
 
 **Tasks:**
-- [ ] Add `groqKey` to storage interface
-- [ ] Add `getGroqKey()` method
-- [ ] Add `setGroqKey()` method
-- [ ] Add `clearGroqKey()` method
-- [ ] Update `loadAll()` to include Groq key
-- [ ] Update `clearAll()` to include Groq key
+- [x] Add `groqKey` to storage interface
+- [x] Add `getGroqKey()` method
+- [x] Add `setGroqKey()` method
+- [x] Add `clearGroqKey()` method
+- [x] Update `loadAll()` to include Groq key
+- [x] Update `clearAll()` to include Groq key
 
 **Code Changes:**
 ```typescript
@@ -602,15 +598,15 @@ export const aiConfigStorage = {
 
 ---
 
-#### Step 2.2: Update useAISettings Hook ⏳ TODO
+#### Step 2.2: Update useAISettings Hook ✅ COMPLETED
 **File:** `src/hooks/useAISettings.ts`
 
 **Tasks:**
-- [ ] Add Groq key state management
-- [ ] Add Groq to AIProvider type unions
-- [ ] Update model selection logic for Groq
-- [ ] Add Groq to `availableModels` calculation
-- [ ] Update `saveAllSettings()` to save Groq key
+- [x] Add Groq key state management
+- [x] Add Groq to AIProvider type unions
+- [x] Update model selection logic for Groq
+- [x] Add Groq to `availableModels` calculation
+- [x] Update `saveAllSettings()` to save Groq key
 
 **Code Changes:**
 ```typescript
@@ -671,15 +667,15 @@ export const useAISettings = (ollamaModels: string[] = []): AISettings => {
 
 ### Phase 3: UI Components
 
-#### Step 3.1: Update API Keys Section ⏳ TODO
+#### Step 3.1: Update API Keys Section ✅ COMPLETED
 **File:** `src/components/AIConfiguration/APIKeysSection.tsx`
 
 **Tasks:**
-- [ ] Add Groq API key input field
-- [ ] Add Groq key visibility toggle
-- [ ] Add Groq key clear button
-- [ ] Add status indicator for Groq key
-- [ ] Add link to Groq API keys page
+- [x] Add Groq API key input field
+- [x] Add Groq key visibility toggle
+- [x] Add Groq key clear button
+- [x] Add status indicator for Groq key
+- [x] Add link to Groq API keys page
 
 **Code Changes:**
 ```typescript
@@ -743,16 +739,16 @@ interface APIKeysSectionProps {
 
 ---
 
-#### Step 3.2: Create Groq Configuration Component ⏳ TODO
+#### Step 3.2: Create Groq Configuration Component ✅ COMPLETED
 **File:** `src/components/AIConfiguration/GroqConfiguration.tsx` (NEW)
 
 **Tasks:**
-- [ ] Create new component for Groq-specific settings
-- [ ] Add test connection button
-- [ ] Add connection status indicator
-- [ ] Add speed/latency display
-- [ ] Add model information display
-- [ ] Add helpful links to Groq documentation
+- [x] Create new component for Groq-specific settings
+- [x] Add test connection button
+- [x] Add connection status indicator
+- [x] Add speed/latency display
+- [x] Add model information display
+- [x] Add helpful links to Groq documentation
 
 **Implementation:**
 ```typescript
@@ -899,13 +895,13 @@ export const GroqConfiguration = ({ hasApiKey, onTestConnection }: GroqConfigura
 
 ---
 
-#### Step 3.3: Update Provider Selector ⏳ TODO
+#### Step 3.3: Update Provider Selector ✅ COMPLETED
 **File:** `src/components/AIConfiguration/ProviderSelector.tsx`
 
 **Tasks:**
-- [ ] Add Groq option to provider dropdown
-- [ ] Add Zap icon for Groq
-- [ ] Update provider description
+- [x] Add Groq option to provider dropdown
+- [x] Add Zap icon for Groq
+- [x] Update provider description
 
 **Code Changes:**
 ```typescript
@@ -924,14 +920,14 @@ import { Key, Sparkles, Server, Zap } from 'lucide-react';
 
 ---
 
-#### Step 3.4: Update AI Configuration Dialog ⏳ TODO
+#### Step 3.4: Update AI Configuration Dialog ✅ COMPLETED
 **File:** `src/components/AIConfiguration.tsx`
 
 **Tasks:**
-- [ ] Add Groq key props to APIKeysSection
-- [ ] Add Groq configuration section (conditional render)
-- [ ] Add `handleTestGroq` function
-- [ ] Pass Groq state from useAISettings
+- [x] Add Groq key props to APIKeysSection
+- [x] Add Groq configuration section (conditional render)
+- [x] Add `handleTestGroq` function
+- [x] Pass Groq state from useAISettings
 
 **Code Changes:**
 ```typescript
@@ -968,13 +964,13 @@ const handleTestGroq = async () => {
 
 ---
 
-#### Step 3.5: Update Model Selector ⏳ TODO
+#### Step 3.5: Update Model Selector ✅ COMPLETED
 **File:** `src/components/AIConfiguration/ModelSelector.tsx`
 
 **Tasks:**
-- [ ] Add Groq provider case in model display
-- [ ] Add Groq-specific help text
-- [ ] Update model selection UI for Groq models
+- [x] Add Groq provider case in model display
+- [x] Add Groq-specific help text
+- [x] Update model selection UI for Groq models
 
 **Code Changes:**
 ```typescript
@@ -1004,15 +1000,15 @@ if (provider === 'groq') {Free tier: 30-60 req/min.
 
 ### Phase 4: Formula Generation & Validation
 
-#### Step 4.1: Update Formula Generators ⏳ TODO
+#### Step 4.1: Update Formula Generators ✅ COMPLETED
 **File:** `src/lib/generators/formulaGenerators.ts`
 
 **Tasks:**
-- [ ] Import Groq utilities
-- [ ] Add Groq detection in formula generation
-- [ ] Update `generateFormulaCode()` for Groq API calls
-- [ ] Add Groq-specific API endpoint handling
-- [ ] Test generated formulas with Groq models
+- [x] Import Groq utilities
+- [x] Add Groq detection in formula generation
+- [x] Update `generateFormulaCode()` for Groq API calls
+- [x] Add Groq-specific API endpoint handling
+- [x] Test generated formulas with Groq models
 
 **Code Changes:**
 ```typescript
@@ -1117,13 +1113,13 @@ return data.choices[0].message.content.trim();
 
 ---
 
-#### Step 4.2: Update Formula Validation ⏳ TODO
+#### Step 4.2: Update Formula Validation ✅ COMPLETED
 **File:** `src/hooks/useFormulaValidation.ts`
 
 **Tasks:**
-- [ ] Add Groq to provider type unions
-- [ ] Update validation logic for Groq
-- [ ] Add Groq-specific error messages
+- [x] Add Groq to provider type unions
+- [x] Update validation logic for Groq
+- [x] Add Groq-specific error messages
 
 **Code Changes:**
 ```typescript
@@ -1211,6 +1207,279 @@ export const useFormulaValidation = (options: {
 
 ---
 
+### Phase 6: Rate Limiting & Bulk Request Handling ⚠️ CRITICAL
+
+#### Step 6.1: Create Rate Limiter Utility ✅ COMPLETED
+**File:** `src/lib/utils/rateLimiter.ts` (NEW)
+
+**Tasks:**
+- [x] Create `executeWithRateLimit` function
+- [x] Support configurable batch size and delay
+- [x] Add progress callback for UI updates
+- [x] Add abort signal support for cancellation
+- [x] Add TypeScript types and JSDoc
+
+**Implementation:**
+```typescript
+/**
+ * Execute promises in batches with rate limiting
+ * @param promises - Array of promise-returning functions
+ * @param maxConcurrent - Maximum concurrent requests per batch
+ * @param delayMs - Delay between batches in milliseconds
+ * @param onProgress - Optional progress callback
+ */
+export async function executeWithRateLimit<T>(
+  promises: Array<() => Promise<T>>,
+  options: {
+    maxConcurrent?: number;
+    delayMs?: number;
+    onProgress?: (completed: number, total: number) => void;
+    signal?: AbortSignal;
+  } = {}
+): Promise<T[]> {
+  const {
+    maxConcurrent = 10,
+    delayMs = 1000,
+    onProgress,
+    signal
+  } = options;
+
+  const results: T[] = [];
+  const total = promises.length;
+  
+  for (let i = 0; i < total; i += maxConcurrent) {
+    // Check for cancellation
+    if (signal?.aborted) {
+      throw new Error('Rate limited execution cancelled');
+    }
+
+    const batch = promises.slice(i, i + maxConcurrent);
+    const batchResults = await Promise.all(batch.map(fn => fn()));
+    results.push(...batchResults);
+    
+    // Update progress
+    if (onProgress) {
+      onProgress(Math.min(i + maxConcurrent, total), total);
+    }
+    
+    // Add delay between batches (except for last batch)
+    if (i + maxConcurrent < total) {
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+  
+  return results;
+}
+
+/**
+ * Get rate limit configuration for each provider
+ */
+export function getRateLimitConfig(provider: string, model?: string): {
+  maxConcurrent: number;
+  delayMs: number;
+  description: string;
+} {
+  switch (provider) {
+    case 'groq':
+      // Qwen and Kimi models have higher limits (60 RPM)
+      const isHigherLimit = model?.includes('qwen') || model?.includes('kimi');
+      return {
+        maxConcurrent: isHigherLimit ? 15 : 10,
+        delayMs: 1000,
+        description: isHigherLimit 
+          ? 'Groq (60 req/min - Qwen/Kimi models)'
+          : 'Groq (30 req/min)'
+      };
+    
+    case 'gemini':
+      return {
+        maxConcurrent: 30,
+        delayMs: 500,
+        description: 'Gemini (60 req/min)'
+      };
+    
+    case 'openai':
+      return {
+        maxConcurrent: 50,
+        delayMs: 100,
+        description: 'OpenAI (high limits)'
+      };
+    
+    case 'ollama':
+      return {
+        maxConcurrent: 100, // No rate limit for local
+        delayMs: 0,
+        description: 'Ollama (local - no limits)'
+      };
+    
+    default:
+      return {
+        maxConcurrent: 10,
+        delayMs: 1000,
+        description: 'Default rate limiting'
+      };
+  }
+}
+```
+
+**Estimated Time:** 1.5 hours
+
+---
+
+#### Step 6.2: Update Formula Execution Hook 🔄 IN PROGRESS
+**File:** `src/hooks/useFormulaExecution.ts`
+
+**Tasks:**
+- [ ] Import rate limiter utility
+- [ ] Get current provider from useAISettings
+- [ ] Apply rate limiting based on provider
+- [ ] Add progress tracking state
+- [ ] Update toast notifications with progress
+- [ ] Handle cancellation
+
+**Code Changes:**
+```typescript
+import { executeWithRateLimit, getRateLimitConfig } from '@/lib/utils/rateLimiter';
+import { useDataStore } from '@/stores/useDataStore';
+import { useState, useCallback } from 'react';
+
+export const useFormulaExecution = (): UseFormulaExecutionReturn => {
+  const [executionProgress, setExecutionProgress] = useState<{
+    completed: number;
+    total: number;
+  } | null>(null);
+
+  const executeFormula = async (column: string) => {
+    // ... existing validation code
+
+    // Get current AI provider and model
+    const aiProvider = localStorage.getItem('ai_provider') || 'openai';
+    const aiModel = localStorage.getItem('ai_model') || '';
+    
+    const rateLimitConfig = getRateLimitConfig(aiProvider, aiModel);
+    
+    console.log(`🚦 Rate limiting: ${rateLimitConfig.description}`);
+    console.log(`📊 Batch size: ${rateLimitConfig.maxConcurrent}, Delay: ${rateLimitConfig.delayMs}ms`);
+
+    try {
+      // Create array of promise-returning functions (not promises yet!)
+      const rowTasks = rows.map((row, i) => async () => {
+        try {
+          const asyncFunction = new Function('row', 'runAIAgents', `
+            return (async () => {
+              ${formula}
+            })();
+          `);
+          
+          const result = await asyncFunction(row, runAIAgents);
+          const stringResult = result !== null && result !== undefined ? String(result) : '';
+          
+          updateCell(i, column, stringResult);
+          return { success: true, rowIndex: i };
+        } catch (error) {
+          updateCell(i, column, 'ERROR');
+          console.error(`❌ Row ${i + 1} failed:`, error);
+          return { success: false, rowIndex: i, error };
+        }
+      });
+
+      // Execute with rate limiting
+      const results = await executeWithRateLimit(rowTasks, {
+        maxConcurrent: rateLimitConfig.maxConcurrent,
+        delayMs: rateLimitConfig.delayMs,
+        onProgress: (completed, total) => {
+          setExecutionProgress({ completed, total });
+          console.log(`📊 Progress: ${completed}/${total} rows`);
+        }
+      });
+      
+      setExecutionProgress(null);
+      
+      const successCount = results.filter(r => r.success).length;
+      const errorCount = results.filter(r => !r.success).length;
+
+      toast({
+        title: "Formula Executed",
+        description: `${successCount} rows processed successfully${errorCount > 0 ? `, ${errorCount} errors` : ''}. Rate limited: ${rateLimitConfig.description}`,
+        variant: errorCount === 0 ? "default" : "destructive",
+      });
+    } catch (error) {
+      console.error('Error executing formula:', error);
+      setExecutionProgress(null);
+      toast({
+        title: "Execution Error",
+        description: "Failed to execute formula. Check your syntax.",
+        variant: "destructive",
+      });
+    } finally {
+      setExecutingColumn(null);
+      setLoading(false);
+    }
+  };
+
+  return {
+    executingColumn,
+    executingCells,
+    executeFormula,
+    executeCellFormula,
+    executionProgress, // Export for UI
+  };
+};
+```
+
+**Estimated Time:** 2 hours
+
+---
+
+#### Step 6.3: Add Progress Indicator UI ⏳ TODO
+**File:** `src/components/DataTable/TableToolbar.tsx`
+
+**Tasks:**
+- [ ] Import execution progress from hook
+- [ ] Add progress bar component
+- [ ] Show "Processing batch X of Y" message
+- [ ] Add cancel button (optional)
+
+**Code Changes:**
+```typescript
+import { Progress } from '@/components/ui/progress';
+
+// In component:
+const { executionProgress } = useFormulaExecution();
+
+// In JSX:
+{executionProgress && (
+  <div className="flex items-center gap-2 text-sm">
+    <Progress 
+      value={(executionProgress.completed / executionProgress.total) * 100} 
+      className="w-32"
+    />
+    <span className="text-muted-foreground">
+      {executionProgress.completed}/{executionProgress.total} rows
+    </span>
+  </div>
+)}
+```
+
+**Estimated Time:** 1 hour
+
+---
+
+#### Step 6.4: Testing Rate Limiting ⏳ TODO
+**Tasks:**
+- [ ] Test with 100+ rows on Groq (should batch properly)
+- [ ] Test with different Groq models (30 vs 60 RPM)
+- [ ] Verify no 429 errors occur
+- [ ] Test progress indicator updates correctly
+- [ ] Test switching providers mid-execution
+- [ ] Compare execution time vs without rate limiting
+- [ ] Test with OpenAI (should be faster with higher limits)
+- [ ] Test with Ollama (should be instant, no batching)
+
+**Estimated Time:** 2 hours
+
+---
+
 ## Benefits Summary
 
 ### For Users
@@ -1238,7 +1507,8 @@ export const useFormulaValidation = (options: {
 | **Phase 3** | UI Components | 3.5 hours |
 | **Phase 4** | Formula Generation & Validation | 2.5 hours |
 | **Phase 5** | Testing & Documentation | 7 hours |
-| **Total** | | **20 hours** |
+| **Phase 6** | Rate Limiting & Bulk Request Handling | 6.5 hours |
+| **Total** | | **26.5 hours** |
 
 ---
 
@@ -1274,6 +1544,88 @@ export const useFormulaValidation = (options: {
 - Implement proper error handling for 429 (rate limit) responses
 - Consider request queuing for high-volume scenarios
 
+### **⚠️ CRITICAL: Bulk Request Rate Limiting**
+
+**Problem**: When users execute formulas on all rows (e.g., 100 rows), `useFormulaExecution.ts` currently uses `Promise.all()` to fire all requests simultaneously. This will immediately hit Groq's rate limit:
+- First 29-59 rows: ✅ Success
+- Remaining rows: ❌ 429 Rate Limit Error
+
+**Current Behavior**:
+```typescript
+// In useFormulaExecution.ts - Line 42-68
+const rowPromises = rows.map(async (row, i) => {
+  // Each row fires immediately
+});
+await Promise.all(rowPromises); // All 100 requests fire at once!
+```
+
+**Solution: Client-Side Rate Limiting** ⭐
+
+Since all API fetching happens client-side, rate limiting must also be implemented client-side. Add a request queue/throttle in `useFormulaExecution.ts`:
+
+```typescript
+// New utility function to throttle requests
+async function executeWithRateLimit(
+  promises: Array<() => Promise<any>>,
+  maxConcurrent: number = 10,  // Process 10 at a time
+  delayMs: number = 1000        // 1 second delay between batches
+): Promise<any[]> {
+  const results: any[] = [];
+  
+  for (let i = 0; i < promises.length; i += maxConcurrent) {
+    const batch = promises.slice(i, i + maxConcurrent);
+    const batchResults = await Promise.all(batch.map(fn => fn()));
+    results.push(...batchResults);
+    
+    // Add delay between batches (except for last batch)
+    if (i + maxConcurrent < promises.length) {
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+  
+  return results;
+}
+
+// Usage in executeFormula():
+const rowPromises = rows.map((row, i) => async () => {
+  // ... existing row execution logic
+});
+
+// Replace Promise.all with rate-limited execution
+const results = await executeWithRateLimit(rowPromises, 10, 1000);
+```
+
+**Benefits**:
+- ✅ Works for ALL providers (OpenAI, Gemini, Groq, Ollama)
+- ✅ Configurable per provider (Groq: 10/batch, OpenAI: 50/batch)
+- ✅ Simple to implement - pure client-side JavaScript
+- ✅ No backend changes needed
+- ✅ Works with existing fetch() calls
+
+**Rate Limit Calculation**:
+- Groq Free: 30 RPM = ~10 requests every 20 seconds = safe ✅
+- With 10 requests/batch + 1s delay: ~60 requests/minute = within limit ✅
+- For Qwen/Kimi (60 RPM): 15 requests/batch + 1s delay = safe ✅
+
+**Implementation Plan**:
+1. Create `src/lib/utils/rateLimiter.ts` with `executeWithRateLimit` utility
+2. Update `useFormulaExecution.ts` to detect provider and apply rate limits:
+   - Groq: 10 requests/batch, 1s delay (30 RPM)
+   - Qwen/Kimi Groq models: 15 requests/batch, 1s delay (60 RPM)
+   - OpenAI: 50 requests/batch, 100ms delay (no significant limit)
+   - Gemini: 30 requests/batch, 500ms delay
+   - Ollama: No rate limiting (local)
+3. Add progress indicator showing "Processing batch X of Y..."
+4. Update error messages to suggest rate limit cause
+
+**Files to Modify**:
+- `src/lib/utils/rateLimiter.ts` - NEW
+- `src/hooks/useFormulaExecution.ts` - Update to use rate limiter
+- `src/hooks/useAISettings.ts` - Expose current provider info
+- `src/components/DataTable/TableToolbar.tsx` - Add batch progress indicator
+
+**Estimated Time**: 2-3 hours
+
 ### Future Enhancements
 - [ ] Add streaming support for real-time responses
 - [ ] Implement automatic provider failover (if Groq fails, try OpenAI)
@@ -1281,6 +1633,7 @@ export const useFormulaValidation = (options: {
 - [ ] Support for Groq's function calling capabilities
 - [ ] Integration with Groq's batch processing API
 - [ ] Add model performance benchmarks to UI
+- [ ] Implement retry logic with exponential backoff for failed requests
 
 ---
 
@@ -1298,33 +1651,39 @@ export const useFormulaValidation = (options: {
 ## Completion Checklist
 
 ### Phase 1: Core Infrastructure
-- [ ] Step 1.1: Add Groq Constants
-- [ ] Step 1.2: Create Groq Utilities Module
-- [ ] Step 1.3: Update AI Providers Helper
-- [ ] Step 1.4: Update AI Agents Module
+- [x] Step 1.1: Add Groq Constants
+- [x] Step 1.2: Create Groq Utilities Module
+- [x] Step 1.3: Update AI Providers Helper
+- [x] Step 1.4: Update AI Agents Module
 
 ### Phase 2: Storage & State Management
-- [ ] Step 2.1: Update AI Config Storage
-- [ ] Step 2.2: Update useAISettings Hook
+- [x] Step 2.1: Update AI Config Storage
+- [x] Step 2.2: Update useAISettings Hook
 
 ### Phase 3: UI Components
-- [ ] Step 3.1: Update API Keys Section
-- [ ] Step 3.2: Create Groq Configuration Component
-- [ ] Step 3.3: Update Provider Selector
-- [ ] Step 3.4: Update AI Configuration Dialog
-- [ ] Step 3.5: Update Model Selector
+- [x] Step 3.1: Update API Keys Section
+- [x] Step 3.2: Create Groq Configuration Component
+- [x] Step 3.3: Update Provider Selector
+- [x] Step 3.4: Update AI Configuration Dialog
+- [x] Step 3.5: Update Model Selector
 
 ### Phase 4: Formula Generation & Validation
-- [ ] Step 4.1: Update Formula Generators
-- [ ] Step 4.2: Update Formula Validation
+- [x] Step 4.1: Update Formula Generators
+- [x] Step 4.2: Update Formula Validation
 
 ### Phase 5: Testing & Documentation
-- [ ] Step 5.1: Manual Testing
-- [ ] Step 5.2: Integration Testing
-- [ ] Step 5.3: Documentation Updates
+- [ ] Step 5.1: Manual Testing (Deferred)
+- [ ] Step 5.2: Integration Testing (Deferred)
+- [ ] Step 5.3: Documentation Updates (Deferred)
+
+### Phase 6: Rate Limiting (⚠️ CRITICAL)
+- [ ] Step 6.1: Create Rate Limiter Utility ← 🔄 CURRENT STEP
+- [ ] Step 6.2: Update Formula Execution Hook
+- [ ] Step 6.3: Add Progress Indicator UI
+- [ ] Step 6.4: Testing Rate Limiting
 
 ---
 
-**Status:** ⏳ Planning Complete - Ready for Implementation  
-**Last Updated:** February 7, 2026  
-**Created By:** GitHub Copilot
+**Status:** 🔄 In Progress - Phase 6: Step 6.1 (Rate Limiting - CRITICAL)  
+**Progress:** Phase 1-4 Complete ✅ | Phase 5 Deferred | Currently at Step 6.1 🔄  
+**Last Updated:** February 8, 2026  

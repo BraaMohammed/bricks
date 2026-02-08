@@ -14,7 +14,7 @@
  * 5. Update icon imports if needed
  */
 
-import { Key, Sparkles, Server } from 'lucide-react';
+import { Key, Sparkles, Server, Zap } from 'lucide-react';
 
 /**
  * Model definition interface
@@ -44,6 +44,13 @@ export const PROVIDERS = [
     id: 'gemini',
     name: 'Google Gemini (Cloud)',
     icon: Sparkles,
+    requiresApiKey: true,
+    supportsLocalModels: false,
+  },
+  {
+    id: 'groq',
+    name: 'Groq (Cloud)',
+    icon: Zap,
     requiresApiKey: true,
     supportsLocalModels: false,
   },
@@ -100,6 +107,37 @@ export const geminiModels: ModelDefinition[] = [
 ];
 
 /**
+ * Available Groq models with metadata
+ * Note: Free tier has rate limits - 30 RPM for most models, 60 RPM for Qwen/Kimi
+ */
+export const groqModels: ModelDefinition[] = [
+  { 
+    id: 'llama-3.3-70b-versatile', 
+    name: 'Llama 3.3 70B Versatile (Recommended)', 
+    supportsThinking: false, 
+    cost: 'Free tier: 30 RPM, 1K RPD' 
+  },
+  { 
+    id: 'qwen/qwen3-32b', 
+    name: 'Qwen 3 32B (Reasoning)', 
+    supportsThinking: false, 
+    cost: 'Free tier: 60 RPM, 1K RPD' 
+  },
+  { 
+    id: 'moonshotai/kimi-k2-instruct', 
+    name: 'Kimi K2 Instruct (Fast)', 
+    supportsThinking: false, 
+    cost: 'Free tier: 60 RPM, 1K RPD' 
+  },
+  { 
+    id: 'openai/gpt-oss-120b', 
+    name: 'GPT OSS 120B (Largest)', 
+    supportsThinking: false, 
+    cost: 'Free tier: 30 RPM, 1K RPD' 
+  },
+];
+
+/**
  * Helper function to get models for a specific provider
  * Ollama models are fetched dynamically from the server
  */
@@ -109,6 +147,8 @@ export function getProviderModels(provider: AIProvider, ollamaModels: string[] =
       return openAIModels;
     case 'gemini':
       return geminiModels;
+    case 'groq':
+      return groqModels;
     case 'ollama':
       return ollamaModels.map(model => ({
         id: model,
@@ -238,6 +278,7 @@ export const STORAGE_KEYS = {
   OPENAI_KEY: 'openai_api_key',
   FIRECRAWL_KEY: 'firecrawl_api_key',
   GEMINI_KEY: 'gemini_api_key',
+  GROQ_KEY: 'groq_api_key',
   
   // AI Settings
   AI_MODEL: 'ai_model',
@@ -284,6 +325,16 @@ export const GEMINI_MODELS = [
   'gemini-2.5-pro',
   'gemini-2.5-flash',
   'gemini-2.5-flash-lite'
+] as const;
+
+/**
+ * Groq models list (for validation and type safety)
+ */
+export const GROQ_MODELS = [
+  'llama-3.3-70b-versatile',
+  'qwen/qwen3-32b',
+  'moonshotai/kimi-k2-instruct',
+  'openai/gpt-oss-120b'
 ] as const;
 
 /**
@@ -336,3 +387,8 @@ export type OpenAIModel = typeof OPENAI_MODELS[number];
  * Gemini model type
  */
 export type GeminiModel = typeof GEMINI_MODELS[number];
+
+/**
+ * Groq model type
+ */
+export type GroqModel = typeof GROQ_MODELS[number];

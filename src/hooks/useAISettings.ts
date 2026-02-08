@@ -22,6 +22,7 @@ import {
   DEFAULT_OPENAI_MODEL, 
   openAIModels, 
   geminiModels,
+  groqModels,
   ModelDefinition 
 } from '@/lib/constants/aiModels';
 import { detectThinkingSupport } from '@/lib/providers/aiProviders';
@@ -39,6 +40,12 @@ export interface AISettings {
   hasGeminiKey: boolean;
   setGeminiKey: (key: string) => void;
   clearGeminiKey: () => void;
+  
+  // Groq API Key
+  groqKey: string;
+  hasGroqKey: boolean;
+  setGroqKey: (key: string) => void;
+  clearGroqKey: () => void;
   
   // Firecrawl API Key
   firecrawlKey: string;
@@ -101,6 +108,12 @@ export const useAISettings = (ollamaModels: string[] = []): AISettings => {
     initialConfig.geminiKey
   );
   
+  const groqKeyManager = useAPIKeyManager(
+    STORAGE_KEYS.GROQ_KEY,
+    'Groq',
+    initialConfig.groqKey
+  );
+  
   const firecrawlKeyManager = useAPIKeyManager(
     STORAGE_KEYS.FIRECRAWL_KEY,
     'Firecrawl',
@@ -145,6 +158,8 @@ export const useAISettings = (ollamaModels: string[] = []): AISettings => {
       return openAIModels;
     } else if (aiProvider === 'gemini') {
       return geminiModels;
+    } else if (aiProvider === 'groq') {
+      return groqModels;
     } else {
       // Ollama models
       return ollamaModels.map(modelName => ({
@@ -164,6 +179,7 @@ export const useAISettings = (ollamaModels: string[] = []): AISettings => {
     
     openaiKeyManager.setKey(config.openaiKey);
     geminiKeyManager.setKey(config.geminiKey);
+    groqKeyManager.setKey(config.groqKey);
     firecrawlKeyManager.setKey(config.firecrawlKey);
     setAiProviderState(config.provider);
     setModelState(config.model || DEFAULT_OPENAI_MODEL);
@@ -181,6 +197,9 @@ export const useAISettings = (ollamaModels: string[] = []): AISettings => {
     }
     if (geminiKeyManager.key.trim()) {
       aiConfigStorage.setGeminiKey(geminiKeyManager.key);
+    }
+    if (groqKeyManager.key.trim()) {
+      aiConfigStorage.setGroqKey(groqKeyManager.key);
     }
     if (firecrawlKeyManager.key.trim()) {
       aiConfigStorage.setFirecrawlKey(firecrawlKeyManager.key);
@@ -200,6 +219,7 @@ export const useAISettings = (ollamaModels: string[] = []): AISettings => {
   }, [
     openaiKeyManager.key,
     geminiKeyManager.key,
+    groqKeyManager.key,
     firecrawlKeyManager.key,
     aiProvider,
     model,
@@ -296,6 +316,14 @@ export const useAISettings = (ollamaModels: string[] = []): AISettings => {
   }, [geminiKeyManager]);
 
   /**
+   * Wrapper for clearGroqKey with persistence
+   */
+  const clearGroqKey = useCallback(() => {
+    groqKeyManager.clearKey();
+    aiConfigStorage.clearGroqKey();
+  }, [groqKeyManager]);
+
+  /**
    * Wrapper for clearFirecrawlKey with persistence
    */
   const clearFirecrawlKey = useCallback(() => {
@@ -315,6 +343,12 @@ export const useAISettings = (ollamaModels: string[] = []): AISettings => {
     hasGeminiKey: geminiKeyManager.hasKey,
     setGeminiKey: geminiKeyManager.setKey,
     clearGeminiKey,
+    
+    // Groq API Key
+    groqKey: groqKeyManager.key,
+    hasGroqKey: groqKeyManager.hasKey,
+    setGroqKey: groqKeyManager.setKey,
+    clearGroqKey,
     
     // Firecrawl API Key
     firecrawlKey: firecrawlKeyManager.key,

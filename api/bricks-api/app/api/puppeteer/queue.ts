@@ -27,7 +27,7 @@ export interface QueueJob {
 class PuppeteerQueue {
   private jobs: Map<string, QueueJob> = new Map();
   private processingJobs = new Set<string>();
-  private maxConcurrent = 3; // Max jobs processing simultaneously
+  private maxConcurrent = 10; // Max jobs processing simultaneously (increased from 3)
   private processing = false;
 
   private generateJobId(): string {
@@ -123,7 +123,8 @@ class PuppeteerQueue {
         const { page, release: releasePage } = await browserPool.getPage(browserId);
         
         try {
-          // Set timeout
+          // Set navigation timeout (separate from execution timeout)
+          page.setDefaultNavigationTimeout(60000); // 60s for page loads
           page.setDefaultTimeout(job.config.timeout);
           
           // Validate code security
@@ -205,7 +206,7 @@ class PuppeteerQueue {
           recordJobCompleted(job.id, job.startedAt ? Date.now() - job.startedAt.getTime() : 0);
 
         } finally {
-          releasePage();
+          await releasePage();
         }
       } finally {
         releaseBrowser();

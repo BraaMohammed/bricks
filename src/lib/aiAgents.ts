@@ -1,4 +1,5 @@
 import { isGeminiModel, sendGeminiChatRequest } from './gemini';
+import { isGroqModel, sendGroqChatRequest } from './groq';
 import type { AIProvider } from './constants/aiModels';
 
 interface AgentConfig {
@@ -30,6 +31,8 @@ function isOllamaModel(modelName: string): boolean {
 function getModelProvider(modelName: string): AIProvider {
   if (isGeminiModel(modelName)) {
     return 'gemini';
+  } else if (isGroqModel(modelName)) {
+    return 'groq';
   } else if (isOllamaModel(modelName)) {
     return 'ollama';
   } else {
@@ -49,6 +52,18 @@ function getApiConfig(modelName: string) {
       requiresApiKey: true,
       apiKey,
       provider: 'gemini' as const
+    };
+  } else if (provider === 'groq') {
+    const apiKey = localStorage.getItem('groq_api_key');
+    return {
+      endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      requiresApiKey: true,
+      apiKey,
+      provider: 'groq' as const
     };
   } else if (provider === 'ollama') {
     const baseUrl = localStorage.getItem('ollama_base_url') || 'http://localhost:11434';
@@ -248,6 +263,17 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
     } catch (error) {
       throw new Error(`Gemini Creator API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  } else if (apiConfig.provider === 'groq') {
+    try {
+      rawCreatorContent = await sendGroqChatRequest(
+        config.messageCreatorModel as any,
+        [{ role: 'user', content: creatorPrompt }],
+        { temperature: 0.7, maxTokens: 2048 }
+      );
+      console.log('📥 Groq creator response:', rawCreatorContent);
+    } catch (error) {
+      throw new Error(`Groq Creator API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   } else {
     // OpenAI and Ollama use standard chat completions API
     const creatorResponse = await fetch(apiConfig.endpoint, {
@@ -371,6 +397,17 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
       console.log('📥 Gemini roleplay response:', rawRoleplayContent);
     } catch (error) {
       throw new Error(`Gemini Roleplay API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  } else if (apiConfig.provider === 'groq') {
+    try {
+      rawRoleplayContent = await sendGroqChatRequest(
+        config.leadRoleplayModel as any,
+        [{ role: 'user', content: roleplayPrompt }],
+        { temperature: 0.7, maxTokens: 2048 }
+      );
+      console.log('📥 Groq roleplay response:', rawRoleplayContent);
+    } catch (error) {
+      throw new Error(`Groq Roleplay API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   } else {
     // OpenAI and Ollama use standard chat completions API

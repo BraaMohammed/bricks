@@ -43,20 +43,28 @@ Puppeteer Mode uses standard Puppeteer API with some enhancements:
 
 ```javascript
 // Basic page navigation
-await page.goto('{URL}');
-await page.waitForSelector('h1');
+const url = rowData.URL;
+await page.goto(url);
+const opts = { timeout: 10000 };
+await page.waitForSelector('h1', opts);
 const title = await page.title();
 return title;
 ```
 
 ### 3. Use Column References
 
-Reference data from other columns using `{Column Name}` syntax:
+Access data from other columns using the `rowData` object:
 
 ```javascript
 // Form automation using column data
+const searchTerm = rowData.SearchTerm;
+// For columns with spaces, use bracket notation
+const companyName = rowData['Company Name'];
+
 await page.goto('https://example.com/search');
-await page.type('#search-input', '{Search Term}');
+const opts = { timeout: 5000 };
+await page.waitForSelector('#search-input', opts);
+await page.type('#search-input', searchTerm);
 await page.click('#search-button');
 await page.waitForNavigation();
 return await page.url();
@@ -74,8 +82,10 @@ return await page.url();
 
 ```javascript
 // Navigate to page and extract title
-await page.goto('{URL}');
-await page.waitForSelector('h1', { timeout: 10000 });
+const url = rowData.URL;
+await page.goto(url);
+const opts = { timeout: 10000 };
+await page.waitForSelector('h1', opts);
 const title = await page.$eval('h1', el => el.textContent);
 return title;
 ```
@@ -84,8 +94,10 @@ return title;
 
 ```javascript
 // Extract all paragraph text
-await page.goto('{URL}');
-await page.waitForSelector('p', { timeout: 10000 });
+const url = rowData.URL;
+await page.goto(url);
+const opts = { timeout: 10000 };
+await page.waitForSelector('p', opts);
 const paragraphs = await page.$$eval('p', elements => 
   elements.map(el => el.textContent.trim()).filter(text => text.length > 0)
 );
@@ -96,14 +108,12 @@ return paragraphs.join(' | ');
 
 ```javascript
 // Take a screenshot of the page
-await page.goto('{URL}');
-await page.setViewport({ width: 1200, height: 800 });
-await page.waitForLoadState('networkidle');
-const screenshot = await page.screenshot({ 
-  encoding: 'base64',
-  type: 'png',
-  fullPage: false
-});
+const url = rowData.URL;
+await page.goto(url);
+const viewport = { width: 1200, height: 800 };
+await page.setViewport(viewport);
+const opts = { encoding: 'base64', type: 'png', fullPage: false };
+const screenshot = await page.screenshot(opts);
 return \`data:image/png;base64,\${screenshot}\`;
 ```
 
@@ -111,12 +121,17 @@ return \`data:image/png;base64,\${screenshot}\`;
 
 ```javascript
 // Fill and submit a form
-await page.goto('{Form URL}');
-await page.waitForSelector('form', { timeout: 10000 });
+const formUrl = rowData.FormURL;
+const email = rowData.Email;
+const message = rowData.Message;
+
+await page.goto(formUrl);
+const opts = { timeout: 10000 };
+await page.waitForSelector('form', opts);
 
 // Fill form fields
-await page.fill('input[name="email"]', '{Email}');
-await page.fill('input[name="message"]', '{Message}');
+await page.type('input[name="email"]', email);
+await page.type('textarea[name="message"]', message);
 
 // Submit form
 await page.click('button[type="submit"]');
@@ -129,8 +144,10 @@ return 'Form submitted successfully';
 
 ```javascript
 // Wait for dynamic content to load
-await page.goto('{URL}');
-await page.waitForSelector('.dynamic-content', { timeout: 15000 });
+const url = rowData.URL;
+await page.goto(url);
+const opts = { timeout: 15000 };
+await page.waitForSelector('.dynamic-content', opts);
 
 // Wait for specific content to appear
 await page.waitForFunction(() => {
@@ -146,12 +163,14 @@ return price;
 
 ```javascript
 // Extract all links from a page
-await page.goto('{URL}');
-await page.waitForSelector('a', { timeout: 10000 });
+const url = rowData.URL;
+await page.goto(url);
+const opts = { timeout: 10000 };
+await page.waitForSelector('a', opts);
 
 const links = await page.$$eval('a', anchors => 
   anchors
-    .map(a => ({ text: a.textContent.trim(), url: a.href }))
+    .map(a => { return { text: a.textContent.trim(), url: a.href }; })
     .filter(link => link.url && link.url.startsWith('http'))
     .slice(0, 10) // Limit to first 10 links
 );
@@ -299,7 +318,8 @@ if (element) {
 - **Solution**: Use stealth mode (enabled by default) and add delays
 - **Example**:
 ```javascript
-await page.goto('{URL}');
+const url = rowData.URL;
+await page.goto(url);
 await page.waitForTimeout(2000); // Random delay
 await page.mouse.move(100, 100); // Simulate mouse movement
 ```
@@ -377,57 +397,53 @@ The system provides real-time monitoring:
 ### Custom Headers
 
 ```javascript
-await page.setExtraHTTPHeaders({
+const headers = {
   'Accept-Language': 'en-US,en;q=0.9',
   'User-Agent': 'Mozilla/5.0 (custom agent)'
-});
-await page.goto('{URL}');
+};
+await page.setExtraHTTPHeaders(headers);
+const url = rowData.URL;
+await page.goto(url);
 ```
 
 ### Viewport Customization
 
 ```javascript
-await page.setViewport({ 
-  width: 1366, 
-  height: 768,
-  deviceScaleFactor: 1
-});
+const viewport = { width: 1366, height: 768, deviceScaleFactor: 1 };
+await page.setViewport(viewport);
 ```
 
 ### Cookie Management
 
 ```javascript
 // Set cookies before navigation
-await page.context().addCookies([{
+const sessionToken = rowData.SessionToken;
+const cookies = [{
   name: 'session',
-  value: '{Session Token}',
+  value: sessionToken,
   domain: 'example.com',
   path: '/'
-}]);
+}];
+await page.context().addCookies(cookies);
 ```
 
 ### PDF Generation
 
 ```javascript
-await page.goto('{URL}');
-await page.waitForLoadState('networkidle');
-const pdf = await page.pdf({ 
-  format: 'A4',
-  printBackground: true
-});
+const url = rowData.URL;
+await page.goto(url);
+const pdfOpts = { format: 'A4', printBackground: true };
+const pdf = await page.pdf(pdfOpts);
 return \`data:application/pdf;base64,\${pdf.toString('base64')}\`;
 ```
 
 ### Mobile Emulation
 
 ```javascript
-await page.setViewport({ 
-  width: 375, 
-  height: 667,
-  isMobile: true,
-  hasTouch: true
-});
-await page.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X)');
+const viewport = { width: 375, height: 667, isMobile: true, hasTouch: true };
+await page.setViewport(viewport);
+const userAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X)';
+await page.setUserAgent(userAgent);
 ```
 
 This comprehensive documentation provides everything users need to effectively use Puppeteer Mode, from basic concepts to advanced automation techniques.

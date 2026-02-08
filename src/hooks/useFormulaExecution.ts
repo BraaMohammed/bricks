@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { useDataStore } from '@/stores/useDataStore';
 import { toast } from '@/hooks/use-toast';
 import { runAIAgents } from '@/lib/aiAgents';
+import { executeWithRateLimit, getRateLimitConfig } from '@/lib/utils/rateLimiter';
 
 export interface UseFormulaExecutionReturn {
   executingColumn: string | null;
   executingCells: Set<string>;
   executeFormula: (column: string) => Promise<void>;
   executeCellFormula: (rowIndex: number, column: string) => Promise<void>;
+  executionProgress: { completed: number; total: number } | null;
 }
 
 /**
@@ -18,6 +20,7 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
   const { headers, rows, getFormula, updateCell, setLoading, executeFormulaOnCell } = useDataStore();
   const [executingColumn, setExecutingColumn] = useState<string | null>(null);
   const [executingCells, setExecutingCells] = useState<Set<string>>(new Set());
+  const [executionProgress, setExecutionProgress] = useState<{ completed: number; total: number } | null>(null);
 
   /**
    * Execute formula on all rows in a column
@@ -39,8 +42,17 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
     setLoading(true);
 
     try {
-      // Execute all rows in parallel with individual timeouts for each API call
-      const rowPromises = rows.map(async (row, i) => {
+      // Get current AI provider and model for rate limit configuration
+      const aiProvider = localStorage.getItem('ai_provider') || 'openai';
+      const aiModel = localStorage.getItem('ai_model') || '';
+      
+      const rateLimitConfig = getRateLimitConfig(aiProvider, aiModel);
+      
+      console.log(`🚦 Rate limiting: ${rateLimitConfig.description}`);
+      console.log(`📊 Batch size: ${rateLimitConfig.maxConcurrent}, Delay: ${rateLimitConfig.delayMs}ms`);
+
+      // Create array of promise-returning functions (not promises yet!)
+      const rowTasks = rows.map((row, i) => async () => {
         try {
           console.log(`🚀 Starting row ${i + 1}/${rows.length} with individual timeout per API call`);
           
@@ -64,19 +76,29 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
         }
       });
 
-      // Wait for all rows to complete (each with its own independent timeout)
-      const results = await Promise.all(rowPromises);
+      // Execute with rate limiting
+      const results = await executeWithRateLimit(rowTasks, {
+        maxConcurrent: rateLimitConfig.maxConcurrent,
+        delayMs: rateLimitConfig.delayMs,
+        onProgress: (completed, total) => {
+          setExecutionProgress({ completed, total });
+          console.log(`📊 Progress: ${completed}/${total} rows`);
+        }
+      });
+      
+      setExecutionProgress(null);
       
       const successCount = results.filter(r => r.success).length;
       const errorCount = results.filter(r => !r.success).length;
 
       toast({
         title: "Formula Executed",
-        description: `${successCount} rows processed successfully${errorCount > 0 ? `, ${errorCount} errors` : ''}.`,
+        description: `${successCount} rows processed successfully${errorCount > 0 ? `, ${errorCount} errors` : ''}. Rate limited: ${rateLimitConfig.description}`,
         variant: errorCount === 0 ? "default" : "destructive",
       });
     } catch (error) {
       console.error('Error executing formula:', error);
+      setExecutionProgress(null);
       toast({
         title: "Execution Error",
         description: "Failed to execute formula. Check your syntax.",
@@ -123,5 +145,6 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
     executingCells,
     executeFormula,
     executeCellFormula,
+    executionProgress,
   };
 };

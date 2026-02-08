@@ -37,12 +37,16 @@ return title;
 
 ### 4. Use Your Data
 
-Reference columns using `{Column Name}` syntax:
+Access column data using the `rowData` object:
 
 ```javascript
 // If you have a "URL" column
-await page.goto('{URL}');
+const url = rowData.URL;
+await page.goto(url);
 return await page.title();
+
+// For columns with spaces
+const company = rowData['Company Name'];
 ```
 
 ### 5. Configure Settings
@@ -67,24 +71,34 @@ GET http://localhost:3000/api/puppeteer/queue-status
 
 ### Web Scraping
 ```javascript
-await page.goto('{URL}');
-await page.waitForSelector('.content');
+const url = rowData.URL;
+await page.goto(url);
+const opts = { timeout: 10000 };
+await page.waitForSelector('.content', opts);
 const text = await page.$eval('.content', el => el.textContent);
 return text;
 ```
 
 ### Form Automation
 ```javascript
-await page.goto('{Form URL}');
-await page.fill('input[name="email"]', '{Email}');
+const formUrl = rowData.FormURL;
+const email = rowData.Email;
+await page.goto(formUrl);
+const opts = { timeout: 5000 };
+await page.waitForSelector('input[name="email"]', opts);
+await page.type('input[name="email"]', email);
 await page.click('button[type="submit"]');
 return 'Form submitted';
 ```
 
 ### Screenshot
 ```javascript
-await page.goto('{URL}');
-const screenshot = await page.screenshot({ encoding: 'base64' });
+const url = rowData.URL;
+await page.goto(url);
+const viewport = { width: 1200, height: 800 };
+await page.setViewport(viewport);
+const opts = { encoding: 'base64' };
+const screenshot = await page.screenshot(opts);
 return \`data:image/png;base64,\${screenshot}\`;
 ```
 

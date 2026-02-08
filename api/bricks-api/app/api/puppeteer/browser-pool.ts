@@ -21,10 +21,10 @@ interface PageInstance {
 class BrowserPool {
   private browsers: Map<string, BrowserInstance> = new Map();
   private pages: PageInstance[] = [];
-  private maxBrowsers = 3;
+  private maxBrowsers = 10; // Increased for better concurrency
   private browserIdleTimeout = 600000; // 10 minutes
   private maxMemoryPerBrowser = 500; // MB
-  private requestDelay = 2000; // 2 seconds between requests
+  private requestDelay = 500; // 500ms between requests (reduced from 2000ms)
   private lastRequestTime = 0;
 
   private userAgents = [
@@ -176,7 +176,7 @@ class BrowserPool {
     return { browser, browserId, release };
   }
 
-  async getPage(browserId: string): Promise<{ page: Page; release: () => void }> {
+  async getPage(browserId: string): Promise<{ page: Page; release: () => Promise<void> }> {
     const browserInstance = this.browsers.get(browserId);
     if (!browserInstance) {
       throw new Error(`Browser ${browserId} not found`);
@@ -266,10 +266,36 @@ class BrowserPool {
 
     availablePage.inUse = true;
 
-    const release = () => {
+    const release = async () => {
       if (availablePage) {
-        availablePage.inUse = false;
-        console.log(`📄 Released page for browser ${browserId}`);
+        try {
+          // Clean page state for reuse instead of closing
+          const page = availablePage.page;
+          
+          // Clear cookies and storage
+          const client = await page.target().createCDPSession();
+          await client.send('Network.clearBrowserCookies');
+          await client.send('Network.clearBrowserCache');
+          await page.evaluateOnNewDocument(() => {
+            localStorage.clear();
+            sessionStorage.clear();
+          });
+          
+          // Navigate to blank page to clear state
+          await page.goto('about:blank', { timeout: 5000 }).catch(() => {});
+          
+          availablePage.inUse = false;
+          console.log(`📄 Cleaned and released page for browser ${browserId}`);
+        } catch (error) {
+          // If cleanup fails, close the page
+          console.warn(`⚠️ Page cleanup failed, closing page:`, error);
+          try {
+            await availablePage.page.close();
+            this.pages = this.pages.filter(p => p !== availablePage);
+          } catch (closeError) {
+            console.error(`Error closing page:`, closeError);
+          }
+        }
       }
     };
 

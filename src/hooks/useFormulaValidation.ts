@@ -19,13 +19,14 @@ export interface FormulaValidationParams {
   formula?: string;
   headers?: string[];
   aiPrompt?: string;
-  aiProvider?: 'openai' | 'ollama' | 'gemini';
+  aiProvider?: 'openai' | 'ollama' | 'gemini' | 'groq';
   ollamaConnected?: boolean;
   ollamaModels?: string[];
   firecrawlUrl?: string;
   userOfferDetails?: string;
   hasOpenAIKey?: boolean;
   hasGeminiKey?: boolean;
+  hasGroqKey?: boolean;
   hasFirecrawlKey?: boolean;
 }
 
@@ -55,6 +56,7 @@ export const useFormulaValidation = (): FormulaValidationHook => {
       userOfferDetails,
       hasOpenAIKey,
       hasGeminiKey,
+      hasGroqKey,
       hasFirecrawlKey,
     } = params;
 
@@ -84,6 +86,10 @@ export const useFormulaValidation = (): FormulaValidationHook => {
         } else if (aiProvider === 'gemini') {
           if (!hasGeminiKey) {
             errors.push('Please set your Gemini API key in AI Settings.');
+          }
+        } else if (aiProvider === 'groq') {
+          if (!hasGroqKey) {
+            errors.push('Please set your Groq API key in AI Settings.');
           }
         } else if (aiProvider === 'ollama') {
           if (!ollamaConnected) {

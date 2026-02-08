@@ -2,7 +2,7 @@
  * AI Provider Utilities
  * 
  * This module contains utility functions for working with different AI providers
- * (OpenAI, Ollama, Gemini) in a unified way.
+ * (OpenAI, Ollama, Gemini, Groq) in a unified way.
  */
 
 /**
@@ -37,17 +37,19 @@ export const detectThinkingSupport = (modelName: string): boolean => {
 
 /**
  * Gets the API endpoint for a given provider and model
- * @param provider - The AI provider ('openai', 'ollama', or 'gemini')
+ * @param provider - The AI provider ('openai', 'ollama', 'gemini', or 'groq')
  * @param model - The model name
  * @param baseUrl - The base URL for Ollama (optional, defaults to localhost)
  * @returns The API endpoint URL
  */
 export const getAPIEndpoint = (
-  provider: 'openai' | 'ollama' | 'gemini',
+  provider: 'openai' | 'ollama' | 'gemini' | 'groq',
   model: string,
   baseUrl?: string
 ): string => {
   switch (provider) {
+    case 'groq':
+      return 'https://api.groq.com/openai/v1/chat/completions';
     case 'ollama':
       return `${baseUrl || 'http://localhost:11434'}/v1/chat/completions`;
     case 'gemini':
@@ -67,7 +69,7 @@ export const getAPIEndpoint = (
  * @returns The request body object
  */
 export const buildRequestBody = (
-  provider: 'openai' | 'ollama' | 'gemini',
+  provider: 'openai' | 'ollama' | 'gemini' | 'groq',
   model: string,
   prompt: string,
   settings: {
@@ -108,6 +110,27 @@ export const buildRequestBody = (
         }],
         generationConfig
       };
+    }
+    
+    case 'groq': {
+      // Groq uses OpenAI-compatible format
+      const requestBody: any = {
+        model,
+        messages: [{
+          role: 'user',
+          content: prompt
+        }]
+      };
+      
+      if (hasCustomTemperature && temperature !== undefined) {
+        requestBody.temperature = temperature;
+      }
+      
+      if (hasCustomMaxTokens && maxTokens !== undefined) {
+        requestBody.max_tokens = maxTokens;
+      }
+      
+      return requestBody;
     }
     
     case 'ollama': {
@@ -173,7 +196,7 @@ export const buildRequestBody = (
  * @returns The headers object
  */
 export const getAuthHeader = (
-  provider: 'openai' | 'ollama' | 'gemini',
+  provider: 'openai' | 'ollama' | 'gemini' | 'groq',
   apiKey?: string
 ): Record<string, string> => {
   const baseHeaders: Record<string, string> = {
@@ -190,6 +213,15 @@ export const getAuthHeader = (
         return {
           ...baseHeaders,
           'x-goog-api-key': apiKey
+        };
+      }
+      return baseHeaders;
+    
+    case 'groq':
+      if (apiKey) {
+        return {
+          ...baseHeaders,
+          'Authorization': `Bearer ${apiKey}`
         };
       }
       return baseHeaders;
