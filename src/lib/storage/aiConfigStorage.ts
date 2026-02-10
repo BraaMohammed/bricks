@@ -155,12 +155,12 @@ export const aiConfigStorage = {
   // ==================== AI Provider ====================
   
   /**
-   * Get the stored AI provider ('openai', 'ollama', or 'gemini')
-   * Defaults to 'openai' if not set
+   * Get the stored AI provider
+   * Defaults to 'openai' if not set or invalid
    */
   getProvider: (): AIProvider => {
     const provider = getItem(STORAGE_KEYS.AI_PROVIDER);
-    return (provider === 'openai' || provider === 'ollama' || provider === 'gemini') ? provider : 'openai';
+    return (provider === 'openai' || provider === 'ollama' || provider === 'gemini' || provider === 'groq') ? provider : 'openai';
   },
 
   /**

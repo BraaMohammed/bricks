@@ -29,7 +29,7 @@ export const isOllamaModel = (modelName: string): boolean => {
  */
 export const detectThinkingSupport = (modelName: string): boolean => {
   const thinkingPatterns = [
-    'deepseek', 'r1', 'thinking', 'reasoning', 'o1', 'o3', 'qwq'
+    'deepseek', 'r1', 'thinking', 'reasoning', 'o1', 'o3', 'qwq', 'qwen'
   ];
   const lowerModel = modelName.toLowerCase();
   return thinkingPatterns.some(pattern => lowerModel.includes(pattern));

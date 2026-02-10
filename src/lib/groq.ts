@@ -97,7 +97,11 @@ export async function sendGroqChatRequest(
       throw new Error('Invalid response format from Groq API');
     }
 
-    return data.choices[0].message.content;
+    // Remove <think>...</think> tags and their content from the response
+    const content = data.choices[0].message.content;
+    const cleanedContent = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+    return cleanedContent;
   } catch (error) {
     if (error instanceof Error) {
       throw error;

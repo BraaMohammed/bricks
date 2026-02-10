@@ -122,55 +122,78 @@ export function getRateLimitConfig(provider: string, model?: string): {
   delayMs: number;
   description: string;
 } {
-  switch (provider) {
+  // Normalize provider to lowercase for case-insensitive matching
+  const normalizedProvider = provider.toLowerCase();
+  
+  console.log('🚦 Rate limiter config requested for:', { provider, normalizedProvider, model });
+  
+  switch (normalizedProvider) {
     case 'groq': {
       // Groq Rate Limits:
       // - Standard models: 30 requests/minute = 0.5 req/second
       // - Qwen/Kimi models: 60 requests/minute = 1 req/second
-      // Strategy: Send small batches with longer delays to stay under limit
+      // Strategy: ONE row at a time with 2s delay = 30 req/min (for 1 API call per row)
+      // For 500 rows: 500 ÷ 30/min = ~16.6 min + API overhead = ~18-20 min
       const isHigherLimit = model?.includes('qwen') || model?.includes('kimi');
-      return {
-        maxConcurrent: isHigherLimit ? 4 : 2,  // Very small batches
-        delayMs: isHigherLimit ? 5000 : 5000,  // 5 second delay between batches
+      const config = {
+        maxConcurrent: 1,  // ONE row at a time - prevents bursts
+        delayMs: isHigherLimit ? 1000 : 2000,  // 2s = 30 req/min, 1s = 60 req/min
         description: isHigherLimit 
-          ? 'Groq (60 req/min - Qwen/Kimi models) - 4 req every 5s'
-          : 'Groq (30 req/min) - 2 req every 5s'
+          ? 'Groq (60 req/min - Qwen/Kimi) - ~1s per row'
+          : 'Groq (30 req/min) - ~2s per row'
       };
+      console.log('✅ Groq config selected:', config);
+      return config;
     }
     
-    case 'gemini':
-      return {
+    case 'gemini': {
+      const config = {
         maxConcurrent: 30,
         delayMs: 500,
         description: 'Gemini (60 req/min)'
       };
+      console.log('✅ Gemini config selected:', config);
+      return config;
+    }
     
-    case 'openai':
-      return {
+    case 'openai': {
+      const config = {
         maxConcurrent: 50,
         delayMs: 100,
         description: 'OpenAI (high limits)'
       };
+      console.log('✅ OpenAI config selected:', config);
+      return config;
+    }
     
-    case 'ollama':
-      return {
+    case 'ollama': {
+      const config = {
         maxConcurrent: 100, // No rate limit for local
         delayMs: 0,
         description: 'Ollama (local - no limits)'
       };
+      console.log('✅ Ollama config selected:', config);
+      return config;
+    }
     
-    case 'puppeteer':
-      return {
+    case 'puppeteer': {
+      const config = {
         maxConcurrent: 100, // Server has queue management - send all at once
         delayMs: 0,
         description: 'Puppeteer (server-side queue handles rate limiting)'
       };
+      console.log('✅ Puppeteer config selected:', config);
+      return config;
+    }
     
-    default:
-      return {
+    default: {
+      const config = {
         maxConcurrent: 10,
         delayMs: 1000,
         description: 'Default rate limiting'
       };
-  }
+      console.log('⚠️ Default config selected (unknown provider):', config);
+      return config;
+    }
+}
 }

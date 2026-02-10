@@ -3,6 +3,7 @@ import { useDataStore } from '@/stores/useDataStore';
 import { toast } from '@/hooks/use-toast';
 import { runAIAgents } from '@/lib/aiAgents';
 import { executeWithRateLimit, getRateLimitConfig } from '@/lib/utils/rateLimiter';
+import { getFormulaProvider, getFormulaModel } from '@/lib/utils/formulaParser';
 
 export interface UseFormulaExecutionReturn {
   executingColumn: string | null;
@@ -42,14 +43,26 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
     setLoading(true);
 
     try {
-      // Get current AI provider and model for rate limit configuration
-      const aiProvider = localStorage.getItem('ai_provider') || 'openai';
-      const aiModel = localStorage.getItem('ai_model') || '';
+      // Get the formula for this column
+      const formula = getFormula(column);
+      
+      // Extract provider and model from formula metadata (embedded in comments)
+      // Falls back to localStorage for backward compatibility with old formulas
+      const aiProvider = getFormulaProvider(formula, localStorage.getItem('ai_provider') || 'openai');
+      const aiModel = getFormulaModel(formula) || localStorage.getItem('ai_model') || '';
+      
+      console.log('🔍 DEBUG - Provider Detection:', { 
+        raw: aiProvider, 
+        model: aiModel,
+        isGroq: aiProvider === 'groq',
+        source: 'formula metadata'
+      });
       
       const rateLimitConfig = getRateLimitConfig(aiProvider, aiModel);
       
       console.log(`🚦 Rate limiting: ${rateLimitConfig.description}`);
       console.log(`📊 Batch size: ${rateLimitConfig.maxConcurrent}, Delay: ${rateLimitConfig.delayMs}ms`);
+      console.warn(`⚠️ CRITICAL: Starting execution of ${rows.length} rows with above config`);
 
       // Create array of promise-returning functions (not promises yet!)
       const rowTasks = rows.map((row, i) => async () => {

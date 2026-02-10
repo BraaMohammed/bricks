@@ -43,7 +43,6 @@ export const useFormulaGeneration = (): FormulaGenerators => {
     try {
       const formula = generateAIFormulaCode(params);
       console.log('✅ Successfully generated AI formula');
-      console.log('📝 Formula preview:', formula.substring(0, 500) + '...');
       
       // Validate the generated JavaScript syntax
       try {
@@ -51,7 +50,6 @@ export const useFormulaGeneration = (): FormulaGenerators => {
         console.log('✅ Generated formula has valid JavaScript syntax');
       } catch (syntaxError) {
         console.error('❌ Generated formula has invalid JavaScript syntax:', syntaxError);
-        console.error('🔍 Problematic formula:', formula);
         throw new Error(`Generated formula has invalid syntax: ${syntaxError.message}`);
       }
       

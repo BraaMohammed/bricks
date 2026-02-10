@@ -244,7 +244,9 @@ if (${hasCustomMaxTokens}) {
     return result;
   }` : '';
 
-  return `// ${providerName} Generated Formula${isReasoningModel ? ' (Reasoning Model)' : ''}
+  return `// @provider: ${provider}
+// @model: ${model}
+// ${providerName} Generated Formula${isReasoningModel ? ' (Reasoning Model)' : ''}
 ${apiKeyCheck}
 
 // Filter thinking content from response
@@ -282,13 +284,11 @@ const filterThinkingContent = (content) => {
 
 // Use Promise-based approach with timeout control
 console.log('🚀 Making API request with model:', '${model}');
-console.log('📝 Prompt:', \`${fullPrompt.replace(/`/g, '\\`')}\`);
 console.log('🔧 Is reasoning model:', ${isReasoningModel});
 console.log('⚙️ Custom settings - Temperature: ${hasCustomTemperature}, MaxTokens: ${hasCustomMaxTokens}, TopK: ${hasCustomTopK}');
 ${isReasoningModel ? `console.log('🧠 Thinking mode:', ${thinkingMode});` : ''}
 ${requestBodyCode}
 
-console.log('📦 Request body:', JSON.stringify(requestBody, null, 2));
 
 return fetch('${apiEndpoint}', {
   method: 'POST',
@@ -367,7 +367,9 @@ ${ollamaFallback}
 export const generateFirecrawlFormulaCode = (urlTemplate: string): string => {
   const processedUrl = processColumnReferences(urlTemplate);
 
-  return `// Firecrawl v2 Generated Formula
+  return `// @provider: firecrawl
+// @model: none
+// Firecrawl v2 Generated Formula
 const apiKey = localStorage.getItem('firecrawl_api_key');
 
 if (!apiKey) {
@@ -415,7 +417,11 @@ return fetch('https://api.firecrawl.dev/v2/scrape', {
  * Generates AI Agents formula code
  */
 export const generateAIAgentsFormulaCode = (config: AIAgentsConfig): string => {
-  return `// AI Copy Agents Formula
+  // Detect provider from the models being used
+  const provider = isGroqModel(config.messageCreatorModel) ? 'groq' : 'openai';
+  return `// @provider: ${provider}
+// @model: ${config.messageCreatorModel}
+// AI Copy Agents Formula
 const config = ${JSON.stringify(config, null, 2)};
 return await runAIAgents(config, row);`;
 };
@@ -430,7 +436,9 @@ export const generatePuppeteerFormulaCode = (code: string, timeout: number, head
   // Users should use rowData.ColumnName directly to avoid { } conflicts
   const puppeteerCode = code;
 
-  return `// Puppeteer Generated Formula (Enhanced Error Handling)  
+  return `// @provider: puppeteer
+// @model: none
+// Puppeteer Generated Formula (Enhanced Error Handling)  
 const puppeteerCodeString = ${JSON.stringify(puppeteerCode)};
 const config = {
   timeout: ${timeout},
