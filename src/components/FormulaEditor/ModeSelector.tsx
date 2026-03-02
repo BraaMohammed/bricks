@@ -9,7 +9,7 @@ interface ModeSelectorProps {
 export const ModeSelector = ({ mode, onModeChange }: ModeSelectorProps) => {
   return (
     <Tabs value={mode} onValueChange={onModeChange} className="w-full">
-      <TabsList className="grid w-full grid-cols-5">
+      <TabsList className="grid w-full grid-cols-6">
         {MODES.map((modeConfig) => {
           const Icon = modeConfig.icon;
           return (

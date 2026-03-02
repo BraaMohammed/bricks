@@ -6,8 +6,9 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { isAgentFormula } from '@/lib/agents/agentFormula';
 
-export type FormulaMode = 'code' | 'ai' | 'firecrawl' | 'ai-agents' | 'puppeteer';
+export type FormulaMode = 'code' | 'ai' | 'firecrawl' | 'ai-agents' | 'puppeteer' | 'agent';
 
 export interface FormulaModeHook {
   mode: FormulaMode;
@@ -31,6 +32,12 @@ export const useFormulaMode = (initialMode: FormulaMode = 'code'): FormulaModeHo
   const detectModeFromFormula = useCallback((formula: string): FormulaMode => {
     if (!formula || !formula.trim()) {
       return 'code';
+    }
+
+    // Check for AI Agent (must be checked before other AI patterns)
+    if (isAgentFormula(formula)) {
+      console.log('🔍 Detected AI Agent mode from formula');
+      return 'agent';
     }
 
     // Check for AI Copy Agents
@@ -108,6 +115,12 @@ export const useFormulaMode = (initialMode: FormulaMode = 'code'): FormulaModeHo
             '// Example: Get page title\n' +
             'await page.goto("{URL}");\n' +
             'return await page.title();';
+        }
+        break;
+
+      case 'agent':
+        if (!currentValues.agentInstruction) {
+          defaults.agentInstruction = '';
         }
         break;
 

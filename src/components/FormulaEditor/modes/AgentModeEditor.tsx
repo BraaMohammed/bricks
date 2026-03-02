@@ -1,0 +1,205 @@
+/**
+ * AgentModeEditor
+ *
+ * UI for the "AI Agent" formula mode. The user writes a natural-language
+ * instruction with {ColumnName} placeholders. When executed, the agent
+ * autonomously searches the web and reads pages to answer the instruction
+ * for every row.
+ */
+
+import { Info, Search, Zap } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Slider } from '@/components/ui/slider';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ColumnBadges } from '@/components/FormulaEditor/ColumnBadges';
+import { getProviderModels, PROVIDERS } from '@/lib/constants/aiModels';
+import type { AIProvider } from '@/lib/constants/aiModels';
+
+interface AgentModeEditorProps {
+  headers: string[];
+  firstRow: Record<string, string> | null;
+  // Agent config
+  provider: AIProvider;
+  onProviderChange: (provider: AIProvider) => void;
+  model: string;
+  onModelChange: (model: string) => void;
+  maxSteps: number;
+  onMaxStepsChange: (steps: number) => void;
+  instruction: string;
+  onInstructionChange: (value: string) => void;
+  // Jina key status
+  hasJinaKey: boolean;
+  // Change handler
+  onInputChange: () => void;
+}
+
+export const AgentModeEditor = ({
+  headers,
+  firstRow,
+  provider,
+  onProviderChange,
+  model,
+  onModelChange,
+  maxSteps,
+  onMaxStepsChange,
+  instruction,
+  onInstructionChange,
+  hasJinaKey,
+  onInputChange,
+}: AgentModeEditorProps) => {
+  const availableModels = getProviderModels(provider);
+
+  const handleProviderChange = (newProvider: string) => {
+    const providerId = newProvider as AIProvider;
+    onProviderChange(providerId);
+    // Reset model to first available when provider changes
+    const firstModel = getProviderModels(providerId)?.[0]?.id ?? '';
+    onModelChange(firstModel);
+    onInputChange();
+  };
+
+  const insertColumnPlaceholder = (col: string) => {
+    onInstructionChange(instruction + `{${col}}`);
+    onInputChange();
+  };
+
+  // Build a preview — replaces placeholders with first row values
+  const previewText =
+    firstRow && instruction
+      ? instruction.replace(/\{([^}]+)\}/g, (_, col) => firstRow[col] ?? `{${col}}`)
+      : instruction;
+
+  return (
+    <div className="space-y-5">
+      {/* Header / description */}
+      <Card className="p-4 bg-muted/30 border-dashed">
+        <div className="flex gap-3 items-start">
+          <Search className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+          <div className="space-y-1">
+            <p className="text-sm font-medium">AI Web Research Agent</p>
+            <p className="text-xs text-muted-foreground">
+              Write a research instruction using <code className="bg-muted px-1 rounded">{'{ColumnName}'}</code> placeholders.
+              The agent will search the web and read pages to answer your question for each row.
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Jina key warning */}
+      {!hasJinaKey && (
+        <Card className="p-3 border-yellow-300 bg-yellow-50 dark:border-yellow-700 dark:bg-yellow-950/20">
+          <div className="flex gap-2 items-center text-yellow-800 dark:text-yellow-300 text-xs">
+            <Info className="h-4 w-4 shrink-0" />
+            <span>
+              No Jina AI key detected — the agent will still work on the free tier (rate-limited).
+              Add a key in <strong>AI Configuration → API Keys</strong> for better throughput.
+            </span>
+          </div>
+        </Card>
+      )}
+
+      {/* Provider + Model selectors */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">AI Provider</Label>
+          <Select value={provider} onValueChange={handleProviderChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select provider" />
+            </SelectTrigger>
+            <SelectContent>
+              {PROVIDERS.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Model</Label>
+          <Select value={model} onValueChange={(v) => { onModelChange(v); onInputChange(); }}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select model" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableModels.map((m) => (
+                <SelectItem key={m.id} value={m.id}>
+                  {m.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Max steps */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-sm font-medium flex items-center gap-1.5">
+            <Zap className="h-4 w-4" />
+            Max Tool Steps
+          </Label>
+          <Badge variant="secondary" className="tabular-nums">
+            {maxSteps} {maxSteps === 1 ? 'step' : 'steps'}
+          </Badge>
+        </div>
+        <Slider
+          min={1}
+          max={20}
+          step={1}
+          value={[maxSteps]}
+          onValueChange={([v]) => { onMaxStepsChange(v); onInputChange(); }}
+          className="w-full"
+        />
+        <p className="text-xs text-muted-foreground">
+          Each step lets the agent call a tool (search or read a page). Higher = more thorough but slower.
+        </p>
+      </div>
+
+      {/* Instruction textarea */}
+      <div className="space-y-2">
+        <Label className="text-sm font-medium">Research Instruction</Label>
+        <Textarea
+          value={instruction}
+          onChange={(e) => { onInstructionChange(e.target.value); onInputChange(); }}
+          placeholder={"Find the CEO of {Company Name} who works at {Website}. Return their full name only."}
+          className="min-h-[100px] font-mono text-sm resize-y"
+        />
+        <p className="text-xs text-muted-foreground">
+          Use <code className="bg-muted px-1 rounded">{'{ColumnName}'}</code> to inject cell values from any column.
+        </p>
+      </div>
+
+      {/* Column badges */}
+      {headers.length > 0 && (
+        <div className="space-y-2">
+          <Label className="text-sm font-medium text-muted-foreground">Insert column</Label>
+          <div className="flex flex-wrap gap-1.5">
+            {headers.map((col) => (
+              <Badge
+                key={col}
+                variant="outline"
+                className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
+                onClick={() => insertColumnPlaceholder(col)}
+              >
+                {col}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Live preview */}
+      {instruction && (
+        <Card className="p-3 bg-muted/20">
+          <p className="text-xs font-medium text-muted-foreground mb-1">Preview (row 1):</p>
+          <p className="text-sm italic text-foreground/80 break-words">{previewText}</p>
+        </Card>
+      )}
+    </div>
+  );
+};

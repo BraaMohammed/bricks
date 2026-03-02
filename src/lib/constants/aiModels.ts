@@ -279,6 +279,7 @@ export const STORAGE_KEYS = {
   FIRECRAWL_KEY: 'firecrawl_api_key',
   GEMINI_KEY: 'gemini_api_key',
   GROQ_KEY: 'groq_api_key',
+  JINA_KEY: 'jina_api_key',
   
   // AI Settings
   AI_MODEL: 'ai_model',

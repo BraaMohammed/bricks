@@ -31,6 +31,11 @@ export interface APIKeysSectionProps {
   setFirecrawlKey: (key: string) => void;
   clearFirecrawlKey: () => void;
   hasFirecrawlKey: boolean;
+
+  jinaKey: string;
+  setJinaKey: (key: string) => void;
+  clearJinaKey: () => void;
+  hasJinaKey: boolean;
 }
 
 export const APIKeysSection = ({
@@ -50,6 +55,10 @@ export const APIKeysSection = ({
   setFirecrawlKey,
   clearFirecrawlKey,
   hasFirecrawlKey,
+  jinaKey,
+  setJinaKey,
+  clearJinaKey,
+  hasJinaKey,
 }: APIKeysSectionProps) => {
   return (
     <Card>
@@ -190,6 +199,41 @@ export const APIKeysSection = ({
             >
               Firecrawl
             </a>
+          </p>
+        </div>
+
+        {/* Jina AI API Key */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="jina-key" className="flex items-center gap-2">
+              Jina AI API Key
+              {hasJinaKey && <div className="w-2 h-2 bg-green-500 rounded-full" />}
+            </Label>
+            <a
+              href="https://jina.ai/api-dashboard/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-blue-500 hover:underline flex items-center gap-1"
+            >
+              Get API Key <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+          <div className="flex gap-2">
+            <Input
+              id="jina-key"
+              type="password"
+              placeholder={hasJinaKey ? "API key is saved" : "Enter your Jina AI API key (optional)"}
+              value={jinaKey}
+              onChange={(e) => setJinaKey(e.target.value)}
+            />
+            {hasJinaKey && (
+              <Button variant="outline" onClick={clearJinaKey}>
+                Clear
+              </Button>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Used by the AI Search Agent for web search &amp; page reading. Optional — free tier works without a key.
           </p>
         </div>
       </CardContent>

@@ -16,6 +16,7 @@ export interface AIConfig {
   geminiKey: string;
   groqKey: string;
   firecrawlKey: string;
+  jinaKey: string;
   provider: AIProvider;
   model: string;
   customPrompt: string;
@@ -152,6 +153,20 @@ export const aiConfigStorage = {
     removeItem(STORAGE_KEYS.FIRECRAWL_KEY);
   },
 
+  // ==================== Jina AI API Key ====================
+
+  getJinaKey: (): string | null => {
+    return getItem(STORAGE_KEYS.JINA_KEY);
+  },
+
+  setJinaKey: (key: string): void => {
+    setItem(STORAGE_KEYS.JINA_KEY, key.trim());
+  },
+
+  clearJinaKey: (): void => {
+    removeItem(STORAGE_KEYS.JINA_KEY);
+  },
+
   // ==================== AI Provider ====================
   
   /**
@@ -256,6 +271,14 @@ export const aiConfigStorage = {
         aiConfigStorage.clearFirecrawlKey();
       }
     }
+
+    if (config.jinaKey !== undefined) {
+      if (config.jinaKey) {
+        aiConfigStorage.setJinaKey(config.jinaKey);
+      } else {
+        aiConfigStorage.clearJinaKey();
+      }
+    }
     
     if (config.provider !== undefined) {
       aiConfigStorage.setProvider(config.provider);
@@ -283,6 +306,7 @@ export const aiConfigStorage = {
       geminiKey: aiConfigStorage.getGeminiKey() || '',
       groqKey: aiConfigStorage.getGroqKey() || '',
       firecrawlKey: aiConfigStorage.getFirecrawlKey() || '',
+      jinaKey: aiConfigStorage.getJinaKey() || '',
       provider: aiConfigStorage.getProvider(),
       model: aiConfigStorage.getModel() || DEFAULT_OPENAI_MODEL,
       customPrompt: aiConfigStorage.getCustomPrompt() || '',

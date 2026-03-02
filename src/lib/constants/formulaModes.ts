@@ -12,7 +12,7 @@
  * 4. Add TabsContent in FormulaEditor.tsx
  */
 
-import { Code, Brain, Wand2, Users, Bot } from 'lucide-react';
+import { Code, Brain, Wand2, Users, Bot, Search } from 'lucide-react';
 
 /**
  * Formula editor modes configuration
@@ -52,6 +52,13 @@ export const MODES = [
     icon: Bot,
     description: 'Browser automation for complex web scraping and interactions',
     requiresApiKey: false,
+  },
+  {
+    id: 'agent',
+    name: 'AI Agent',
+    icon: Search,
+    description: 'Autonomous web research agent — search the web and extract structured data row by row',
+    requiresApiKey: true,
   },
 ] as const;
 

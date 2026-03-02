@@ -35,12 +35,14 @@ import { AIModeEditor } from '@/components/FormulaEditor/modes/AIModeEditor';
 import { FirecrawlModeEditor } from '@/components/FormulaEditor/modes/FirecrawlModeEditor';
 import { AIAgentsModeEditor } from '@/components/FormulaEditor/modes/AIAgentsModeEditor';
 import { PuppeteerModeEditor } from '@/components/FormulaEditor/modes/PuppeteerModeEditor';
+import { AgentModeEditor } from '@/components/FormulaEditor/modes/AgentModeEditor';
 import { SlashMenu } from '@/components/SlashMenu';
 
 // Utilities
 import { validateFormula } from '@/components/FormulaValidator';
 import { openAIModels, geminiModels, defaultMessageCreatorInstructions, defaultLeadRoleplayInstructions } from '@/lib/constants/aiModels';
 import type { FormulaMode } from '@/lib/constants/formulaModes';
+import { encodeAgentFormula, decodeAgentFormula } from '@/lib/agents/agentFormula';
 
 // Extend window interface for Puppeteer logging
 declare global {
@@ -105,6 +107,12 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   const [puppeteerHeadless, setPuppeteerHeadless] = useState(true);
   const [puppeteerExecutionLog, setPuppeteerExecutionLog] = useState<string[]>([]);
   const [puppeteerLastResult, setPuppeteerLastResult] = useState<{type: 'success' | 'error', message: string} | null>(null);
+
+  // Mode-specific state (Agent mode)
+  const [agentProvider, setAgentProvider] = useState('openai');
+  const [agentModel, setAgentModel] = useState('gpt-4o-mini');
+  const [agentMaxSteps, setAgentMaxSteps] = useState(10);
+  const [agentInstruction, setAgentInstruction] = useState('');
   
   // ============================================================
   // COMPUTED VALUES
@@ -167,9 +175,17 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
       // Detect mode from formula
       const detectedMode = formulaModeHook.detectModeFromFormula(existingFormula);
       formulaModeHook.setMode(detectedMode);
-      
-      // TODO: Parse and set mode-specific state from existing formulas
-      // This would extract things like AI prompts, Firecrawl URLs, etc.
+
+      // Parse agent config if in agent mode
+      if (detectedMode === 'agent') {
+        const agentConfig = decodeAgentFormula(existingFormula);
+        if (agentConfig) {
+          setAgentProvider(agentConfig.provider);
+          setAgentModel(agentConfig.model);
+          setAgentMaxSteps(agentConfig.maxSteps);
+          setAgentInstruction(agentConfig.instruction);
+        }
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeColumn]);
@@ -284,6 +300,24 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
             code: puppeteerCode,
             timeout: puppeteerTimeout,
             headless: puppeteerHeadless
+          });
+          break;
+        }
+
+        case 'agent': {
+          if (!agentInstruction.trim()) {
+            toast({
+              title: 'Validation Error',
+              description: 'Please enter a research instruction for the AI Agent.',
+              variant: 'destructive',
+            });
+            return;
+          }
+          finalFormula = encodeAgentFormula({
+            provider: agentProvider,
+            model: agentModel,
+            maxSteps: agentMaxSteps,
+            instruction: agentInstruction,
           });
           break;
         }
@@ -456,6 +490,23 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
                   executionLog={puppeteerExecutionLog}
                   onClearLog={() => setPuppeteerExecutionLog([])}
                   lastResult={puppeteerLastResult}
+                  onInputChange={handleAIInputChange}
+                />
+              </TabsContent>
+
+              <TabsContent value="agent" className="space-y-4">
+                <AgentModeEditor
+                  headers={headers}
+                  firstRow={firstRow}
+                  provider={agentProvider}
+                  onProviderChange={setAgentProvider}
+                  model={agentModel}
+                  onModelChange={setAgentModel}
+                  maxSteps={agentMaxSteps}
+                  onMaxStepsChange={setAgentMaxSteps}
+                  instruction={agentInstruction}
+                  onInstructionChange={setAgentInstruction}
+                  hasJinaKey={!!aiSettings.jinaKey}
                   onInputChange={handleAIInputChange}
                 />
               </TabsContent>

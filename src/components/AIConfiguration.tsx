@@ -128,6 +128,10 @@ export const AIConfiguration = () => {
             setFirecrawlKey={settings.setFirecrawlKey}
             clearFirecrawlKey={settings.clearFirecrawlKey}
             hasFirecrawlKey={settings.hasFirecrawlKey}
+            jinaKey={settings.jinaKey}
+            setJinaKey={settings.setJinaKey}
+            clearJinaKey={settings.clearJinaKey}
+            hasJinaKey={settings.hasJinaKey}
           />
 
           {/* Provider Selection */}

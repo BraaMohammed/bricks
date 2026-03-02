@@ -4,6 +4,8 @@ import { toast } from '@/hooks/use-toast';
 import { runAIAgents } from '@/lib/aiAgents';
 import { executeWithRateLimit, getRateLimitConfig } from '@/lib/utils/rateLimiter';
 import { getFormulaProvider, getFormulaModel } from '@/lib/utils/formulaParser';
+import { isAgentFormula, decodeAgentFormula } from '@/lib/agents/agentFormula';
+import { runSearchAgent } from '@/lib/agents/executor';
 
 export interface UseFormulaExecutionReturn {
   executingColumn: string | null;
@@ -45,6 +47,65 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
     try {
       // Get the formula for this column
       const formula = getFormula(column);
+
+      // ── Agent mode: natural-language research agent ──────────────────────
+      if (isAgentFormula(formula)) {
+        const agentConfig = decodeAgentFormula(formula);
+        if (!agentConfig) {
+          toast({ title: 'Invalid Agent Formula', variant: 'destructive' });
+          return;
+        }
+
+        const jinaApiKey = localStorage.getItem('jina_api_key') ?? undefined;
+        const providerRateConfig = getRateLimitConfig(agentConfig.provider, agentConfig.model);
+        const agentRateConfig = {
+          maxConcurrent: Math.max(1, Math.floor(providerRateConfig.maxConcurrent / 2)),
+          delayMs: Math.max(providerRateConfig.delayMs, 1500),
+          description: `Agent mode: ${providerRateConfig.description}`,
+        };
+
+        const rowTasks = rows.map((row, i) => async () => {
+          try {
+            const result = await runSearchAgent({
+              instruction: agentConfig.instruction,
+              rowData: row as Record<string, string>,
+              provider: agentConfig.provider as 'openai' | 'gemini' | 'groq' | 'ollama',
+              model: agentConfig.model,
+              maxSteps: agentConfig.maxSteps,
+              jinaApiKey,
+            });
+
+            if (result.error) {
+              throw new Error(result.error);
+            }
+
+            updateCell(i, column, result.result);
+            return { success: true, rowIndex: i };
+          } catch (error) {
+            updateCell(i, column, 'ERROR');
+            console.error(`❌ Agent row ${i + 1} failed:`, error);
+            return { success: false, rowIndex: i, error };
+          }
+        });
+
+        const results = await executeWithRateLimit(rowTasks, {
+          maxConcurrent: agentRateConfig.maxConcurrent,
+          delayMs: agentRateConfig.delayMs,
+          onProgress: (completed, total) => {
+            setExecutionProgress({ completed, total });
+          },
+        });
+
+        setExecutionProgress(null);
+        const successCount = results.filter(r => r.success).length;
+        const errorCount = results.filter(r => !r.success).length;
+        toast({
+          title: 'Agent Complete',
+          description: `${successCount} rows researched${errorCount > 0 ? `, ${errorCount} errors` : ''}. ${agentRateConfig.description}`,
+          variant: errorCount === 0 ? 'default' : 'destructive',
+        });
+        return;
+      }
       
       // Extract provider and model from formula metadata (embedded in comments)
       // Falls back to localStorage for backward compatibility with old formulas
@@ -125,13 +186,46 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
 
   /**
    * Execute formula on a single cell
-   * Uses the store's executeFormulaOnCell method
+   * Handles agent mode formulas specially, falls back to store's executeFormulaOnCell for regular formulas
    */
   const executeCellFormula = async (rowIndex: number, column: string) => {
     const cellKey = `${rowIndex}-${column}`;
     setExecutingCells(prev => new Set(prev).add(cellKey));
 
     try {
+      const formula = getFormula(column);
+      const row = rows[rowIndex];
+
+      // ── Agent mode: special handling for single cell ──────────────────────
+      if (isAgentFormula(formula)) {
+        const agentConfig = decodeAgentFormula(formula);
+        if (!agentConfig) {
+          throw new Error('Invalid agent formula');
+        }
+
+        const jinaApiKey = localStorage.getItem('jina_api_key') ?? undefined;
+        const result = await runSearchAgent({
+          instruction: agentConfig.instruction,
+          rowData: row as Record<string, string>,
+          provider: agentConfig.provider as 'openai' | 'gemini' | 'groq' | 'ollama',
+          model: agentConfig.model,
+          maxSteps: agentConfig.maxSteps,
+          jinaApiKey,
+        });
+
+        if (result.error) {
+          throw new Error(result.error);
+        }
+        
+        updateCell(rowIndex, column, result.result);
+        toast({
+          title: "Cell Updated",
+          description: `Cell ${column} in row ${rowIndex + 1} has been updated.`,
+        });
+        return;
+      }
+
+      // ── Regular formula: execute as JavaScript ─────────────────────────────
       await executeFormulaOnCell(rowIndex, column, { runAIAgents });
       toast({
         title: "Cell Updated",
@@ -139,6 +233,7 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
       });
     } catch (error) {
       console.error('Error executing cell formula:', error);
+      updateCell(rowIndex, column, 'ERROR');
       toast({
         title: "Execution Error",
         description: error instanceof Error ? error.message : "Failed to execute formula on this cell.",

@@ -52,7 +52,13 @@ export interface AISettings {
   hasFirecrawlKey: boolean;
   setFirecrawlKey: (key: string) => void;
   clearFirecrawlKey: () => void;
-  
+
+  // Jina AI API Key
+  jinaKey: string;
+  hasJinaKey: boolean;
+  setJinaKey: (key: string) => void;
+  clearJinaKey: () => void;
+
   // Provider & Model
   aiProvider: AIProvider;
   setAiProvider: (provider: AIProvider) => void;
@@ -119,6 +125,12 @@ export const useAISettings = (ollamaModels: string[] = []): AISettings => {
     'Firecrawl',
     initialConfig.firecrawlKey
   );
+
+  const jinaKeyManager = useAPIKeyManager(
+    STORAGE_KEYS.JINA_KEY,
+    'Jina AI',
+    initialConfig.jinaKey
+  );
   
   // Provider & Model State
   const [aiProvider, setAiProviderState] = useState<AIProvider>(initialConfig.provider);
@@ -181,10 +193,12 @@ export const useAISettings = (ollamaModels: string[] = []): AISettings => {
     geminiKeyManager.setKey(config.geminiKey);
     groqKeyManager.setKey(config.groqKey);
     firecrawlKeyManager.setKey(config.firecrawlKey);
+    jinaKeyManager.setKey(config.jinaKey);
     setAiProviderState(config.provider);
     setModelState(config.model || DEFAULT_OPENAI_MODEL);
     setCustomPromptState(config.customPrompt);
     setOllamaBaseUrlState(config.ollamaBaseUrl);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /**
@@ -204,6 +218,9 @@ export const useAISettings = (ollamaModels: string[] = []): AISettings => {
     if (firecrawlKeyManager.key.trim()) {
       aiConfigStorage.setFirecrawlKey(firecrawlKeyManager.key);
     }
+    if (jinaKeyManager.key.trim()) {
+      aiConfigStorage.setJinaKey(jinaKeyManager.key);
+    }
     
     // Save other settings
     aiConfigStorage.setProvider(aiProvider);
@@ -221,6 +238,7 @@ export const useAISettings = (ollamaModels: string[] = []): AISettings => {
     geminiKeyManager.key,
     groqKeyManager.key,
     firecrawlKeyManager.key,
+    jinaKeyManager.key,
     aiProvider,
     model,
     customPrompt,
@@ -331,6 +349,11 @@ export const useAISettings = (ollamaModels: string[] = []): AISettings => {
     aiConfigStorage.clearFirecrawlKey();
   }, [firecrawlKeyManager]);
 
+  const clearJinaKey = useCallback(() => {
+    jinaKeyManager.clearKey();
+    aiConfigStorage.clearJinaKey();
+  }, [jinaKeyManager]);
+
   return {
     // OpenAI API Key
     apiKey: openaiKeyManager.key,
@@ -355,6 +378,12 @@ export const useAISettings = (ollamaModels: string[] = []): AISettings => {
     hasFirecrawlKey: firecrawlKeyManager.hasKey,
     setFirecrawlKey: firecrawlKeyManager.setKey,
     clearFirecrawlKey,
+
+    // Jina AI API Key
+    jinaKey: jinaKeyManager.key,
+    hasJinaKey: jinaKeyManager.hasKey,
+    setJinaKey: jinaKeyManager.setKey,
+    clearJinaKey,
     
     // Provider & Model
     aiProvider,
