@@ -40,7 +40,7 @@ import { SlashMenu } from '@/components/SlashMenu';
 
 // Utilities
 import { validateFormula } from '@/components/FormulaValidator';
-import { openAIModels, geminiModels, defaultMessageCreatorInstructions, defaultLeadRoleplayInstructions } from '@/lib/constants/aiModels';
+import { openAIModels, geminiModels, defaultMessageCreatorInstructions, defaultLeadRoleplayInstructions, getProviderModels, AIProvider } from '@/lib/constants/aiModels';
 import type { FormulaMode } from '@/lib/constants/formulaModes';
 import { encodeAgentFormula, decodeAgentFormula } from '@/lib/agents/agentFormula';
 
@@ -109,7 +109,7 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   const [puppeteerLastResult, setPuppeteerLastResult] = useState<{type: 'success' | 'error', message: string} | null>(null);
 
   // Mode-specific state (Agent mode)
-  const [agentProvider, setAgentProvider] = useState('openai');
+  const [agentProvider, setAgentProvider] = useState<AIProvider>('openai');
   const [agentModel, setAgentModel] = useState('gpt-4o-mini');
   const [agentMaxSteps, setAgentMaxSteps] = useState(10);
   const [agentInstruction, setAgentInstruction] = useState('');
@@ -133,17 +133,34 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
       cost: 'Free (Local)' 
     }))
   ];
+
+  // Available models for the AI search agent; ollama ones included via helper
+  const agentAvailableModels = getProviderModels(agentProvider, ollamaConnection.models || []);
+
+  // Keep agentModel in sync when provider or ollama models change
+  useEffect(() => {
+    if (agentAvailableModels.length > 0) {
+      // if current model isn't in list or is empty, pick the first one
+      const exists = agentAvailableModels.some(m => m.id === agentModel);
+      if (!exists) {
+        setAgentModel(agentAvailableModels[0].id);
+      }
+    }
+  }, [agentProvider, agentAvailableModels, agentModel]);
   
   // ============================================================
   // EFFECTS
   // ============================================================
   
   // Initialize Ollama connection if using Ollama provider
+  // NOTE: `ollamaConnection` is an object recreated on every render so
+  // depending on it causes this effect to run continuously.  Instead we
+  // rely on the stable `checkConnection` callback returned by the hook.
   useEffect(() => {
     if (aiSettings.aiProvider === 'ollama') {
       ollamaConnection.checkConnection();
     }
-  }, [aiSettings.aiProvider, ollamaConnection]);
+  }, [aiSettings.aiProvider, ollamaConnection.checkConnection]);
   
   // Expose Puppeteer logging functions to window
   useEffect(() => {
@@ -508,6 +525,7 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
                   onInstructionChange={setAgentInstruction}
                   hasJinaKey={!!aiSettings.jinaKey}
                   onInputChange={handleAIInputChange}
+                  ollamaModels={ollamaConnection.models}
                 />
               </TabsContent>
             </Tabs>

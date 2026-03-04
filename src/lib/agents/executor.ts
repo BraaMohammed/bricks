@@ -128,6 +128,8 @@ export async function runSearchAgent(options: AgentRunOptions): Promise<AgentRun
           stopWhen: stepCountIs(maxSteps),
         });
 
+        console.log('🤖 Agent response:', { text: response.text, steps: response.steps?.length });
+
         return {
           result: response.text,
           steps: response.steps?.length ?? 0,

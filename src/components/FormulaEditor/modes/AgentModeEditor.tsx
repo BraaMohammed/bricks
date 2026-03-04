@@ -8,6 +8,7 @@
  */
 
 import { Info, Search, Zap } from 'lucide-react';
+import { useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
@@ -30,6 +31,8 @@ interface AgentModeEditorProps {
   onMaxStepsChange: (steps: number) => void;
   instruction: string;
   onInstructionChange: (value: string) => void;
+  // list of available ollama models (dynamic)
+  ollamaModels?: string[];
   // Jina key status
   hasJinaKey: boolean;
   // Change handler
@@ -49,14 +52,15 @@ export const AgentModeEditor = ({
   onInstructionChange,
   hasJinaKey,
   onInputChange,
+  ollamaModels,
 }: AgentModeEditorProps) => {
-  const availableModels = getProviderModels(provider);
+  const availableModels = getProviderModels(provider, ollamaModels || []);
 
   const handleProviderChange = (newProvider: string) => {
     const providerId = newProvider as AIProvider;
     onProviderChange(providerId);
     // Reset model to first available when provider changes
-    const firstModel = getProviderModels(providerId)?.[0]?.id ?? '';
+    const firstModel = getProviderModels(providerId, ollamaModels || [])?.[0]?.id ?? '';
     onModelChange(firstModel);
     onInputChange();
   };
@@ -65,6 +69,17 @@ export const AgentModeEditor = ({
     onInstructionChange(instruction + `{${col}}`);
     onInputChange();
   };
+
+  // if available models list changes (e.g. new ollama models appear),
+  // pick the first one when the current selection is gone
+  useEffect(() => {
+    if (availableModels.length > 0) {
+      const exists = availableModels.some(m => m.id === model);
+      if (!exists) {
+        onModelChange(availableModels[0].id);
+      }
+    }
+  }, [availableModels, model, onModelChange]);
 
   // Build a preview — replaces placeholders with first row values
   const previewText =

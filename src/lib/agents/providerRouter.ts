@@ -8,6 +8,7 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createGroq } from '@ai-sdk/groq';
+import { ollama } from 'ai-sdk-ollama';
 import type { LanguageModel } from 'ai';
 
 export interface AgentProviderConfig {
@@ -52,10 +53,12 @@ export function getAgentModel(config: AgentProviderConfig): LanguageModel {
     }
 
     case 'ollama': {
-      // Ollama exposes an OpenAI-compatible API at its base URL
-      const baseURL = (config.ollamaBaseUrl || 'http://localhost:11434') + '/v1';
-      const client = createOpenAI({ baseURL, apiKey: 'ollama' }); // key is ignored by Ollama
-      return client(model || 'llama3.1');
+      // Use the dedicated Ollama provider with proper tool calling support
+      // It handles response synthesis automatically for tool calling
+      const baseUrl = config.ollamaBaseUrl || 'http://localhost:11434';
+      return ollama(model || 'llama3.1', {
+        baseURL: baseUrl,
+      });
     }
 
     default:

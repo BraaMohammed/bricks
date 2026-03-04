@@ -217,6 +217,7 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
           throw new Error(result.error);
         }
         
+        console.log('📝 Updating cell:', { rowIndex, column, result: result.result, steps: result.steps });
         updateCell(rowIndex, column, result.result);
         toast({
           title: "Cell Updated",
