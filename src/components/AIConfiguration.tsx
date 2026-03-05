@@ -37,7 +37,7 @@ import { OPENAI_MODELS } from '@/lib/constants/aiModels';
 
 export const AIConfiguration = () => {
   const [open, setOpen] = useState(false);
-  
+
   // Custom hooks handle all state management
   const settings = useAISettings();
   const ollama = useOllamaConnection(settings.ollamaBaseUrl);
@@ -54,16 +54,16 @@ export const AIConfiguration = () => {
 
   // Auto-select first Ollama model when models are loaded
   useEffect(() => {
-    if (settings.aiProvider === 'ollama' && 
-        ollama.models.length > 0 && 
-        !settings.model) {
+    if (settings.aiProvider === 'ollama' &&
+      ollama.models.length > 0 &&
+      !settings.model) {
       settings.setModel(ollama.models[0]);
     }
   }, [settings.aiProvider, ollama.models, settings.model]);
 
   const handleSave = () => {
     settings.saveAllSettings();
-    
+
     toast({
       title: "AI Settings Saved",
       description: "Your AI configuration has been saved successfully.",
@@ -82,7 +82,7 @@ export const AIConfiguration = () => {
 
   const handleProviderChange = (provider: 'openai' | 'ollama' | 'gemini' | 'groq') => {
     settings.setAiProvider(provider);
-    
+
     // Trigger Ollama connection check if switching to Ollama
     if (provider === 'ollama') {
       setTimeout(() => {
@@ -100,7 +100,7 @@ export const AIConfiguration = () => {
           {(settings.hasApiKey || settings.hasGeminiKey || settings.hasGroqKey) && <div className="w-2 h-2 bg-green-500 rounded-full" />}
         </Button>
       </DialogTrigger>
-      
+
       <DialogContent className="max-w-2xl h-[80vh] overflow-y-scroll">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -128,10 +128,6 @@ export const AIConfiguration = () => {
             setFirecrawlKey={settings.setFirecrawlKey}
             clearFirecrawlKey={settings.clearFirecrawlKey}
             hasFirecrawlKey={settings.hasFirecrawlKey}
-            jinaKey={settings.jinaKey}
-            setJinaKey={settings.setJinaKey}
-            clearJinaKey={settings.clearJinaKey}
-            hasJinaKey={settings.hasJinaKey}
           />
 
           {/* Provider Selection */}
@@ -178,7 +174,7 @@ export const AIConfiguration = () => {
             model={settings.model}
             setModel={settings.setModel}
             availableModels={
-              settings.aiProvider === 'openai' 
+              settings.aiProvider === 'openai'
                 ? [...OPENAI_MODELS]
                 : ollama.models
             }

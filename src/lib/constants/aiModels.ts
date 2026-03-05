@@ -111,29 +111,29 @@ export const geminiModels: ModelDefinition[] = [
  * Note: Free tier has rate limits - 30 RPM for most models, 60 RPM for Qwen/Kimi
  */
 export const groqModels: ModelDefinition[] = [
-  { 
-    id: 'llama-3.3-70b-versatile', 
-    name: 'Llama 3.3 70B Versatile (Recommended)', 
-    supportsThinking: false, 
-    cost: 'Free tier: 30 RPM, 1K RPD' 
+  {
+    id: 'llama-3.3-70b-versatile',
+    name: 'Llama 3.3 70B Versatile (Recommended)',
+    supportsThinking: false,
+    cost: 'Free tier: 30 RPM, 1K RPD'
   },
-  { 
-    id: 'qwen/qwen3-32b', 
-    name: 'Qwen 3 32B (Reasoning)', 
-    supportsThinking: false, 
-    cost: 'Free tier: 60 RPM, 1K RPD' 
+  {
+    id: 'qwen/qwen3-32b',
+    name: 'Qwen 3 32B (Reasoning)',
+    supportsThinking: false,
+    cost: 'Free tier: 60 RPM, 1K RPD'
   },
-  { 
-    id: 'moonshotai/kimi-k2-instruct', 
-    name: 'Kimi K2 Instruct (Fast)', 
-    supportsThinking: false, 
-    cost: 'Free tier: 60 RPM, 1K RPD' 
+  {
+    id: 'moonshotai/kimi-k2-instruct',
+    name: 'Kimi K2 Instruct (Fast)',
+    supportsThinking: false,
+    cost: 'Free tier: 60 RPM, 1K RPD'
   },
-  { 
-    id: 'openai/gpt-oss-120b', 
-    name: 'GPT OSS 120B (Largest)', 
-    supportsThinking: false, 
-    cost: 'Free tier: 30 RPM, 1K RPD' 
+  {
+    id: 'openai/gpt-oss-120b',
+    name: 'GPT OSS 120B (Largest)',
+    supportsThinking: false,
+    cost: 'Free tier: 30 RPM, 1K RPD'
   },
 ];
 
@@ -279,8 +279,7 @@ export const STORAGE_KEYS = {
   FIRECRAWL_KEY: 'firecrawl_api_key',
   GEMINI_KEY: 'gemini_api_key',
   GROQ_KEY: 'groq_api_key',
-  JINA_KEY: 'jina_api_key',
-  
+
   // AI Settings
   AI_MODEL: 'ai_model',
   AI_PROVIDER: 'ai_provider',
@@ -290,7 +289,7 @@ export const STORAGE_KEYS = {
   AI_TEMPERATURE: 'ai_temperature',
   AI_MAX_TOKENS: 'ai_max_tokens',
   AI_TOP_K: 'ai_top_k',
-  
+
   // Add new storage keys here as needed
 } as const;
 

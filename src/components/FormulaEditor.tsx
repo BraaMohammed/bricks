@@ -62,7 +62,7 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   // STORE & DATA ACCESS
   // ============================================================
   const { activeColumn, getFormula, setFormula, removeColumn, headers, rows } = useDataStore();
-  
+
   // ============================================================
   // CUSTOM HOOKS - Business Logic & State Management
   // ============================================================
@@ -71,7 +71,7 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   const formulaModeHook = useFormulaMode('code');
   const savedFormulasHook = useSavedFormulas();
   const formulaGenerators = useFormulaGeneration();
-  
+
   // ============================================================
   // LOCAL COMPONENT STATE - UI State Only
   // ============================================================
@@ -83,14 +83,14 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   const [formulaName, setFormulaName] = useState('');
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  
+
   // Mode-specific state (AI mode)
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiMessage, setAiMessage] = useState('');
-  
+
   // Mode-specific state (Firecrawl mode)
   const [firecrawlUrl, setFirecrawlUrl] = useState('');
-  
+
   // Mode-specific state (AI Agents mode)
   const [userOfferDetails, setUserOfferDetails] = useState('');
   const [messageCreatorModel, setMessageCreatorModel] = useState('gpt-4o-mini');
@@ -106,19 +106,19 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   const [puppeteerTimeout, setPuppeteerTimeout] = useState(30000);
   const [puppeteerHeadless, setPuppeteerHeadless] = useState(true);
   const [puppeteerExecutionLog, setPuppeteerExecutionLog] = useState<string[]>([]);
-  const [puppeteerLastResult, setPuppeteerLastResult] = useState<{type: 'success' | 'error', message: string} | null>(null);
+  const [puppeteerLastResult, setPuppeteerLastResult] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
   // Mode-specific state (Agent mode)
   const [agentProvider, setAgentProvider] = useState<AIProvider>('openai');
   const [agentModel, setAgentModel] = useState('gpt-4o-mini');
   const [agentMaxSteps, setAgentMaxSteps] = useState(10);
   const [agentInstruction, setAgentInstruction] = useState('');
-  
+
   // ============================================================
   // COMPUTED VALUES
   // ============================================================
   const firstRow = rows && rows.length > 0 ? rows[0] : null;
-  
+
   // Combine all models for AI Agents mode
   const allAvailableModels = [
     ...openAIModels,
@@ -126,11 +126,11 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
       ...model,
       name: `${model.name} (Gemini)`
     })),
-    ...(ollamaConnection.models || []).map(model => ({ 
-      id: model, 
-      name: `${model} (Ollama)`, 
-      supportsThinking: false, 
-      cost: 'Free (Local)' 
+    ...(ollamaConnection.models || []).map(model => ({
+      id: model,
+      name: `${model} (Ollama)`,
+      supportsThinking: false,
+      cost: 'Free (Local)'
     }))
   ];
 
@@ -147,11 +147,11 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
       }
     }
   }, [agentProvider, agentAvailableModels, agentModel]);
-  
+
   // ============================================================
   // EFFECTS
   // ============================================================
-  
+
   // Initialize Ollama connection if using Ollama provider
   // NOTE: `ollamaConnection` is an object recreated on every render so
   // depending on it causes this effect to run continuously.  Instead we
@@ -161,7 +161,7 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
       ollamaConnection.checkConnection();
     }
   }, [aiSettings.aiProvider, ollamaConnection.checkConnection]);
-  
+
   // Expose Puppeteer logging functions to window
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -173,7 +173,7 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
         setPuppeteerLastResult(result);
       };
     }
-    
+
     return () => {
       if (typeof window !== 'undefined') {
         delete window.updatePuppeteerLog;
@@ -181,14 +181,14 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
       }
     };
   }, []);
-  
+
   // Load existing formula when column changes
   useEffect(() => {
     if (activeColumn) {
       const existingFormula = getFormula(activeColumn);
       setFormulaText(existingFormula);
       setHasChanges(false);
-      
+
       // Detect mode from formula
       const detectedMode = formulaModeHook.detectModeFromFormula(existingFormula);
       formulaModeHook.setMode(detectedMode);
@@ -206,30 +206,30 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeColumn]);
-  
+
   // ============================================================
   // HELPER FUNCTIONS
   // ============================================================
-  
+
   const handleAIInputChange = () => {
     setHasChanges(true);
   };
-  
+
   const handleSlashMenuTrigger = (position: { top: number, left: number }) => {
     setSlashMenuPosition(position);
     setShowSlashMenu(true);
   };
-  
+
   // ============================================================
   // MAIN SAVE HANDLER - Orchestrates formula generation
   // ============================================================
-  
+
   const handleSave = () => {
     if (!activeColumn) return;
-    
+
     let finalFormula = '';
     const mode = formulaModeHook.mode;
-    
+
     try {
       switch (mode) {
         case 'code': {
@@ -246,7 +246,7 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
           finalFormula = formula;
           break;
         }
-          
+
         case 'ai': {
           // Validate AI inputs
           if (!aiPrompt.trim()) {
@@ -257,7 +257,7 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
             });
             return;
           }
-          
+
           // Generate AI formula using the hook
           finalFormula = formulaGenerators.generateAIFormula({
             prompt: aiPrompt,
@@ -283,11 +283,11 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
             });
             return;
           }
-          
+
           finalFormula = formulaGenerators.generateFirecrawlFormula(firecrawlUrl);
           break;
         }
-          
+
         case 'ai-agents': {
           // Validate AI Agents inputs
           if (!userOfferDetails.trim()) {
@@ -298,7 +298,7 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
             });
             return;
           }
-          
+
           finalFormula = formulaGenerators.generateAIAgentsFormula({
             userOfferDetails,
             messageCreatorModel,
@@ -338,21 +338,21 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
           });
           break;
         }
-          
+
         default:
           console.error('Unknown mode:', mode);
           return;
       }
-      
+
       // Save the formula
       setFormula(activeColumn, finalFormula);
       onOpenChange(false);
-      
+
       toast({
         title: "Formula Saved",
         description: `Formula for "${activeColumn}" has been saved.`,
       });
-      
+
     } catch (error) {
       console.error('Error saving formula:', error);
       toast({
@@ -362,7 +362,7 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
       });
     }
   };
-  
+
   const handleRemoveColumn = () => {
     if (activeColumn) {
       removeColumn(activeColumn);
@@ -374,11 +374,11 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
       });
     }
   };
-  
+
   // ============================================================
   // JSX RENDER - Clean orchestration of sub-components
   // ============================================================
-  
+
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
@@ -389,14 +389,14 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
               Write JavaScript formulas, use AI to generate content, or automate with Puppeteer
             </SheetDescription>
           </SheetHeader>
-          
+
           <div className="mt-6">
             <Tabs value={formulaModeHook.mode} onValueChange={(value) => formulaModeHook.setMode(value as FormulaMode)}>
               <ModeSelector
                 mode={formulaModeHook.mode}
                 onModeChange={(mode) => formulaModeHook.setMode(mode)}
               />
-              
+
               <TabsContent value="code" className="space-y-4">
                 <CodeModeEditor
                   formula={formula}
@@ -425,7 +425,7 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
                   onSlashMenuTrigger={handleSlashMenuTrigger}
                 />
               </TabsContent>
-              
+
               <TabsContent value="ai" className="space-y-4">
                 <AIModeEditor
                   headers={headers}
@@ -457,7 +457,7 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
                   onInputChange={handleAIInputChange}
                 />
               </TabsContent>
-              
+
               <TabsContent value="firecrawl" className="space-y-4">
                 <FirecrawlModeEditor
                   headers={headers}
@@ -467,7 +467,7 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
                   onInputChange={handleAIInputChange}
                 />
               </TabsContent>
-              
+
               <TabsContent value="ai-agents" className="space-y-4">
                 <AIAgentsModeEditor
                   headers={headers}
@@ -493,7 +493,7 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
                   onInputChange={handleAIInputChange}
                 />
               </TabsContent>
-              
+
               <TabsContent value="puppeteer" className="space-y-4">
                 <PuppeteerModeEditor
                   headers={headers}
@@ -523,13 +523,12 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
                   onMaxStepsChange={setAgentMaxSteps}
                   instruction={agentInstruction}
                   onInstructionChange={setAgentInstruction}
-                  hasJinaKey={!!aiSettings.jinaKey}
                   onInputChange={handleAIInputChange}
                   ollamaModels={ollamaConnection.models}
                 />
               </TabsContent>
             </Tabs>
-            
+
             {/* Footer Actions */}
             <div className="flex justify-between items-center mt-6 pt-4 border-t">
               <Button
@@ -538,7 +537,7 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
               >
                 Remove Column
               </Button>
-              
+
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => onOpenChange(false)}>
                   Cancel
@@ -551,7 +550,7 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
           </div>
         </SheetContent>
       </Sheet>
-      
+
       {/* Slash Menu for Code Mode */}
       <SlashMenu
         isVisible={showSlashMenu}
@@ -568,7 +567,7 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
         }}
         availableColumns={headers}
       />
-      
+
       {/* Remove Column Confirmation Dialog */}
       <AlertDialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
         <AlertDialogContent>

@@ -16,7 +16,6 @@ export interface AIConfig {
   geminiKey: string;
   groqKey: string;
   firecrawlKey: string;
-  jinaKey: string;
   provider: AIProvider;
   model: string;
   customPrompt: string;
@@ -62,7 +61,7 @@ const removeItem = (key: string): void => {
  */
 export const aiConfigStorage = {
   // ==================== OpenAI API Key ====================
-  
+
   /**
    * Get the stored OpenAI API key
    */
@@ -85,7 +84,7 @@ export const aiConfigStorage = {
   },
 
   // ==================== Gemini API Key ====================
-  
+
   /**
    * Get the stored Gemini API key
    */
@@ -108,7 +107,7 @@ export const aiConfigStorage = {
   },
 
   // ==================== Groq API Key ====================
-  
+
   /**
    * Get the stored Groq API key
    */
@@ -131,7 +130,7 @@ export const aiConfigStorage = {
   },
 
   // ==================== Firecrawl API Key ====================
-  
+
   /**
    * Get the stored Firecrawl API key
    */
@@ -153,22 +152,8 @@ export const aiConfigStorage = {
     removeItem(STORAGE_KEYS.FIRECRAWL_KEY);
   },
 
-  // ==================== Jina AI API Key ====================
-
-  getJinaKey: (): string | null => {
-    return getItem(STORAGE_KEYS.JINA_KEY);
-  },
-
-  setJinaKey: (key: string): void => {
-    setItem(STORAGE_KEYS.JINA_KEY, key.trim());
-  },
-
-  clearJinaKey: (): void => {
-    removeItem(STORAGE_KEYS.JINA_KEY);
-  },
-
   // ==================== AI Provider ====================
-  
+
   /**
    * Get the stored AI provider
    * Defaults to 'openai' if not set or invalid
@@ -186,7 +171,7 @@ export const aiConfigStorage = {
   },
 
   // ==================== AI Model ====================
-  
+
   /**
    * Get the stored AI model
    */
@@ -202,7 +187,7 @@ export const aiConfigStorage = {
   },
 
   // ==================== Custom Prompt ====================
-  
+
   /**
    * Get the stored custom AI prompt
    */
@@ -218,7 +203,7 @@ export const aiConfigStorage = {
   },
 
   // ==================== Ollama Base URL ====================
-  
+
   /**
    * Get the stored Ollama base URL
    * Defaults to DEFAULT_OLLAMA_BASE_URL if not set
@@ -235,7 +220,7 @@ export const aiConfigStorage = {
   },
 
   // ==================== Bulk Operations ====================
-  
+
   /**
    * Save all AI configuration settings at once
    */
@@ -247,7 +232,7 @@ export const aiConfigStorage = {
         aiConfigStorage.clearOpenAIKey();
       }
     }
-    
+
     if (config.geminiKey !== undefined) {
       if (config.geminiKey) {
         aiConfigStorage.setGeminiKey(config.geminiKey);
@@ -255,7 +240,7 @@ export const aiConfigStorage = {
         aiConfigStorage.clearGeminiKey();
       }
     }
-    
+
     if (config.groqKey !== undefined) {
       if (config.groqKey) {
         aiConfigStorage.setGroqKey(config.groqKey);
@@ -263,7 +248,7 @@ export const aiConfigStorage = {
         aiConfigStorage.clearGroqKey();
       }
     }
-    
+
     if (config.firecrawlKey !== undefined) {
       if (config.firecrawlKey) {
         aiConfigStorage.setFirecrawlKey(config.firecrawlKey);
@@ -272,26 +257,18 @@ export const aiConfigStorage = {
       }
     }
 
-    if (config.jinaKey !== undefined) {
-      if (config.jinaKey) {
-        aiConfigStorage.setJinaKey(config.jinaKey);
-      } else {
-        aiConfigStorage.clearJinaKey();
-      }
-    }
-    
     if (config.provider !== undefined) {
       aiConfigStorage.setProvider(config.provider);
     }
-    
+
     if (config.model !== undefined) {
       aiConfigStorage.setModel(config.model);
     }
-    
+
     if (config.customPrompt !== undefined) {
       aiConfigStorage.setCustomPrompt(config.customPrompt);
     }
-    
+
     if (config.ollamaBaseUrl !== undefined) {
       aiConfigStorage.setOllamaBaseUrl(config.ollamaBaseUrl);
     }
@@ -306,7 +283,6 @@ export const aiConfigStorage = {
       geminiKey: aiConfigStorage.getGeminiKey() || '',
       groqKey: aiConfigStorage.getGroqKey() || '',
       firecrawlKey: aiConfigStorage.getFirecrawlKey() || '',
-      jinaKey: aiConfigStorage.getJinaKey() || '',
       provider: aiConfigStorage.getProvider(),
       model: aiConfigStorage.getModel() || DEFAULT_OPENAI_MODEL,
       customPrompt: aiConfigStorage.getCustomPrompt() || '',

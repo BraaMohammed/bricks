@@ -7,7 +7,7 @@
  * for every row.
  */
 
-import { Info, Search, Zap } from 'lucide-react';
+import { Search, Zap } from 'lucide-react';
 import { useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -33,8 +33,6 @@ interface AgentModeEditorProps {
   onInstructionChange: (value: string) => void;
   // list of available ollama models (dynamic)
   ollamaModels?: string[];
-  // Jina key status
-  hasJinaKey: boolean;
   // Change handler
   onInputChange: () => void;
 }
@@ -50,7 +48,6 @@ export const AgentModeEditor = ({
   onMaxStepsChange,
   instruction,
   onInstructionChange,
-  hasJinaKey,
   onInputChange,
   ollamaModels,
 }: AgentModeEditorProps) => {
@@ -102,19 +99,6 @@ export const AgentModeEditor = ({
           </div>
         </div>
       </Card>
-
-      {/* Jina key warning */}
-      {!hasJinaKey && (
-        <Card className="p-3 border-yellow-300 bg-yellow-50 dark:border-yellow-700 dark:bg-yellow-950/20">
-          <div className="flex gap-2 items-center text-yellow-800 dark:text-yellow-300 text-xs">
-            <Info className="h-4 w-4 shrink-0" />
-            <span>
-              No Jina AI key detected — the agent will still work on the free tier (rate-limited).
-              Add a key in <strong>AI Configuration → API Keys</strong> for better throughput.
-            </span>
-          </div>
-        </Card>
-      )}
 
       {/* Provider + Model selectors */}
       <div className="grid grid-cols-2 gap-4">

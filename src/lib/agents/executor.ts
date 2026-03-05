@@ -2,7 +2,7 @@
  * AI Search Agent Executor
  *
  * Runs an autonomous agentic loop using Vercel AI SDK's generateText().
- * The agent can call Jina tools (search_web, read_url, parallel_read_url)
+ * The agent can call search tools (search_web, read_url, parallel_read_url)
  * to answer the user's instruction.
  *
  * Usage:
@@ -16,7 +16,7 @@
  */
 
 import { generateText, stepCountIs } from 'ai';
-import { buildJinaTools } from './jinaTools';
+import { buildSearchTools } from './searchTools';
 import { getAgentModel, readAgentKeysFromStorage } from './providerRouter';
 
 export interface AgentRunOptions {
@@ -30,8 +30,6 @@ export interface AgentRunOptions {
   model: string;
   /** Maximum agentic iterations (tool call rounds). Default: 5. */
   maxSteps?: number;
-  /** Optional Jina API key override. If omitted, read from localStorage. */
-  jinaApiKey?: string;
 }
 
 export interface AgentRunResult {
@@ -90,18 +88,13 @@ export async function runSearchAgent(options: AgentRunOptions): Promise<AgentRun
     provider,
     model,
     maxSteps = 5,
-    jinaApiKey,
   } = options;
-
-  // Resolve Jina key
-  const resolvedJinaKey =
-    jinaApiKey ?? localStorage.getItem('jina_api_key') ?? undefined;
 
   // Resolve AI provider keys
   const storedKeys = readAgentKeysFromStorage();
 
-  // Build tools
-  const tools = buildJinaTools(resolvedJinaKey || undefined);
+  // Build tools (keys are server-side, no key needed here)
+  const tools = buildSearchTools();
 
   // Resolve model instance
   let aiModel;

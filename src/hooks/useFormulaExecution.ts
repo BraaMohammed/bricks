@@ -31,7 +31,7 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
    */
   const executeFormula = async (column: string) => {
     const formula = getFormula(column);
-    
+
     if (!formula.trim()) {
       toast({
         title: "No Formula",
@@ -56,7 +56,6 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
           return;
         }
 
-        const jinaApiKey = localStorage.getItem('jina_api_key') ?? undefined;
         const providerRateConfig = getRateLimitConfig(agentConfig.provider, agentConfig.model);
         const agentRateConfig = {
           maxConcurrent: Math.max(1, Math.floor(providerRateConfig.maxConcurrent / 2)),
@@ -72,7 +71,6 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
               provider: agentConfig.provider as 'openai' | 'gemini' | 'groq' | 'ollama',
               model: agentConfig.model,
               maxSteps: agentConfig.maxSteps,
-              jinaApiKey,
             });
 
             if (result.error) {
@@ -106,21 +104,21 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
         });
         return;
       }
-      
+
       // Extract provider and model from formula metadata (embedded in comments)
       // Falls back to localStorage for backward compatibility with old formulas
       const aiProvider = getFormulaProvider(formula, localStorage.getItem('ai_provider') || 'openai');
       const aiModel = getFormulaModel(formula) || localStorage.getItem('ai_model') || '';
-      
-      console.log('🔍 DEBUG - Provider Detection:', { 
-        raw: aiProvider, 
+
+      console.log('🔍 DEBUG - Provider Detection:', {
+        raw: aiProvider,
         model: aiModel,
         isGroq: aiProvider === 'groq',
         source: 'formula metadata'
       });
-      
+
       const rateLimitConfig = getRateLimitConfig(aiProvider, aiModel);
-      
+
       console.log(`🚦 Rate limiting: ${rateLimitConfig.description}`);
       console.log(`📊 Batch size: ${rateLimitConfig.maxConcurrent}, Delay: ${rateLimitConfig.delayMs}ms`);
       console.warn(`⚠️ CRITICAL: Starting execution of ${rows.length} rows with above config`);
@@ -129,17 +127,17 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
       const rowTasks = rows.map((row, i) => async () => {
         try {
           console.log(`🚀 Starting row ${i + 1}/${rows.length} with individual timeout per API call`);
-          
+
           // Create async function from formula string with proper column access syntax
           const asyncFunction = new Function('row', 'runAIAgents', `
             return (async () => {
               ${formula}
             })();
           `);
-          
+
           const result = await asyncFunction(row, runAIAgents);
           const stringResult = result !== null && result !== undefined ? String(result) : '';
-          
+
           updateCell(i, column, stringResult);
           console.log(`✅ Row ${i + 1} completed successfully`);
           return { success: true, rowIndex: i };
@@ -159,9 +157,9 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
           console.log(`📊 Progress: ${completed}/${total} rows`);
         }
       });
-      
+
       setExecutionProgress(null);
-      
+
       const successCount = results.filter(r => r.success).length;
       const errorCount = results.filter(r => !r.success).length;
 
@@ -203,20 +201,18 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
           throw new Error('Invalid agent formula');
         }
 
-        const jinaApiKey = localStorage.getItem('jina_api_key') ?? undefined;
         const result = await runSearchAgent({
           instruction: agentConfig.instruction,
           rowData: row as Record<string, string>,
           provider: agentConfig.provider as 'openai' | 'gemini' | 'groq' | 'ollama',
           model: agentConfig.model,
           maxSteps: agentConfig.maxSteps,
-          jinaApiKey,
         });
 
         if (result.error) {
           throw new Error(result.error);
         }
-        
+
         console.log('📝 Updating cell:', { rowIndex, column, result: result.result, steps: result.steps });
         updateCell(rowIndex, column, result.result);
         toast({
