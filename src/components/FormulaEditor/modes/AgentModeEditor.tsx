@@ -15,9 +15,13 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronDown, Settings2 } from 'lucide-react';
 import { ColumnBadges } from '@/components/FormulaEditor/ColumnBadges';
 import { getProviderModels, PROVIDERS } from '@/lib/constants/aiModels';
 import type { AIProvider } from '@/lib/constants/aiModels';
+import { ThinkingModeToggle } from '../ThinkingModeToggle';
 
 interface AgentModeEditorProps {
   headers: string[];
@@ -29,6 +33,10 @@ interface AgentModeEditorProps {
   onModelChange: (model: string) => void;
   maxSteps: number;
   onMaxStepsChange: (steps: number) => void;
+  temperature: number;
+  onTemperatureChange: (temp: number) => void;
+  thinkingMode: boolean;
+  onThinkingModeChange: (enabled: boolean) => void;
   instruction: string;
   onInstructionChange: (value: string) => void;
   // list of available ollama models (dynamic)
@@ -46,6 +54,10 @@ export const AgentModeEditor = ({
   onModelChange,
   maxSteps,
   onMaxStepsChange,
+  temperature,
+  onTemperatureChange,
+  thinkingMode,
+  onThinkingModeChange,
   instruction,
   onInstructionChange,
   onInputChange,
@@ -158,6 +170,49 @@ export const AgentModeEditor = ({
           Each step lets the agent call a tool (search or read a page). Higher = more thorough but slower.
         </p>
       </div>
+
+      {/* Advanced Settings for Agent */}
+      <Collapsible className="border rounded-md p-3 bg-muted/10">
+        <CollapsibleTrigger className="flex items-center justify-between w-full text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+          <div className="flex items-center gap-2">
+            <Settings2 className="h-4 w-4" />
+            Agent Settings
+          </div>
+          <ChevronDown className="h-4 w-4" />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="pt-4 space-y-5">
+          {/* Temperature */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">Temperature</Label>
+              <Badge variant="secondary" className="tabular-nums">
+                {temperature}
+              </Badge>
+            </div>
+            <Slider
+              min={0}
+              max={2}
+              step={0.1}
+              value={[temperature]}
+              onValueChange={([v]) => { onTemperatureChange(v); onInputChange(); }}
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Precise</span>
+              <span>Creative</span>
+            </div>
+          </div>
+
+          {/* Thinking Mode */}
+          {availableModels.find(m => m.id === model)?.supportsThinking && (
+            <ThinkingModeToggle
+              enabled={thinkingMode}
+              modelName={model}
+              onToggle={(v) => { onThinkingModeChange(v); onInputChange(); }}
+            />
+          )}
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Instruction textarea */}
       <div className="space-y-2">

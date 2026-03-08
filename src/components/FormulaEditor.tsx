@@ -112,6 +112,8 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   const [agentProvider, setAgentProvider] = useState<AIProvider>('openai');
   const [agentModel, setAgentModel] = useState('gpt-4o-mini');
   const [agentMaxSteps, setAgentMaxSteps] = useState(10);
+  const [agentTemperature, setAgentTemperature] = useState(0.7);
+  const [agentThinkingMode, setAgentThinkingMode] = useState(false);
   const [agentInstruction, setAgentInstruction] = useState('');
 
   // ============================================================
@@ -152,15 +154,11 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   // EFFECTS
   // ============================================================
 
-  // Initialize Ollama connection if using Ollama provider
-  // NOTE: `ollamaConnection` is an object recreated on every render so
-  // depending on it causes this effect to run continuously.  Instead we
-  // rely on the stable `checkConnection` callback returned by the hook.
+  // Initialize Ollama connection on mount so Ollama models are available 
+  // across all modes (AI Agents, AI Web Research Agent, etc.)
   useEffect(() => {
-    if (aiSettings.aiProvider === 'ollama') {
-      ollamaConnection.checkConnection();
-    }
-  }, [aiSettings.aiProvider, ollamaConnection.checkConnection]);
+    ollamaConnection.checkConnection();
+  }, [ollamaConnection.checkConnection]);
 
   // Expose Puppeteer logging functions to window
   useEffect(() => {
@@ -197,9 +195,11 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
       if (detectedMode === 'agent') {
         const agentConfig = decodeAgentFormula(existingFormula);
         if (agentConfig) {
-          setAgentProvider(agentConfig.provider);
+          setAgentProvider(agentConfig.provider as AIProvider);
           setAgentModel(agentConfig.model);
           setAgentMaxSteps(agentConfig.maxSteps);
+          if (agentConfig.temperature !== undefined) setAgentTemperature(agentConfig.temperature);
+          if (agentConfig.thinkingMode !== undefined) setAgentThinkingMode(agentConfig.thinkingMode);
           setAgentInstruction(agentConfig.instruction);
         }
       }
@@ -334,6 +334,8 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
             provider: agentProvider,
             model: agentModel,
             maxSteps: agentMaxSteps,
+            temperature: agentTemperature,
+            thinkingMode: agentThinkingMode,
             instruction: agentInstruction,
           });
           break;
@@ -521,6 +523,10 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
                   onModelChange={setAgentModel}
                   maxSteps={agentMaxSteps}
                   onMaxStepsChange={setAgentMaxSteps}
+                  temperature={agentTemperature}
+                  onTemperatureChange={setAgentTemperature}
+                  thinkingMode={agentThinkingMode}
+                  onThinkingModeChange={setAgentThinkingMode}
                   instruction={agentInstruction}
                   onInstructionChange={setAgentInstruction}
                   onInputChange={handleAIInputChange}

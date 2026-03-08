@@ -30,6 +30,8 @@ export interface AgentRunOptions {
   model: string;
   /** Maximum agentic iterations (tool call rounds). Default: 5. */
   maxSteps?: number;
+  temperature?: number;
+  thinkingMode?: boolean;
 }
 
 export interface AgentRunResult {
@@ -74,6 +76,24 @@ function isRetryableProviderError(error: unknown): boolean {
   );
 }
 
+function extractRetryDelay(error: unknown): number | null {
+  const msg = String(error).toLowerCase();
+
+  // Look for "try again in X.XXs"
+  const sMatch = msg.match(/try again in ([\d\.]+)s/);
+  if (sMatch && sMatch[1]) {
+    return parseFloat(sMatch[1]) * 1000;
+  }
+
+  // Look for "try again in X.XXms"
+  const msMatch = msg.match(/try again in ([\d\.]+)ms/);
+  if (msMatch && msMatch[1]) {
+    return parseFloat(msMatch[1]);
+  }
+
+  return null;
+}
+
 async function sleep(ms: number): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -88,6 +108,7 @@ export async function runSearchAgent(options: AgentRunOptions): Promise<AgentRun
     provider,
     model,
     maxSteps = 5,
+    temperature = 0.7,
   } = options;
 
   // Resolve AI provider keys
@@ -108,7 +129,7 @@ export async function runSearchAgent(options: AgentRunOptions): Promise<AgentRun
   const resolvedInstruction = interpolate(instruction, rowData);
 
   try {
-    const maxAttempts = 3;
+    const maxAttempts = 50; // Groq free tier 6000 TPM limit requires many, many retries across a large batch
     let lastError: unknown;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -119,6 +140,8 @@ export async function runSearchAgent(options: AgentRunOptions): Promise<AgentRun
           prompt: resolvedInstruction,
           tools,
           stopWhen: stepCountIs(maxSteps),
+          maxRetries: 0, // Handle retries entirely in this loop so we can respect explicit wait times
+          temperature,
         });
 
         console.log('🤖 Agent response:', { text: response.text, steps: response.steps?.length });
@@ -133,7 +156,22 @@ export async function runSearchAgent(options: AgentRunOptions): Promise<AgentRun
           break;
         }
 
-        const backoffMs = 1000 * 2 ** (attempt - 1) + Math.floor(Math.random() * 400);
+        let backoffMs = 1000 * 2 ** (attempt - 1) + Math.floor(Math.random() * 400);
+
+        const explicitDelay = extractRetryDelay(err);
+        if (explicitDelay !== null) {
+          // Add a tiny 150ms buffer PLUS a random jitter up to 1.5 seconds.
+          // The jitter prevents the "thundering herd" problem where 5 concurrent promises 
+          // all wake up at the exact same millisecond and instantly smash the rate limit again.
+          const jiter = Math.floor(Math.random() * 1500);
+          backoffMs = explicitDelay + 150 + jiter;
+          console.warn(`⏳ [Attempt ${attempt}] Rate limit hit. Extracted exact wait time: ${explicitDelay}ms. Sleeping for ${backoffMs}ms (including jitter)...`);
+        } else {
+          // Cap exponential backoff at 10 seconds if no explicit delay is given
+          backoffMs = Math.min(backoffMs, 10000);
+          console.warn(`⏳ [Attempt ${attempt}] Rate limit hit. No exact wait time found. Sleeping for ${backoffMs}ms...`);
+        }
+
         await sleep(backoffMs);
       }
     }

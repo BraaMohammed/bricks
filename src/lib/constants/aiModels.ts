@@ -120,7 +120,7 @@ export const groqModels: ModelDefinition[] = [
   {
     id: 'qwen/qwen3-32b',
     name: 'Qwen 3 32B (Reasoning)',
-    supportsThinking: false,
+    supportsThinking: true,
     cost: 'Free tier: 60 RPM, 1K RPD'
   },
   {
@@ -166,7 +166,7 @@ export function getProviderModels(provider: AIProvider, ollamaModels: string[] =
  */
 function detectThinkingSupport(modelName: string): boolean {
   const thinkingPatterns = [
-    'deepseek', 'r1', 'thinking', 'reasoning', 'o1', 'o3', 'qwq'
+    'deepseek', 'r1', 'thinking', 'reasoning', 'o1', 'o3', 'qwq', 'qwen'
   ];
   const lowerModel = modelName.toLowerCase();
   return thinkingPatterns.some(pattern => lowerModel.includes(pattern));

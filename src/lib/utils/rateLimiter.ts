@@ -6,102 +6,64 @@
  * (e.g., Groq: 30-60 req/min, Gemini: 60 req/min).
  */
 
-/**
- * Execute promises in batches with rate limiting
- * 
- * @param promises - Array of promise-returning functions (not promises themselves!)
- * @param options - Configuration options for rate limiting
- * @returns Promise that resolves with array of results
- * 
- * @example
- * ```typescript
- * const tasks = rows.map((row, i) => async () => {
- *   return await processRow(row, i);
- * });
- * 
- * const results = await executeWithRateLimit(tasks, {
- *   maxConcurrent: 10,
- *   delayMs: 1000,
- *   onProgress: (completed, total) => console.log(`${completed}/${total}`)
- * });
- * ```
- */
+import pLimit from 'p-limit';
+
 export async function executeWithRateLimit<T>(
-  // <T> is a TypeScript generic - it means this function works with any type
-  // Example: If you pass functions that return strings, T = string
-  //          If you pass functions that return numbers, T = number
-  //          If you pass functions that return {success: boolean, data: any}, T = {success: boolean, data: any}
-  
   promises: Array<() => Promise<T>>,
-  // promises is an array of FUNCTIONS that return promises
-  // Each function is: () => Promise<T>
-  // Example: async () => { return someResult; }
-  // NOT: [promise1, promise2] - we need functions that create promises!
-  
   options: {
-    maxConcurrent?: number;      // How many requests to run at once (batch size)
-    delayMs?: number;             // How long to wait between batches (in milliseconds)
-    onProgress?: (completed: number, total: number) => void;  // Callback for progress updates
-    signal?: AbortSignal;         // Signal to cancel execution
+    maxConcurrent?: number;
+    delayMs?: number;
+    onProgress?: (completed: number, total: number) => void;
+    signal?: AbortSignal;
   } = {}
-  // The "= {}" means: if caller doesn't pass options, use empty object as default
-  // They CAN still pass options! Example: executeWithRateLimit(tasks, { maxConcurrent: 20 })
-  // Without "= {}", you'd have to always pass options, even if empty: executeWithRateLimit(tasks, {})
 ): Promise<T[]> {
-  // Destructure options with default values
-  // If options.maxConcurrent is not provided, use 10
-  // If options.delayMs is not provided, use 1000
-  const {
-    maxConcurrent = 10,
-    delayMs = 1000,
-    onProgress,
-    signal
-  } = options;
+  const { maxConcurrent = 10, delayMs = 1000, onProgress, signal } = options;
 
-  // Array to store all results from executed promises
-  const results: T[] = [];  // T[] means "array of T" - same type as the promises return
-  const total = promises.length;  // Total number of tasks to execute
-  
-  // MAIN LOOP: Process promises in batches
-  // Start at 0, increment by maxConcurrent each time
-  // Example: If maxConcurrent=10 and total=100, loop runs: 0, 10, 20, 30...90
-  for (let i = 0; i < total; i += maxConcurrent) {
-    // STEP 1: Check if user cancelled execution
-    if (signal?.aborted) {
-      throw new Error('Rate limited execution cancelled');
-    }
+  const limit = pLimit(maxConcurrent);
+  const total = promises.length;
+  let completed = 0;
 
-    // STEP 2: Get the next batch of functions to execute
-    // slice(i, i + maxConcurrent) gets functions from index i to i+maxConcurrent
-    // Example: slice(0, 10) gets first 10 functions, slice(10, 20) gets next 10, etc.
-    const batch = promises.slice(i, i + maxConcurrent);
-    
-    // STEP 3: Execute all functions in this batch simultaneously
-    // batch.map(fn => fn()) calls each function to create a promise
-    // Promise.all() waits for all promises in the batch to complete
-    const batchResults = await Promise.all(batch.map(fn => fn()));
-    
-    // STEP 4: Add the results from this batch to our results array
-    results.push(...batchResults);  // ...spread operator adds all items individually
-    
-    // STEP 5: Call progress callback if provided
-    if (onProgress) {
-      // Report how many tasks have been completed so far
-      // Use Math.min to avoid reporting more than total (in case of rounding)
-      onProgress(Math.min(i + maxConcurrent, total), total);
-    }
-    
-    // STEP 6: Wait before processing next batch (rate limiting!)
-    // Only wait if there are more batches to process (not on last batch)
-    if (i + maxConcurrent < total) {
-      // Create a promise that resolves after delayMs milliseconds
-      // This creates the delay between batches to avoid hitting rate limits
-      await new Promise(resolve => setTimeout(resolve, delayMs));
-    }
-  }
-  
-  // Return all results after all batches are complete
-  return results;
+  const tasks = promises.map((fn, index) => {
+    return limit(async () => {
+      // 1. Check for cancellation before starting
+      if (signal?.aborted) {
+        throw new Error('Rate limited execution cancelled');
+      }
+
+      // 2. Stagger starting times slightly within a burst
+      // This prevents maxConcurrent requests from hitting the API at the exact same millisecond
+      if (delayMs > 0 && maxConcurrent > 1) {
+        const staggerMs = (index % maxConcurrent) * Math.min(200, delayMs / maxConcurrent);
+        if (staggerMs > 0) {
+          await new Promise(resolve => setTimeout(resolve, staggerMs));
+        }
+      }
+
+      // 3. Execute the promise
+      const result = await fn();
+
+      // 4. Update progress
+      completed++;
+      if (onProgress) {
+        onProgress(completed, total);
+      }
+
+      // 5. Check for cancellation after completion
+      if (signal?.aborted) {
+        throw new Error('Rate limited execution cancelled');
+      }
+
+      // 6. Hold the concurrency slot for delayMs
+      // This acts as a rate limiter per slot, guaranteeing spacing between requests in the same slot
+      if (delayMs > 0 && completed < total) {
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+
+      return result;
+    });
+  });
+
+  return Promise.all(tasks);
 }
 
 /**
@@ -124,28 +86,50 @@ export function getRateLimitConfig(provider: string, model?: string): {
 } {
   // Normalize provider to lowercase for case-insensitive matching
   const normalizedProvider = provider.toLowerCase();
-  
+
   console.log('🚦 Rate limiter config requested for:', { provider, normalizedProvider, model });
-  
+
   switch (normalizedProvider) {
     case 'groq': {
-      // Groq Rate Limits:
-      // - Standard models: 30 requests/minute = 0.5 req/second
-      // - Qwen/Kimi models: 60 requests/minute = 1 req/second
-      // Strategy: ONE row at a time with 2s delay = 30 req/min (for 1 API call per row)
-      // For 500 rows: 500 ÷ 30/min = ~16.6 min + API overhead = ~18-20 min
-      const isHigherLimit = model?.includes('qwen') || model?.includes('kimi');
-      const config = {
-        maxConcurrent: 1,  // ONE row at a time - prevents bursts
-        delayMs: isHigherLimit ? 1000 : 2000,  // 2s = 30 req/min, 1s = 60 req/min
-        description: isHigherLimit 
-          ? 'Groq (60 req/min - Qwen/Kimi) - ~1s per row'
-          : 'Groq (30 req/min) - ~2s per row'
-      };
+      // Groq Rate Limits (Free Tier):
+      // - Standard models: ~30 requests/minute
+      // - Qwen/Kimi models: ~60 requests/minute
+      // Strategy: Use p-limit. Allow multiple rows to execute concurrently.
+      // Since each row might take 5-10s (due to search_web/read_url),
+      // running 5 concurrently naturally spreads out the Groq requests over time.
+      // Groq limits based on official docs (Free tier base):
+      // - qwen3-32b: 60 RPM, 6K TPM
+      // - llama-3.3-70b: 30 RPM, 12K TPM
+      // - llama-8b: 30 RPM, 6K TPM
+      // - kimi: 60 RPM, 10K TPM
+
+      const isQwen = model?.includes('qwen');
+      const isLlamaLarge = model?.includes('llama-3.3') || model?.includes('llama-guard'); // These have 12K-15K TPM limits
+      const isKimi = model?.includes('kimi');
+
+      // 6K TPM runs out instantly with >= 3 concurrent requests per row (since 1 row = ~3000 tokens due to tool calls)
+      let maxConcurrent = 1;
+      let delayMs = 3000;
+      let description = 'Groq (6000 TPM Limit) - 1 concurrent';
+
+      if (isLlamaLarge || isKimi) {
+        // 10K - 15K TPM can support roughly double the parallel token stream before crashing
+        maxConcurrent = 2;
+        delayMs = 2500;
+        description = 'Groq (12K+ TPM Limit - Llama Large/Kimi) - 2 concurrent';
+      } else if (isQwen) {
+        // Qwen has 60 RPM but only 6K TPM. 
+        // Since TPM is the actual bottleneck, we MUST keep concurrency at 1 or max 2.
+        maxConcurrent = 2;
+        delayMs = 2000;
+        description = 'Groq (6000 TPM / 60 RPM - Qwen) - 2 concurrent';
+      }
+
+      const config = { maxConcurrent, delayMs, description };
       console.log('✅ Groq config selected:', config);
       return config;
     }
-    
+
     case 'gemini': {
       const config = {
         maxConcurrent: 30,
@@ -155,7 +139,7 @@ export function getRateLimitConfig(provider: string, model?: string): {
       console.log('✅ Gemini config selected:', config);
       return config;
     }
-    
+
     case 'openai': {
       const config = {
         maxConcurrent: 50,
@@ -165,7 +149,7 @@ export function getRateLimitConfig(provider: string, model?: string): {
       console.log('✅ OpenAI config selected:', config);
       return config;
     }
-    
+
     case 'ollama': {
       const config = {
         maxConcurrent: 100, // No rate limit for local
@@ -175,7 +159,7 @@ export function getRateLimitConfig(provider: string, model?: string): {
       console.log('✅ Ollama config selected:', config);
       return config;
     }
-    
+
     case 'puppeteer': {
       const config = {
         maxConcurrent: 100, // Server has queue management - send all at once
@@ -185,7 +169,7 @@ export function getRateLimitConfig(provider: string, model?: string): {
       console.log('✅ Puppeteer config selected:', config);
       return config;
     }
-    
+
     default: {
       const config = {
         maxConcurrent: 10,
@@ -195,5 +179,5 @@ export function getRateLimitConfig(provider: string, model?: string): {
       console.log('⚠️ Default config selected (unknown provider):', config);
       return config;
     }
-}
+  }
 }

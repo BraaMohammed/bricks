@@ -12,38 +12,23 @@ interface ThinkingModeToggleProps {
 
 export const ThinkingModeToggle = ({ enabled, modelName, onToggle }: ThinkingModeToggleProps) => {
   return (
-    <Card className="p-4 border-orange-200 bg-orange-50/50">
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Brain className="h-4 w-4 text-orange-600" />
-          <h4 className="font-semibold text-orange-800">Reasoning Model Controls</h4>
-          <Badge variant="outline" className="text-orange-700 border-orange-300">
+    <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm bg-card">
+      <div className="space-y-0.5">
+        <Label className="text-sm font-medium flex items-center gap-2">
+          <Brain className="h-4 w-4 text-muted-foreground" />
+          Thinking Mode
+          <Badge variant="secondary" className="font-normal text-[10px] px-1.5 py-0 h-4">
             {modelName}
           </Badge>
-        </div>
-        
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label className="text-sm font-medium text-orange-800">Enable Thinking Mode</Label>
-            <p className="text-xs text-orange-600">
-              Allow model to show reasoning process (may include &lt;thinking&gt; tags)
-            </p>
-          </div>
-          <Switch
-            checked={enabled}
-            onCheckedChange={onToggle}
-          />
-        </div>
-
-        {!enabled && (
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded">
-            <p className="text-xs text-blue-700">
-              💡 <strong>Recommendation:</strong> Keep thinking mode disabled for faster responses. 
-              The output will be automatically filtered to remove &lt;thinking&gt; content.
-            </p>
-          </div>
-        )}
+        </Label>
+        <p className="text-xs text-muted-foreground">
+          Allow the model to use reasoning loops before answering (can take longer).
+        </p>
       </div>
-    </Card>
+      <Switch
+        checked={enabled}
+        onCheckedChange={onToggle}
+      />
+    </div>
   );
 };

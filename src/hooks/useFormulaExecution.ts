@@ -58,8 +58,8 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
 
         const providerRateConfig = getRateLimitConfig(agentConfig.provider, agentConfig.model);
         const agentRateConfig = {
-          maxConcurrent: Math.max(1, Math.floor(providerRateConfig.maxConcurrent / 2)),
-          delayMs: Math.max(providerRateConfig.delayMs, 1500),
+          maxConcurrent: providerRateConfig.maxConcurrent,
+          delayMs: providerRateConfig.delayMs,
           description: `Agent mode: ${providerRateConfig.description}`,
         };
 
@@ -71,6 +71,8 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
               provider: agentConfig.provider as 'openai' | 'gemini' | 'groq' | 'ollama',
               model: agentConfig.model,
               maxSteps: agentConfig.maxSteps,
+              temperature: agentConfig.temperature,
+              thinkingMode: agentConfig.thinkingMode,
             });
 
             if (result.error) {
@@ -207,6 +209,8 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
           provider: agentConfig.provider as 'openai' | 'gemini' | 'groq' | 'ollama',
           model: agentConfig.model,
           maxSteps: agentConfig.maxSteps,
+          temperature: agentConfig.temperature,
+          thinkingMode: agentConfig.thinkingMode,
         });
 
         if (result.error) {
