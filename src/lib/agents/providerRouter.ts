@@ -8,8 +8,9 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createGroq } from '@ai-sdk/groq';
-import { ollama } from 'ai-sdk-ollama';
+import { createOllama, ollama } from 'ai-sdk-ollama';
 import type { LanguageModel } from 'ai';
+import { OllamaChatSettings } from 'ai-sdk-ollama';
 
 export interface AgentProviderConfig {
   provider: 'openai' | 'gemini' | 'groq' | 'ollama';
@@ -18,6 +19,7 @@ export interface AgentProviderConfig {
   geminiKey?: string;
   groqKey?: string;
   ollamaBaseUrl?: string;
+  thinkingMode?: boolean;
 }
 
 /**
@@ -54,10 +56,17 @@ export function getAgentModel(config: AgentProviderConfig): LanguageModel {
 
     case 'ollama': {
       // Use the dedicated Ollama provider with proper tool calling support
-      // It handles response synthesis automatically for tool calling
       const baseUrl = config.ollamaBaseUrl || 'http://localhost:11434';
-      return ollama(model || 'llama3.1', {
-        baseURL: baseUrl,
+      const ollamaProvider = createOllama({ baseURL: baseUrl });
+
+      return ollamaProvider(model || 'llama3.1', {
+        // Disable extended thinking at the Ollama API level.
+        // The `think` flag is honoured by Ollama >=0.7 for models that
+        // expose a thinking mode (e.g. qwen3, deepseek-r1, phi4-reasoning).
+        think: false,
+        // Extra safety: also set via the options object that maps to Ollama's
+        // ModelOptions, which some builds check instead of the top-level flag.
+        options: { thinking: false } as Record<string, unknown>,
       });
     }
 

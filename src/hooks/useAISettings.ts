@@ -245,6 +245,12 @@ export const useAISettings = (ollamaModels: string[] = []): AISettings => {
       // Clear model for Ollama until models are loaded
       setModelState('');
     }
+
+    // Disable thinking mode by default for Ollama
+    if (provider === 'ollama') {
+      setThinkingModeState(false);
+      localStorage.setItem(STORAGE_KEYS.THINKING_MODE, 'false');
+    }
   }, []);
 
   /**

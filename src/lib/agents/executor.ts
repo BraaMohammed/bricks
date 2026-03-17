@@ -63,6 +63,36 @@ Guidelines:
 - If you cannot find the information after reasonable attempts, say so clearly.
 - Return only the final answer – no explanations about what you did.`;
 
+/**
+ * When using Ollama with a reasoning model (e.g. qwen3, deepseek-r1, phi4-reasoning),
+ * appending `/no_think` to the system prompt tells the model to skip the internal
+ * thinking phase entirely. This is the most reliable cross-model suppression method.
+ * See: https://ollama.com/blog/thinking-models
+ */
+const OLLAMA_NO_THINK_SUFFIX = '\n\n/no_think';
+
+/**
+ * Filter thinking content (like <think>...</think>) from AI responses.
+ */
+function filterThinkingContent(content: string): string {
+  if (!content) return content;
+  
+  // Remove <thinking>...</thinking> and <think>...</think> blocks
+  let filtered = content;
+  filtered = filtered.replace(/<thinking[^>]*>[\s\S]*?<\/thinking>/g, '');
+  filtered = filtered.replace(/<think[^>]*>[\s\S]*?<\/think>/g, '');
+  
+  // Remove any stray markers
+  filtered = filtered.replace(/<\/thinking>/g, '');
+  filtered = filtered.replace(/<thinking[^>]*>/g, '');
+  filtered = filtered.replace(/<\/think>/g, '');
+  filtered = filtered.replace(/<think[^>]*>/g, '');
+  
+  // Clean up extra whitespace
+  filtered = filtered.replace(/\n\s*\n\s*\n/g, '\n\n');
+  return filtered.trim();
+}
+
 function isRetryableProviderError(error: unknown): boolean {
   const message = String(error).toLowerCase();
   return (
@@ -109,6 +139,7 @@ export async function runSearchAgent(options: AgentRunOptions): Promise<AgentRun
     model,
     maxSteps = 5,
     temperature = 0.7,
+    thinkingMode = false,
   } = options;
 
   // Resolve AI provider keys
@@ -120,7 +151,7 @@ export async function runSearchAgent(options: AgentRunOptions): Promise<AgentRun
   // Resolve model instance
   let aiModel;
   try {
-    aiModel = getAgentModel({ provider, model, ...storedKeys });
+    aiModel = getAgentModel({ provider, model, ...storedKeys, thinkingMode });
   } catch (err) {
     return { result: '', steps: 0, error: String(err) };
   }
@@ -128,26 +159,53 @@ export async function runSearchAgent(options: AgentRunOptions): Promise<AgentRun
   // Interpolate row data into instruction
   const resolvedInstruction = interpolate(instruction, rowData);
 
+  // Build the effective system prompt.
+  // For Ollama reasoning models, append /no_think to suppress the thinking phase.
+  // This works for qwen3, deepseek-r1, phi4-reasoning, and similar models.
+  const effectiveSystem =
+    provider === 'ollama' && !thinkingMode
+      ? SYSTEM_PROMPT + OLLAMA_NO_THINK_SUFFIX
+      : SYSTEM_PROMPT;
+
+  // Per-request timeout for Ollama to prevent runaway thinking loops.
+  // Other providers (cloud APIs) have their own server-side timeouts.
+  const OLLAMA_TIMEOUT_MS = 120_000; // 2 minutes max per generateText call
+
   try {
     const maxAttempts = 50; // Groq free tier 6000 TPM limit requires many, many retries across a large batch
     let lastError: unknown;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
+        // Build an abort signal for Ollama to cap runaway thinking time.
+        const abortController =
+          provider === 'ollama' ? new AbortController() : null;
+        const ollamaTimer = abortController
+          ? setTimeout(() => abortController.abort(), OLLAMA_TIMEOUT_MS)
+          : null;
+
         const response = await generateText({
           model: aiModel,
-          system: SYSTEM_PROMPT,
+          system: effectiveSystem,
           prompt: resolvedInstruction,
           tools,
           stopWhen: stepCountIs(maxSteps),
           maxRetries: 0, // Handle retries entirely in this loop so we can respect explicit wait times
           temperature,
+          abortSignal: abortController?.signal,
+        }).finally(() => {
+          if (ollamaTimer) clearTimeout(ollamaTimer);
         });
 
-        console.log('🤖 Agent response:', { text: response.text, steps: response.steps?.length });
+        let finalText = response.text;
+        if (!thinkingMode) {
+          finalText = filterThinkingContent(finalText);
+        }
+
+        console.log('🤖 Agent response:', { text: finalText, steps: response.steps?.length });
 
         return {
-          result: response.text,
+          result: finalText,
           steps: response.steps?.length ?? 0,
         };
       } catch (err) {

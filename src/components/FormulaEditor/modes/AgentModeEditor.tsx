@@ -68,6 +68,12 @@ export const AgentModeEditor = ({
   const handleProviderChange = (newProvider: string) => {
     const providerId = newProvider as AIProvider;
     onProviderChange(providerId);
+    
+    // Disable thinking mode by default for Ollama
+    if (providerId === 'ollama') {
+      onThinkingModeChange(false);
+    }
+    
     // Reset model to first available when provider changes
     const firstModel = getProviderModels(providerId, ollamaModels || [])?.[0]?.id ?? '';
     onModelChange(firstModel);
