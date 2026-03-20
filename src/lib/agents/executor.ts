@@ -53,15 +53,24 @@ function interpolate(instruction: string, rowData: Record<string, string>): stri
   });
 }
 
-const SYSTEM_PROMPT = `You are a data research agent. Your job is to find specific information by searching the web and reading web pages.
+function buildSystemPrompt(maxSteps: number): string {
+  return `You are a data research agent. Your job is to find specific information by searching the web and reading web pages.
 
-Guidelines:
+You have a budget of ${maxSteps} tool-call steps total.
+Step budget rules (CRITICAL):
+- Keep track of how many tool calls you have made so far.
+- You MUST stop calling tools and write your final text answer before you run out of steps.
+- Reserve at least 1 step at the end to write your answer — if you are on step ${maxSteps} or beyond, do NOT call any more tools; write your answer immediately.
+- If you have used ${Math.max(1, maxSteps - 1)} or more steps, stop gathering information and synthesize your answer now.
+
+Research guidelines:
 - Use search_web to find relevant URLs about the topic.
 - Use read_url to extract the full content from promising URLs.
-- Use parallel_read_url when you have multiple URLs to check at once.
+- Use parallel_read_url when you have multiple URLs to check at once (saves steps).
 - Be concise and extract only the specific information requested.
 - If you cannot find the information after reasonable attempts, say so clearly.
 - Return only the final answer – no explanations about what you did.`;
+}
 
 function isRetryableProviderError(error: unknown): boolean {
   const message = String(error).toLowerCase();
@@ -136,19 +145,57 @@ export async function runSearchAgent(options: AgentRunOptions): Promise<AgentRun
       try {
         const response = await generateText({
           model: aiModel,
-          system: SYSTEM_PROMPT,
+          system: buildSystemPrompt(maxSteps),
           prompt: resolvedInstruction,
           tools,
-          stopWhen: stepCountIs(maxSteps),
+          // +1 so the model always has a spare step to write its final text answer
+          // after tool calls finish. Without this, all N steps can be consumed by
+          // tool calls and response.text comes back empty.
+          stopWhen: stepCountIs(maxSteps + 1),
           maxRetries: 0, // Handle retries entirely in this loop so we can respect explicit wait times
           temperature,
         });
 
         console.log('🤖 Agent response:', { text: response.text, steps: response.steps?.length });
 
+        // Happy path — model produced a final text answer
+        if (response.text) {
+          return {
+            result: response.text,
+            steps: response.steps?.length ?? 0,
+          };
+        }
+
+        // ── Synthesis fallback ──────────────────────────────────────────────────
+        // The model used all steps on tool calls and never wrote a text answer.
+        // Collect all research gathered so far and make ONE final call with NO tools
+        // so the model is forced to synthesize a plain-text answer.
+        console.warn('⚠️ response.text was empty – running synthesis fallback call...');
+
+        const researchSummary = (response.steps ?? [])
+          .flatMap(step => step.toolResults ?? [])
+          .map((tr, i) => `[Research result ${i + 1}]\n${JSON.stringify(tr.result, null, 2)}`)
+          .join('\n\n');
+
+        if (!researchSummary) {
+          // Truly nothing was gathered — return empty
+          return { result: '', steps: response.steps?.length ?? 0 };
+        }
+
+        const synthResponse = await generateText({
+          model: aiModel,
+          system: 'You are a data extraction assistant. Based only on the research data provided, answer the user\'s question concisely. Return only the answer — no explanations.',
+          prompt: `Question: ${resolvedInstruction}\n\nResearch data collected:\n${researchSummary}`,
+          // No tools — model MUST produce plain text
+          maxRetries: 0,
+          temperature,
+        });
+
+        console.log('🔁 Synthesis result:', synthResponse.text);
+
         return {
-          result: response.text,
-          steps: response.steps?.length ?? 0,
+          result: synthResponse.text,
+          steps: (response.steps?.length ?? 0) + 1,
         };
       } catch (err) {
         lastError = err;

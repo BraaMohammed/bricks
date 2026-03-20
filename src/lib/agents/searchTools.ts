@@ -81,7 +81,7 @@ export function buildSearchTools() {
 
         read_url: tool({
             description:
-                'Extract clean, readable content from a web page as text. Use this after search_web to read the full content of a promising result.',
+                'Extract clean, readable content from a web page as text. Use this after search_web to read the full content of a promising result. dont use for signup protected websites like linkedin, facebook, instagram, twitter, x, etc.',
             inputSchema: z.object({
                 url: z.string().url().describe('The full URL of the web page to read.'),
             }),
