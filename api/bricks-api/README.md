@@ -1,40 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/create-next-app).
+# 🧱 Bricks Backend API
 
-## Getting Started
+Welcome to the headless Next.js API backend for **Bricks**. 
 
-First, run the development server:
+This service runs entirely separate from the main Vite frontend. It handles the heavy-lifting for tasks where standard client-side browser CORS restrictions or massive memory footprints apply. This includes our stealth Puppeteer instances, background browser queues, and proxying logic for the Autonomous AI Agents.
 
+## 🚀 Capabilities
+
+- **Puppeteer Stealth Execution (`/api/puppeteer`)**: A robust, queue-based browser pool system. Using `puppeteer-extra-plugin-stealth`, it handles complex automations, screenshot tasks, and bypasses bot-detection techniques to safely scrape difficult interfaces.
+- **Autonomous Web Search (`/api/search`)**: Proxies dynamic queries through Serper, Tavily, or directly via native DuckDuckGo HTML parsing. Serving as the "eyes" for the Bricks Autonomous Vercel AI Agents.
+- **Web Content Reader (`/api/reader`)**: A headless URL parser utilizing Mozilla Readability and Cheerio to transform messy HTML code into perfectly clean, AI-ready markdown.
+
+## ⚙️ Environment Setup
+
+### 1. Install Dependencies
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Environment Variables (.env)
+Create a `.env` file locally at the root of `api/bricks-api`. 
 
-You can start editing the page by modifying `app/route.ts`. The page auto-updates as you edit the file.
+While you can plug in your AI provider keys (OpenAI, Gemini, Groq) directly in the Bricks Frontend UI, the **Backend API** manages secure keys for web scraping APIs primarily used by the Web Research agent. 
 
-## Learn More
+```env
+# Web Search Providers (Optional)
+# If none are provided, the system falls back gracefully to completely free DuckDuckGo HTML request scraping.
+SERPER_API_KEY=your_serper_key_here
+TAVILY_API_KEY=your_tavily_key_here
+```
 
-To learn more about Next.js, take a look at the following resources:
+### 3. Run the Development Server
+We utilize Fast Refresh and Turbopack for ultra-fast compilation.
+```bash
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The backend API natively binds to `http://localhost:3000`. Keep this running in the background alongside your frontend!
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## 🔌 API Endpoints Reference
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Web Reading & Searching (Agents)
+- **`POST /api/search`**: Receives an AI `{ query }` object and returns curated URL strings and snippets. Dynamically falls back and traverses active providers.
+- **`POST /api/reader`**: Takes a `{ url }` and extracts the clean `content` (markdown) representation for AI processing.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Puppeteer Automation Engine
+- **`POST /api/puppeteer`**: Takes your mapped Javascript and initiates an automation command execution.
+- **`POST /api/puppeteer/queue`**: Queue management mechanism to prevent system crashing on massive bulk CSV scraping tasks.
+- **`GET /api/puppeteer/queue-status`**: Monitor available memory pools and active headless browser limits.
+- **`GET /api/puppeteer/status/[id]`**: Track real-time progress and logs of individual threaded automations.
+- **`GET /api/puppeteer/performance`**: Track server load metrics and concurrent active browser contexts.
 
-## API Routes
+## 🧠 Architecture Notes
+This environment is intentionally structured as Next.js App Router API endpoints (`app/api/.../route.ts`). By decoupling this "Compute Node" from the central UI codebase, we allow this heavy backend server to be vertically scaled, dockerized, or hosted independently of the main React/Zustand lifecycle.
 
-This directory contains example API routes for the headless API app.
-
-For more details, see [route.js file convention](https://nextjs.org/docs/app/api-reference/file-conventions/route).
+---
+*Built as the compute engine for the Bricks Local Enrichment ecosystem.*
