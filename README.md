@@ -69,7 +69,7 @@ npm install
 
 # Start the development server
 npm run dev
-# The UI will be live at http://localhost:5173
+# The UI will be live at http://localhost:8080
 ```
 
 ### 3. Start the Backend API (Terminal 2)
@@ -90,7 +90,7 @@ npm run dev
 ```
 
 ### 4. Configure Your AI
-1. Open the UI at `http://localhost:5173`.
+1. Open the UI at `http://localhost:8080`.
 2. Click the **Settings gear** to pop open the Global Configuration Panel.
 3. Drop in your API keys (OpenAI, Gemini, Groq) or set your local Ollama URL (default: `http://localhost:11434`).
 4. Upload a CSV of target companies and start enriching!
