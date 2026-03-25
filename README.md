@@ -2,6 +2,9 @@
 
 > Build your own massive-scale data enrichment and sales engine locally. Never pay an overpriced monthly SaaS subscription again.
 
+![1755904265844](https://github.com/user-attachments/assets/38d5df71-ce7b-4a54-998d-81a80ac0cec8)
+
+
 Looking to generate pipeline and enrich thousands of leads? Platforms like Clay.com are incredible, but they get brutally expensive when you're scaling—charging hefty base subscriptions plus expensive "API credits" every time you run an enrichment.
 
 **Bricks** gives you the exact same enterprise-grade capabilities—web scraping, AI roleplay agents, browser automation, and data synthesis—running entirely on your own machine. 
