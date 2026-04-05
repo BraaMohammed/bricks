@@ -263,6 +263,99 @@ class BrowserPool {
         'Upgrade-Insecure-Requests': '1'
       });
 
+      // ── Universal request interception ─────────────────────────────────────
+      // Applied once at page creation — covers every URL this page ever loads.
+      //
+      // Two goals:
+      //  1. Block tracker/analytics domains so they can't keep the network busy
+      //     and prevent networkidle2 from settling (the PostHog problem).
+      //  2. Block resource types useless for text extraction (images, fonts,
+      //     media) to speed up every page load.
+      //
+      // The tracker list covers the entire internet — no per-site configuration needed.
+      await page.setRequestInterception(true);
+
+      // Domains whose requests are blocked unconditionally.
+      // These are analytics, tracking, ads, error-reporting, session-recording tools.
+      const BLOCKED_TRACKER_DOMAINS = [
+        // Analytics
+        'google-analytics.com', 'googletagmanager.com', 'googlesyndication.com',
+        'doubleclick.net', 'googleadservices.com',
+        // PostHog (used by workatastartup + many others)
+        'posthog.com', 'posthog.io', 'posthogcdn.com', 'app.posthog.com',
+        // Segment
+        'segment.com', 'segment.io', 'cdn.segment.com', 'api.segment.io',
+        // Mixpanel
+        'mixpanel.com', 'cdn.mxpnl.com',
+        // Amplitude
+        'amplitude.com', 'cdn.amplitude.com',
+        // Hotjar
+        'hotjar.com', 'static.hotjar.com', 'vc.hotjar.io',
+        // FullStory
+        'fullstory.com', 'rs.fullstory.com',
+        // Heap
+        'heap.io', 'heapanalytics.com',
+        // LogRocket
+        'logrocket.com', 'cdn.logrocket.io',
+        // Microsoft Clarity
+        'clarity.ms',
+        // Intercom (widget + analytics)
+        'intercom.io', 'intercom.com', 'intercomcdn.com', 'widget.intercom.io',
+        // Crisp
+        'crisp.chat',
+        // HubSpot analytics
+        'hs-analytics.net', 'hs-scripts.com', 'hsforms.com', 'hubspot.com',
+        // Facebook Pixel
+        'facebook.net', 'facebook.com/tr',
+        // Twitter/X Pixel
+        'ads-twitter.com', 't.co',
+        // LinkedIn Insight
+        'ads.linkedin.com', 'snap.licdn.com',
+        // Snapchat Pixel
+        'tr.snapchat.com',
+        // TikTok Pixel
+        'analytics.tiktok.com',
+        // Amazon Ads
+        'adsystem.amazon.com', 'fls-na.amazon.com',
+        // Error/crash tracking (keep persistent connections open)
+        'ingest.sentry.io', 'sentry.io', 'browser.sentry-cdn.com',
+        'bugsnag.com', 'notify.bugsnag.com',
+        'rollbar.com', 'api.rollbar.com',
+        // Datadog RUM
+        'datadoghq.com', 'browser-intake-datadoghq.com',
+        // New Relic
+        'newrelic.com', 'bam.nr-data.net',
+        // Cloudflare Insights (not the CDN, just the analytics beacon)
+        'cloudflareinsights.com',
+        // Mouseflow / Smartlook
+        'mouseflow.com', 'smartlook.com',
+        // Drift chat
+        'drift.com', 'js.driftt.com',
+        // Zendesk widget
+        'zdassets.com', 'ekr.zdassets.com',
+      ];
+
+      // Resource types that are never needed for text extraction.
+      const BLOCKED_RESOURCE_TYPES = new Set(['image', 'media', 'font']);
+
+      page.on('request', (req) => {
+        // Block useless resource types first (cheapest check)
+        if (BLOCKED_RESOURCE_TYPES.has(req.resourceType())) {
+          req.abort();
+          return;
+        }
+
+        // Block tracker/analytics domains
+        const reqUrl = req.url();
+        const isTracker = BLOCKED_TRACKER_DOMAINS.some(domain => reqUrl.includes(domain));
+        if (isTracker) {
+          req.abort();
+          return;
+        }
+
+        req.continue();
+      });
+
       availablePage = {
         page,
         browserId,
@@ -270,7 +363,7 @@ class BrowserPool {
       };
 
       this.pages.push(availablePage);
-      console.log(`📄 Created new page for browser ${browserId}`);
+      console.log(`📄 Created new page for browser ${browserId} (request interception active)`);
     }
 
     availablePage.inUse = true;
