@@ -22,7 +22,7 @@ export const validateFormula = (formula: string, availableColumns: string[]): Va
 
   // Check for basic syntax issues
   try {
-    new Function('row', formula);
+    new Function('row', `return (async () => { ${formula} })();`);
   } catch (error) {
     errors.push(`Syntax error: ${error instanceof Error ? error.message : 'Invalid JavaScript'}`);
   }
