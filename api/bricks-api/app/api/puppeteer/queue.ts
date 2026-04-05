@@ -27,8 +27,7 @@ export interface QueueJob {
 class PuppeteerQueue {
   private jobs: Map<string, QueueJob> = new Map();
   private processingJobs = new Set<string>();
-  private maxConcurrent = 10; // Max jobs processing simultaneously (increased from 3)
-  private processing = false;
+  private maxConcurrent = 10; // Max jobs processing simultaneously
 
   private generateJobId(): string {
     return `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -74,33 +73,29 @@ class PuppeteerQueue {
   }
 
   private async processNext(): Promise<void> {
-    if (this.processing) return;
-    this.processing = true;
+    // Fix #3: No boolean guard needed — JS is single-threaded so this while loop
+    // is atomic per tick. All concurrent calls safely check processingJobs.size
+    // and only the first one with an open slot actually starts a job.
+    while (this.processingJobs.size < this.maxConcurrent) {
+      // Find next pending job
+      const pendingJob = Array.from(this.jobs.values()).find(
+        job => job.status === 'pending'
+      );
 
-    try {
-      while (this.processingJobs.size < this.maxConcurrent) {
-        // Find next pending job
-        const pendingJob = Array.from(this.jobs.values()).find(
-          job => job.status === 'pending'
-        );
-
-        if (!pendingJob) {
-          break; // No pending jobs
-        }
-
-        // Start processing this job
-        this.processingJobs.add(pendingJob.id);
-        this.updateJobStatus(pendingJob.id, 'processing', undefined, 'Starting browser...');
-        
-        // Process job asynchronously
-        this.executeJob(pendingJob).finally(() => {
-          this.processingJobs.delete(pendingJob.id);
-          // Continue processing next jobs
-          setTimeout(() => this.processNext(), 100);
-        });
+      if (!pendingJob) {
+        break; // No pending jobs
       }
-    } finally {
-      this.processing = false;
+
+      // Mark as processing immediately (before any await) so the next
+      // iteration of the while loop sees the updated count
+      this.processingJobs.add(pendingJob.id);
+      this.updateJobStatus(pendingJob.id, 'processing', undefined, 'Starting browser...');
+
+      // Process job asynchronously (non-blocking)
+      this.executeJob(pendingJob).finally(() => {
+        this.processingJobs.delete(pendingJob.id);
+        this.processNext(); // Direct call — no setTimeout delay needed
+      });
     }
   }
 
@@ -127,6 +122,14 @@ class PuppeteerQueue {
           page.setDefaultNavigationTimeout(60000); // 60s for page loads
           page.setDefaultTimeout(job.config.timeout);
           
+          // Fix #4: Per-domain rate limiting (anti-ban)
+          // Extract target domain from user code (best-effort: scans for page.goto calls)
+          const targetDomain = this.extractDomainFromCode(job.code);
+          if (targetDomain) {
+            this.updateJobStatus(job.id, 'processing', undefined, `Rate limiting: ${targetDomain}...`);
+            await browserPool.enforceRateLimitForDomain(targetDomain);
+          }
+
           // Validate code security
           this.validateCode(job.code);
           
@@ -264,6 +267,21 @@ class PuppeteerQueue {
     if (!code.trim()) {
       throw new Error('No code provided');
     }
+  }
+
+  // Fix #4: Extract the first navigated domain from user code for rate limiting.
+  // Covers the common pattern: page.goto('https://example.com/...')
+  // Returns null if no goto is found (no rate limit applied — different sites run freely in parallel).
+  private extractDomainFromCode(code: string): string | null {
+    const match = code.match(/page\.goto\s*\(\s*['"` ](https?:\/\/[^'"` \s]+)/);
+    if (match) {
+      try {
+        return new URL(match[1]).hostname;
+      } catch {
+        return null;
+      }
+    }
+    return null;
   }
 
   private sanitizeUserCode(code: string): string {

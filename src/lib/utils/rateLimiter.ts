@@ -152,8 +152,8 @@ export function getRateLimitConfig(provider: string, model?: string): {
 
     case 'ollama': {
       const config = {
-        maxConcurrent: 100, // No rate limit for local
-        delayMs: 0,
+        maxConcurrent: 30, // No rate limit for local
+        delayMs: 100,
         description: 'Ollama (local - no limits)'
       };
       console.log('✅ Ollama config selected:', config);
@@ -162,8 +162,8 @@ export function getRateLimitConfig(provider: string, model?: string): {
 
     case 'puppeteer': {
       const config = {
-        maxConcurrent: 100, // Server has queue management - send all at once
-        delayMs: 0,
+        maxConcurrent: 10,  // Batch submissions — server queue handles actual execution concurrency
+        delayMs: 50,        // Small stagger prevents a spike of 200 simultaneous HTTP connections
         description: 'Puppeteer (server-side queue handles rate limiting)'
       };
       console.log('✅ Puppeteer config selected:', config);

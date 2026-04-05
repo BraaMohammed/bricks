@@ -24,7 +24,7 @@ interface PuppeteerRequest {
 export async function POST(request: NextRequest) {
   try {
     console.log('📨 Received Puppeteer job request');
-    
+
     // Handle large payloads (up to 10MB)
     const body: PuppeteerRequest = await request.json();
     const { code, config, rowData } = body;
@@ -83,6 +83,20 @@ export async function POST(request: NextRequest) {
     console.log('⚙️ Config:', sanitizedConfig);
     console.log('📊 Row data keys:', Object.keys(rowData || {}));
 
+    // Fix #2: Queue size cap — prevent unbounded growth (OOM protection)
+    const currentStats = puppeteerQueue.getQueueStats();
+    if (currentStats.pending >= 1000) {
+      console.warn(`⚠️ Queue full: ${currentStats.pending} pending jobs. Rejecting new job.`);
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Queue is full (1000 pending jobs). Please wait for current jobs to complete before submitting more.',
+          queueStats: currentStats
+        },
+        { status: 429, headers: corsHeaders }
+      );
+    }
+
     // Add job to queue (immediate response)
     const jobId = puppeteerQueue.addJob({
       code,
@@ -102,30 +116,30 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('💥 Puppeteer API error:', error);
-    
+
     // Handle specific error types
     if (error instanceof SyntaxError) {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Invalid JSON in request body' 
+        {
+          success: false,
+          error: 'Invalid JSON in request body'
         },
         { status: 400, headers: corsHeaders }
       );
     }
-    
+
     const errorMessage = error instanceof Error ? error.message : 'Unknown server error';
-    
+
     // Log error details for debugging
     console.error('Error details:', {
       message: errorMessage,
       stack: error instanceof Error ? error.stack : undefined,
       timestamp: new Date().toISOString()
     });
-    
+
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: `Server error: ${errorMessage}`,
         timestamp: new Date().toISOString()
       },
@@ -138,7 +152,7 @@ export async function GET() {
   // Return queue statistics
   const stats = puppeteerQueue.getQueueStats();
   const recentJobs = puppeteerQueue.getRecentJobs(5);
-  
+
   return NextResponse.json({
     queue: stats,
     recentJobs,

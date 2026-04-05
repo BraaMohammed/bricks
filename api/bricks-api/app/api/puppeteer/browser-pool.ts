@@ -21,11 +21,14 @@ interface PageInstance {
 class BrowserPool {
   private browsers: Map<string, BrowserInstance> = new Map();
   private pages: PageInstance[] = [];
-  private maxBrowsers = 10; // Increased for better concurrency
+  // PUPPETEER_MAX_BROWSERS — max concurrent browser instances (default: 5)
+  private maxBrowsers = parseInt(process.env.PUPPETEER_MAX_BROWSERS || '5', 10);
   private browserIdleTimeout = 600000; // 10 minutes
   private maxMemoryPerBrowser = 500; // MB
-  private requestDelay = 500; // 500ms between requests (reduced from 2000ms)
-  private lastRequestTime = 0;
+  // Fix #4: Per-domain rate limiting — replaces global single-timestamp lock.
+  // Different domains run freely in parallel; same domain waits 1s between requests.
+  private domainRateLimits: Map<string, number> = new Map();
+  private domainDelay = 1000; // 1 second between requests to the same domain
 
   private userAgents = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -53,9 +56,18 @@ class BrowserPool {
 
   async createBrowser(): Promise<BrowserInstance> {
     console.log('🚀 Creating new browser instance...');
+
+    // PUPPETEER_BROWSER_PATH — optional path to a custom Chromium-based browser
+    // (Chrome, Edge, Brave, Chromium, etc.). Omit to use Puppeteer's bundled Chromium.
+    // The browser is always launched in headless mode regardless of which binary is used.
+    const executablePath = process.env.PUPPETEER_BROWSER_PATH || undefined;
+    if (executablePath) {
+      console.log(`🌐 Using custom browser binary: ${executablePath}`);
+    }
     
     const browser = await puppeteer.launch({
-      headless: true, // Use headless mode
+      headless: true, // Always headless — even when using a custom browser path
+      ...(executablePath ? { executablePath } : {}),
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -131,9 +143,6 @@ class BrowserPool {
   }
 
   async getBrowser(): Promise<{ browser: Browser; browserId: string; release: () => void }> {
-    // Respect rate limiting
-    await this.enforceRateLimit();
-
     // Clean up old browsers first
     await this.cleanupIdleBrowsers();
 
@@ -302,17 +311,24 @@ class BrowserPool {
     return { page: availablePage.page, release };
   }
 
-  private async enforceRateLimit(): Promise<void> {
+  // Fix #4: Per-domain rate limiter.
+  // Called by the queue before executing user code on a page.
+  // - Jobs hitting the same domain wait 1s from the previous hit (anti-ban).
+  // - Jobs hitting different domains have zero artificial delay (full concurrency).
+  async enforceRateLimitForDomain(domain: string): Promise<void> {
+    if (!domain) return;
+
+    const lastTime = this.domainRateLimits.get(domain) || 0;
     const now = Date.now();
-    const timeSinceLastRequest = now - this.lastRequestTime;
-    
-    if (timeSinceLastRequest < this.requestDelay) {
-      const waitTime = this.requestDelay - timeSinceLastRequest;
-      console.log(`⏱️ Rate limiting: waiting ${waitTime}ms`);
+    const elapsed = now - lastTime;
+
+    if (elapsed < this.domainDelay) {
+      const waitTime = this.domainDelay - elapsed;
+      console.log(`⏱️ Rate limiting domain "${domain}": waiting ${waitTime}ms`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
     }
-    
-    this.lastRequestTime = Date.now();
+
+    this.domainRateLimits.set(domain, Date.now());
   }
 
   private async cleanupIdleBrowsers(): Promise<void> {
