@@ -52,10 +52,10 @@ PHASE 1 — SCAN THE CONTEXT FOR AN EXISTING EMAIL
 • Carefully read the lead context the user provided.
 • Does it already contain an email address? (look for patterns like x@y.com)
 • If YES → call validate_email on it immediately.
-  - If "valid" → return that email. You are done.
+  - If "valid" → return EXACTLY: {email} + verifed
   - If "invalid" → discard it. Move to Phase 2.
   - If "catch_all" → note it as a fallback. Continue to Phase 2 to try for a "valid" result.
-  - If "service_error" → this email might still be correct; note it and continue to Phase 2.
+  - If "service_error" → STOP finding. Return EXACTLY: error : validation system is down
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PHASE 2 — GENERATE & VALIDATE EMAIL PATTERNS
@@ -78,12 +78,13 @@ PHASE 2 — GENERATE & VALIDATE EMAIL PATTERNS
   10. contact@domain.com
 
 • For EACH pattern → call validate_email:
-  - "valid" → return this email. STOP immediately.
+  - CRITICAL: NEVER test multiple emails at once! You must check them STRICTLY SEQUENTIALLY (one at a time) and wait for the result before trying the next. Parallel testing wastes credits and is FORBIDDEN.
+  - "valid" → return EXACTLY: {email} + verifed
   - "invalid" → try the next pattern. Do NOT waste steps on other services.
   - "catch_all" → save as best fallback so far. Continue trying for a "valid" result.
-  - "service_error" → still worth trying remaining patterns (service may recover). Continue.
+  - "service_error" → STOP checking other patterns immediately! The verification system is down. Return EXACTLY: error : validation system error
 
-• If a catch_all result is your best finding and you are running low on steps → return it.
+• If a catch_all result is your best finding and you are running low on steps → return EXACTLY: {email} + catch all
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PHASE 3 — DEEP WEB SEARCH (only if phases 1+2 failed)
@@ -96,9 +97,10 @@ PHASE 3 — DEEP WEB SEARCH (only if phases 1+2 failed)
 • Use read_url on the most promising pages (contact pages, about pages, team pages).
 • Extract any email addresses found in the content.
 • Call validate_email on each extracted email.
-  - "valid" → return it.
+  - "valid" → return EXACTLY: {email} + verifed
   - "catch_all" → save as fallback and continue if steps remain.
   - "invalid" → discard and continue.
+  - "service_error" → STOP finding. Return EXACTLY: error : verification down
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP BUDGET RULES (CRITICAL)
@@ -110,17 +112,17 @@ STEP BUDGET RULES (CRITICAL)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 OUTPUT FORMAT (STRICT)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-• If found a "valid" email → return ONLY the email address. Nothing else. No explanation.
-  Example: john.smith@stripe.com
+• If found a "valid" email → return ONLY the email address followed by + verifed. 
+  Example: john.smith@stripe.com + verifed
 
-• If found only a "catch_all" email → return the email with a flag:
-  Example: john.smith@stripe.com [catch-all]
+• If found only a "catch_all" email → return the email followed by + catch all.
+  Example: john.smith@stripe.com + catch all
 
 • If all services returned "service_error" and you could not confirm anything:
-  Return exactly: service_error — validation unavailable, try again later
+  Return exactly: error : {reason}
 
-• If you searched thoroughly and found nothing:
-  Return exactly: not found`;
+• If you searched thoroughly and found nothing (or all were invalid):
+  Return exactly: couldnt find : exhausted all patterns`;
 }
 
 // ── Retry helpers (identical to executor.ts) ──────────────────────────────────
@@ -216,7 +218,7 @@ export async function runEmailFinderAgent(
 
       const researchSummary = (response.steps ?? [])
         .flatMap(step => step.toolResults ?? [])
-        .map((tr, i) => `[Tool result ${i + 1}]\n${JSON.stringify(tr.result, null, 2)}`)
+        .map((tr, i) => `[Tool result ${i + 1}]\n${JSON.stringify((tr as any).result, null, 2)}`)
         .join('\n\n');
 
       if (!researchSummary) {
@@ -228,10 +230,10 @@ export async function runEmailFinderAgent(
         system: `You are an email finder assistant. Based only on the tool results provided, determine the best email address found for the lead.
 
 Output rules:
-- If a "valid" email was found → return ONLY that email address.
-- If only a "catch_all" email was found → return "email [catch-all]".
-- If all services failed → return "service_error — validation unavailable, try again later".
-- If nothing was found → return "not found".`,
+- If a "valid" email was found → return EXACTLY: {email} + verifed
+- If only a "catch_all" email was found → return EXACTLY: {email} + catch all
+- If all services failed → return EXACTLY: error : validation unavailable
+- If nothing was found or all were invalid → return EXACTLY: couldnt find : exhausted all patterns`,
         prompt: `Lead context: ${context}\n\nTool results collected:\n${researchSummary}`,
         maxRetries: 0,
         temperature,
@@ -240,7 +242,7 @@ Output rules:
       console.log('🔁 Email finder synthesis result:', synthResponse.text);
 
       return {
-        result: synthResponse.text?.trim() ?? 'not found',
+        result: synthResponse.text?.trim() ?? 'couldnt find : exhausted all patterns',
         steps: (response.steps?.length ?? 0) + 1,
       };
 

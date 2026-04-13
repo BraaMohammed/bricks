@@ -118,10 +118,13 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
         }
 
         const providerRateConfig = getRateLimitConfig(emailConfig.provider, emailConfig.model);
+        
+        // Even if provider allows 10+, we hard-limit Email Finder to avoid burning validation credits 
+        // across parallel rows (which causes 403/429 loops).
         const emailRateConfig = {
-          maxConcurrent: providerRateConfig.maxConcurrent,
-          delayMs: providerRateConfig.delayMs,
-          description: `Email Finder: ${providerRateConfig.description}`,
+          maxConcurrent: Math.min(providerRateConfig.maxConcurrent, 2),
+          delayMs: Math.max(providerRateConfig.delayMs, 2500),
+          description: `Email Finder: Concurrency capped to protect validation APIs`,
         };
 
         const rowTasks = rows.map((row, i) => async () => {

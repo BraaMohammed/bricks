@@ -407,6 +407,14 @@ export async function POST(request: NextRequest) {
 
         for (let i = 0; i < services.length; i++) {
             const svc = services[i];
+            
+            if (i > 0) {
+                // Add a random delay between services to avoid slamming APIs after failures
+                const delayMs = 1500 + Math.floor(Math.random() * 2000);
+                console.log(`  ⏱️ Delaying ${delayMs}ms before fallback to ${svc.name}...`);
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+            }
+
             try {
                 console.log(`  ↳ [${i + 1}/${services.length}] Trying: ${svc.name}`);
                 const result = await svc.fn();
