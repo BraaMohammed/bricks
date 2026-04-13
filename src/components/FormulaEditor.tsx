@@ -36,6 +36,7 @@ import { FirecrawlModeEditor } from '@/components/FormulaEditor/modes/FirecrawlM
 import { AIAgentsModeEditor } from '@/components/FormulaEditor/modes/AIAgentsModeEditor';
 import { PuppeteerModeEditor } from '@/components/FormulaEditor/modes/PuppeteerModeEditor';
 import { AgentModeEditor } from '@/components/FormulaEditor/modes/AgentModeEditor';
+import { EmailFinderModeEditor } from '@/components/FormulaEditor/modes/EmailFinderModeEditor';
 import { SlashMenu } from '@/components/SlashMenu';
 
 // Utilities
@@ -43,6 +44,7 @@ import { validateFormula } from '@/components/FormulaValidator';
 import { openAIModels, geminiModels, defaultMessageCreatorInstructions, defaultLeadRoleplayInstructions, getProviderModels, AIProvider } from '@/lib/constants/aiModels';
 import type { FormulaMode } from '@/lib/constants/formulaModes';
 import { encodeAgentFormula, decodeAgentFormula } from '@/lib/agents/agentFormula';
+import { encodeEmailFinderFormula, decodeEmailFinderFormula } from '@/lib/agents/emailFinderFormula';
 
 // Extend window interface for Puppeteer logging
 declare global {
@@ -116,6 +118,14 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   const [agentThinkingMode, setAgentThinkingMode] = useState(false);
   const [agentInstruction, setAgentInstruction] = useState('');
 
+  // Mode-specific state (Email Finder mode)
+  const [emailProvider, setEmailProvider] = useState<AIProvider>('openai');
+  const [emailModel, setEmailModel] = useState('gpt-4o-mini');
+  const [emailMaxSteps, setEmailMaxSteps] = useState(15);
+  const [emailTemperature, setEmailTemperature] = useState(0.3);
+  const [emailThinkingMode, setEmailThinkingMode] = useState(false);
+  const [emailContext, setEmailContext] = useState('');
+
   // ============================================================
   // COMPUTED VALUES
   // ============================================================
@@ -139,6 +149,8 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   // Available models for the AI search agent; ollama ones included via helper
   const agentAvailableModels = getProviderModels(agentProvider, ollamaConnection.models || []);
 
+  const emailAvailableModels = getProviderModels(emailProvider, ollamaConnection.models || []);
+
   // Keep agentModel in sync when provider or ollama models change
   useEffect(() => {
     if (agentAvailableModels.length > 0) {
@@ -149,6 +161,16 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
       }
     }
   }, [agentProvider, agentAvailableModels, agentModel]);
+
+  // Keep emailModel in sync
+  useEffect(() => {
+    if (emailAvailableModels.length > 0) {
+      const exists = emailAvailableModels.some(m => m.id === emailModel);
+      if (!exists) {
+        setEmailModel(emailAvailableModels[0].id);
+      }
+    }
+  }, [emailProvider, emailAvailableModels, emailModel]);
 
   // ============================================================
   // EFFECTS
@@ -201,6 +223,18 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
           if (agentConfig.temperature !== undefined) setAgentTemperature(agentConfig.temperature);
           if (agentConfig.thinkingMode !== undefined) setAgentThinkingMode(agentConfig.thinkingMode);
           setAgentInstruction(agentConfig.instruction);
+        }
+      }
+
+      // Parse email finder config
+      if (detectedMode === 'email-finder') {
+        const emailConfig = decodeEmailFinderFormula(existingFormula);
+        if (emailConfig) {
+          setEmailProvider(emailConfig.provider as AIProvider);
+          setEmailModel(emailConfig.model);
+          setEmailMaxSteps(emailConfig.maxSteps);
+          if (emailConfig.temperature !== undefined) setEmailTemperature(emailConfig.temperature);
+          setEmailContext(emailConfig.context);
         }
       }
     }
@@ -337,6 +371,25 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
             temperature: agentTemperature,
             thinkingMode: agentThinkingMode,
             instruction: agentInstruction,
+          });
+          break;
+        }
+
+        case 'email-finder': {
+          if (!emailContext.trim()) {
+            toast({
+              title: 'Validation Error',
+              description: 'Please enter lead context for the Email Finder.',
+              variant: 'destructive',
+            });
+            return;
+          }
+          finalFormula = encodeEmailFinderFormula({
+            provider: emailProvider,
+            model: emailModel,
+            maxSteps: emailMaxSteps,
+            temperature: emailTemperature,
+            context: emailContext,
           });
           break;
         }
@@ -529,6 +582,27 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
                   onThinkingModeChange={setAgentThinkingMode}
                   instruction={agentInstruction}
                   onInstructionChange={setAgentInstruction}
+                  onInputChange={handleAIInputChange}
+                  ollamaModels={ollamaConnection.models}
+                />
+              </TabsContent>
+
+              <TabsContent value="email-finder" className="space-y-4">
+                <EmailFinderModeEditor
+                  headers={headers}
+                  firstRow={firstRow}
+                  provider={emailProvider}
+                  onProviderChange={setEmailProvider}
+                  model={emailModel}
+                  onModelChange={setEmailModel}
+                  maxSteps={emailMaxSteps}
+                  onMaxStepsChange={setEmailMaxSteps}
+                  temperature={emailTemperature}
+                  onTemperatureChange={setEmailTemperature}
+                  thinkingMode={emailThinkingMode}
+                  onThinkingModeChange={setEmailThinkingMode}
+                  context={emailContext}
+                  onContextChange={setEmailContext}
                   onInputChange={handleAIInputChange}
                   ollamaModels={ollamaConnection.models}
                 />

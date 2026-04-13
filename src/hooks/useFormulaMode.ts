@@ -7,8 +7,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { isAgentFormula } from '@/lib/agents/agentFormula';
+import { isEmailFinderFormula } from '@/lib/agents/emailFinderFormula';
 
-export type FormulaMode = 'code' | 'ai' | 'firecrawl' | 'ai-agents' | 'puppeteer' | 'agent';
+export type FormulaMode = 'code' | 'ai' | 'firecrawl' | 'ai-agents' | 'puppeteer' | 'agent' | 'email-finder';
 
 export interface FormulaModeHook {
   mode: FormulaMode;
@@ -32,6 +33,12 @@ export const useFormulaMode = (initialMode: FormulaMode = 'code'): FormulaModeHo
   const detectModeFromFormula = useCallback((formula: string): FormulaMode => {
     if (!formula || !formula.trim()) {
       return 'code';
+    }
+
+    // Check for Email Finder (before other AI patterns)
+    if (isEmailFinderFormula(formula)) {
+      console.log('📧 Detected Email Finder mode from formula');
+      return 'email-finder';
     }
 
     // Check for AI Agent (must be checked before other AI patterns)
@@ -121,6 +128,12 @@ export const useFormulaMode = (initialMode: FormulaMode = 'code'): FormulaModeHo
       case 'agent':
         if (!currentValues.agentInstruction) {
           defaults.agentInstruction = '';
+        }
+        break;
+
+      case 'email-finder':
+        if (!currentValues.emailFinderContext) {
+          defaults.emailFinderContext = '';
         }
         break;
 

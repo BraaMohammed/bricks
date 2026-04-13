@@ -6,6 +6,8 @@ import { executeWithRateLimit, getRateLimitConfig } from '@/lib/utils/rateLimite
 import { getFormulaProvider, getFormulaModel } from '@/lib/utils/formulaParser';
 import { isAgentFormula, decodeAgentFormula } from '@/lib/agents/agentFormula';
 import { runSearchAgent } from '@/lib/agents/executor';
+import { isEmailFinderFormula, decodeEmailFinderFormula } from '@/lib/agents/emailFinderFormula';
+import { runEmailFinderAgent } from '@/lib/agents/emailFinderExecutor';
 
 export interface UseFormulaExecutionReturn {
   executingColumn: string | null;
@@ -102,6 +104,69 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
         toast({
           title: 'Agent Complete',
           description: `${successCount} rows researched${errorCount > 0 ? `, ${errorCount} errors` : ''}. ${agentRateConfig.description}`,
+          variant: errorCount === 0 ? 'default' : 'destructive',
+        });
+        return;
+      }
+
+      // ── Email Finder mode: autonomous email discovery agent ───────────────
+      if (isEmailFinderFormula(formula)) {
+        const emailConfig = decodeEmailFinderFormula(formula);
+        if (!emailConfig) {
+          toast({ title: 'Invalid Email Finder Formula', variant: 'destructive' });
+          return;
+        }
+
+        const providerRateConfig = getRateLimitConfig(emailConfig.provider, emailConfig.model);
+        const emailRateConfig = {
+          maxConcurrent: providerRateConfig.maxConcurrent,
+          delayMs: providerRateConfig.delayMs,
+          description: `Email Finder: ${providerRateConfig.description}`,
+        };
+
+        const rowTasks = rows.map((row, i) => async () => {
+          try {
+            // Interpolate {ColumnName} placeholders in context with row data
+            const interpolatedContext = emailConfig.context.replace(
+              /\{([^}]+)\}/g,
+              (_, col) => (row as Record<string, string>)[col] ?? `{${col}}`,
+            );
+
+            const result = await runEmailFinderAgent({
+              context: interpolatedContext,
+              provider: emailConfig.provider as 'openai' | 'gemini' | 'groq' | 'ollama',
+              model: emailConfig.model,
+              maxSteps: emailConfig.maxSteps,
+              temperature: emailConfig.temperature,
+            });
+
+            if (result.error) {
+              throw new Error(result.error);
+            }
+
+            updateCell(i, column, result.result);
+            return { success: true, rowIndex: i };
+          } catch (error) {
+            updateCell(i, column, 'ERROR');
+            console.error(`❌ Email Finder row ${i + 1} failed:`, error);
+            return { success: false, rowIndex: i, error };
+          }
+        });
+
+        const results = await executeWithRateLimit(rowTasks, {
+          maxConcurrent: emailRateConfig.maxConcurrent,
+          delayMs: emailRateConfig.delayMs,
+          onProgress: (completed, total) => {
+            setExecutionProgress({ completed, total });
+          },
+        });
+
+        setExecutionProgress(null);
+        const successCount = results.filter(r => r.success).length;
+        const errorCount = results.filter(r => !r.success).length;
+        toast({
+          title: 'Email Finder Complete',
+          description: `${successCount} emails found${errorCount > 0 ? `, ${errorCount} errors` : ''}. ${emailRateConfig.description}`,
           variant: errorCount === 0 ? 'default' : 'destructive',
         });
         return;
@@ -222,6 +287,38 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
         toast({
           title: "Cell Updated",
           description: `Cell ${column} in row ${rowIndex + 1} has been updated.`,
+        });
+        return;
+      }
+
+      // ── Email Finder mode: single cell ───────────────────────────────────
+      if (isEmailFinderFormula(formula)) {
+        const emailConfig = decodeEmailFinderFormula(formula);
+        if (!emailConfig) {
+          throw new Error('Invalid email finder formula');
+        }
+
+        const interpolatedContext = emailConfig.context.replace(
+          /\{([^}]+)\}/g,
+          (_, col) => (row as Record<string, string>)[col] ?? `{${col}}`,
+        );
+
+        const result = await runEmailFinderAgent({
+          context: interpolatedContext,
+          provider: emailConfig.provider as 'openai' | 'gemini' | 'groq' | 'ollama',
+          model: emailConfig.model,
+          maxSteps: emailConfig.maxSteps,
+          temperature: emailConfig.temperature,
+        });
+
+        if (result.error) {
+          throw new Error(result.error);
+        }
+
+        updateCell(rowIndex, column, result.result);
+        toast({
+          title: 'Email Found',
+          description: `Email for row ${rowIndex + 1}: ${result.result}`,
         });
         return;
       }
