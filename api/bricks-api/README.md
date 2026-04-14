@@ -9,6 +9,8 @@ This service runs entirely separate from the main Vite frontend. It handles the 
 - **Puppeteer Stealth Execution (`/api/puppeteer`)**: A robust, queue-based browser pool system. Handles complex automations, screenshot tasks, and bypasses bot-detection techniques to safely scrape difficult interfaces.
 - **Autonomous Web Search (`/api/search`)**: Proxies dynamic queries through Serper, Tavily, or directly via native DuckDuckGo HTML parsing. Serving as the "eyes" for the Bricks Autonomous AI Agents.
 - **Web Content Reader (`/api/reader`)**: A resilient, 3-layer URL reader with automatic fallback. Transforms any web page into clean, AI-ready text — including JavaScript-heavy React SPAs. See details below.
+- **Serverless Page Fetcher (`/api/fetch-page`)**: A fast, Puppeteer-free URL reading waterfall that extracts markdown via multiple fallback APIs (Fetch → ScraperAPI → scrape.do → Tavily → Scrapfly → Firecrawl).
+- **Email Validation Waterfall (`/api/validate-email`)**: A resilient email verification cascade routing through multiple specialized providers (Hunter, BillionVerifier, MillionVerifier) to maximize accuracy and bypass rate limits.
 
 ## ⚙️ Environment Setup
 
@@ -29,10 +31,28 @@ SERPER_API_KEY=your_serper_key_here
 TAVILY_API_KEY=your_tavily_key_here
 
 # ── Web Reader — ScraperAPI (Optional) ───────────────────────────────────────
-# Used as a last-resort fallback layer in /api/reader when Puppeteer fails.
+# Used as a fallback layer in /api/reader when Puppeteer fails, and used in /fetch-page stack.
 # Get a key at https://www.scraperapi.com (free tier available).
-# Leave blank to skip this layer — Puppeteer handles the vast majority of cases.
 SCRAPER_API_KEY=your_scraperapi_key_here
+
+# ── Serverless Page Fetcher APIs (/api/fetch-page) ───────────────────────────
+# Keys for the puppeteer-free multi-provider sequence (Fetch → ScraperAPI → scrape.do → Tavily → Scrapfly → Firecrawl)
+SCRAPE_DO_KEY=your_scrape_do_key_here
+SCRAPFLY_KEY=your_scrapfly_key_here
+FIRECRAWL_KEY=your_firecrawl_key_here
+
+# ── /api/reader Feature Flag ──────────────────────────────────────────────────
+# Set to "true" to route ALL /reader traffic through /fetch-page (no Puppeteer).
+READER_USE_FETCH_PAGE="false"
+
+# ── Email Validation APIs (/api/validate-email) ──────────────────────────────
+# We cascade through these APIs from top to bottom
+HUNTER_KEY=your_hunter_key_here
+# VERIFALIA_USERNAME=your_verifalia_username
+# VERIFALIA_PASSWORD=your_verifalia_password
+MILLION_VERIFIER_KEY=your_million_verifier_key_here
+QUICK_EMAIL_VERIFICATION_KEY=your_key_here
+# EMAILABLE_KEY=your_emailable_key
 
 # ── Puppeteer Settings ───────────────────────────────────────────────────────
 # Max concurrent browser instances (default: 5)
@@ -55,9 +75,11 @@ The backend API binds to `http://localhost:3000`. Keep this running alongside yo
 
 ## 🔌 API Endpoints Reference
 
-### Web Reading & Searching (Agents)
+### Web Reading, Search, and Enrichment
 - **`POST /api/search`** — Receives `{ query }` and returns URL/snippet results. Tries Serper → Tavily → DuckDuckGo.
-- **`POST /api/reader`** — Receives `{ url }` and returns `{ content, title, provider, error }`. See fallback chain below.
+- **`POST /api/reader`** — Receives `{ url }` and returns `{ content, title, provider, error }`. Converts URLs to AI-ready markdown endpoints.
+- **`POST /api/fetch-page`** — Fast, Puppeteer-free URL reader. Uses a stacked fallback design parsing pages into clean multi-modal markdown via serverless endpoints.
+- **`POST /api/validate-email`** — Receives `{ email }` and validates whether the inbox exists by cascading through multiple provider APIs.
 
 ### Puppeteer Automation Engine
 - **`POST /api/puppeteer`** — Takes mapped JavaScript and runs an automation command.

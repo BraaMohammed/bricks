@@ -41,6 +41,7 @@ We built a gorgeous, `shadcn/ui` powered interactive data table where every colu
 - Puppeteer script mapping.
 - Firecrawl integrations.
 - Autonomous Web Agents.
+- **Autonomous Email Finder Agents:** AI agents that systematically guess, test, and verify B2B email patterns using multi-provider validation API cascades.
 
 ---
 
@@ -83,8 +84,9 @@ cd api/bricks-api
 # Install backend dependencies (Next.js, Puppeteer Stealth)
 npm install
 
-# Set up your environment variables for Autonomous Web Search
-# Create a .env file locally and add SERPER_API_KEY=xxx or TAVILY_API_KEY=xxx
+# Set up your environment variables for Autonomous Web Search, Email Validation, and URL Fetching
+# Create a .env.local file locally and add SERPER_API_KEY=xxx or TAVILY_API_KEY=xxx
+# Be sure to also add your new keys for Email Validation (Hunter, MillionVerifier, etc.) and Page Fetching (Scrape.do, Firecrawl, etc.)
 # (If no keys are provided, Bricks gracefully falls back to free DuckDuckGo scraping)
 
 # Start the Turbo server
