@@ -80,7 +80,140 @@ async function checkWithQuickEmailVerification(
     throw new Error(`QuickEmailVerification: unknown result (${data.reason ?? 'no reason'})`);
 }
 
-// ── Service 2: Verifalia ──────────────────────────────────────────────────────
+// ── Service 2: BillionVerify ────────────────────────────────────────────────
+//
+// POST https://api.billionverify.com/v1/verify/single
+// Auth: BV-API-KEY header
+// Body: { email }   (check_smtp omitted — defaults to false, saves latency)
+// Response: { success, code, message, data: {
+//     status: "valid"|"invalid"|"unknown"|"catchall"|"role"|"disposable",
+//     score: 0–1, is_deliverable, is_disposable, is_catchall, is_role, is_free,
+//     reason: string|null, credits_used } }
+// Stop on: valid|catchall|role|invalid|disposable
+// Cascade on: unknown or HTTP error
+// Free tier: 100 credits/day
+
+async function checkWithBillionVerify(
+    email: string,
+    apiKey: string,
+): Promise<ValidateEmailResponse> {
+    const res = await fetch('https://api.billionverify.com/v1/verify/single', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'BV-API-KEY': apiKey,
+        },
+        body: JSON.stringify({ email }),
+        signal: AbortSignal.timeout(20000),
+    });
+
+    if (res.status === 429) {
+        throw new Error('BillionVerify: rate limit exceeded (429)');
+    }
+    if (!res.ok) {
+        throw new Error(`BillionVerify HTTP ${res.status} ${res.statusText}`);
+    }
+
+    const body = await res.json();
+
+    if (!body.success) {
+        throw new Error(`BillionVerify API error: ${body.error?.message ?? body.message ?? 'unknown error'}`);
+    }
+
+    const data = body.data ?? {};
+    const status: string = data.status ?? '';
+
+    // valid — confirmed deliverable
+    if (status === 'valid') {
+        return {
+            email, status: 'valid', service: 'billionverify',
+            reason: data.reason ?? 'accepted_email', error: null,
+        };
+    }
+    // catchall — domain accepts all mail (also guarded by is_catchall flag)
+    if (status === 'catchall' || data.is_catchall) {
+        return {
+            email, status: 'catch_all', service: 'billionverify',
+            reason: 'catch_all_domain', error: null,
+        };
+    }
+    // role — role-based address (info@, support@…), score ~0.6, usually deliverable
+    if (status === 'role' || data.is_role) {
+        return {
+            email, status: 'valid', service: 'billionverify',
+            reason: 'role_address', error: null,
+        };
+    }
+    // disposable — throwaway/temporary email, score ~0.3
+    if (status === 'disposable' || data.is_disposable) {
+        return {
+            email, status: 'invalid', service: 'billionverify',
+            reason: 'disposable_email', error: null,
+        };
+    }
+    // invalid — confirmed undeliverable
+    if (status === 'invalid') {
+        return {
+            email, status: 'invalid', service: 'billionverify',
+            reason: data.reason ?? 'rejected_email', error: null,
+        };
+    }
+    // unknown → cascade to next service
+    throw new Error(`BillionVerify: uncertain result — status=${status}`);
+}
+
+// ── Service 3: MillionVerifier ───────────────────────────────────────────────
+//
+// GET https://api.millionverifier.com/api/v3/?api=KEY&email=EMAIL&timeout=10
+// Response: { result: "ok"|"catch_all"|"invalid"|"unknown"|"disposable",
+//             quality: "good"|"bad"|"unknown", resultcode, subresult, error }
+// result="ok" → valid   result="catch_all" → catch_all   result="invalid" → invalid
+// Cascade on: unknown|disposable or error field set or HTTP error
+// Free tier: 500 credits total
+
+async function checkWithMillionVerifier(
+    email: string,
+    apiKey: string,
+): Promise<ValidateEmailResponse> {
+    const url = `https://api.millionverifier.com/api/v3/?api=${apiKey}&email=${encodeURIComponent(email)}&timeout=10`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+
+    if (!res.ok) {
+        throw new Error(`MillionVerifier HTTP ${res.status} ${res.statusText}`);
+    }
+
+    const data = await res.json();
+
+    // API-level error (e.g. invalid_api_key, insufficient_credits)
+    if (data.error && data.error !== '') {
+        throw new Error(`MillionVerifier API error: ${data.error}`);
+    }
+
+    const result: string = data.result ?? '';
+
+    if (result === 'ok') {
+        return {
+            email, status: 'valid', service: 'millionverifier',
+            reason: data.subresult ?? 'accepted_email', error: null,
+        };
+    }
+    if (result === 'catch_all') {
+        return {
+            email, status: 'catch_all', service: 'millionverifier',
+            reason: 'catch_all_domain', error: null,
+        };
+    }
+    if (result === 'invalid') {
+        return {
+            email, status: 'invalid', service: 'millionverifier',
+            reason: data.subresult ?? 'rejected_email', error: null,
+        };
+    }
+    // unknown, disposable → cascade
+    throw new Error(`MillionVerifier: uncertain result — result=${result}, quality=${data.quality}`);
+}
+
+// ── Service 4: Verifalia ──────────────────────────────────────────────────────
 //
 // POST https://api.verifalia.com/v2.7/email-validations?waitTime=30000
 // Auth: HTTP Basic (username:password)
@@ -364,18 +497,23 @@ export async function POST(request: NextRequest) {
         type ServiceDef = { name: string; fn: () => Promise<ValidateEmailResponse> };
         const services: ServiceDef[] = [];
 
-        const qevKey = process.env.QUICK_EMAIL_VERIFICATION_KEY;
-        const vUser = process.env.VERIFALIA_USERNAME;
-        const vPass = process.env.VERIFALIA_PASSWORD;
-        const zbKey = process.env.ZEROBOUNCE_KEY;
-        const emKey = process.env.EMAILABLE_KEY;
-        const hunKey = process.env.HUNTER_KEY;
+        const qevKey  = process.env.QUICK_EMAIL_VERIFICATION_KEY;
+        const bvKey   = process.env.BILLION_VERIFIER_KEY;
+        const mvKey   = process.env.MILLION_VERIFIER_KEY;
+        const vUser   = process.env.VERIFALIA_USERNAME;
+        const vPass   = process.env.VERIFALIA_PASSWORD;
+        const zbKey   = process.env.ZEROBOUNCE_KEY;
+        const emKey   = process.env.EMAILABLE_KEY;
+        const hunKey  = process.env.HUNTER_KEY;
 
         if (qevKey) {
             services.push({ name: 'quickemailverification', fn: () => checkWithQuickEmailVerification(email, qevKey) });
         }
         if (vUser && vPass) {
             services.push({ name: 'verifalia', fn: () => checkWithVerifalia(email, vUser, vPass) });
+        }
+        if (mvKey) {
+            services.push({ name: 'millionverifier', fn: () => checkWithMillionVerifier(email, mvKey) });
         }
         if (zbKey) {
             services.push({ name: 'zerobounce', fn: () => checkWithZeroBounce(email, zbKey) });
@@ -385,6 +523,9 @@ export async function POST(request: NextRequest) {
         }
         if (hunKey) {
             services.push({ name: 'hunter', fn: () => checkWithHunter(email, hunKey) });
+        }
+        if (bvKey) {
+            services.push({ name: 'billionverify', fn: () => checkWithBillionVerify(email, bvKey) });
         }
 
         if (services.length === 0) {

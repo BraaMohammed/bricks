@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Readability } from '@mozilla/readability';
 import { JSDOM } from 'jsdom';
+import TurndownService from 'turndown';
 import { browserPool } from '../puppeteer/browser-pool';
 
 export const runtime = 'nodejs';
@@ -43,9 +44,10 @@ function extractReadableContent(
         const article = reader.parse();
 
         if (article) {
+            const turndownService = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
             return {
                 title: article.title ?? '',
-                content: article.textContent?.trim() ?? '',
+                content: turndownService.turndown(article.content) ?? '',
                 readabilityParsed: true,
             };
         }
@@ -208,6 +210,27 @@ async function readWithPuppeteer(url: string): Promise<{ content: string; title:
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
+    // ── Env flag: forward to /fetch-page (no-Puppeteer stack) ────────────────
+    // Set READER_USE_FETCH_PAGE=true in .env.local to route all /reader traffic
+    // through the puppeteer-free waterfall (fetch → ScraperAPI → scrape.do →
+    // Tavily → Scrapfly → Firecrawl).
+    if (process.env.READER_USE_FETCH_PAGE === 'true') {
+        const baseUrl = process.env.VERCEL_URL
+            ? `https://${process.env.VERCEL_URL}`
+            : process.env.NEXT_PUBLIC_API_URL
+            ?? 'http://localhost:3000';
+
+        const body = await request.json();
+        const forwardRes = await fetch(`${baseUrl}/api/fetch-page`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+
+        const data = await forwardRes.json();
+        return NextResponse.json(data, { status: forwardRes.status, headers: corsHeaders });
+    }
+
     // Puppeteer release handles — kept here so finally block can always clean up.
     let puppeteerRelease: (() => Promise<void>) | null = null;
     let puppeteerBrowserRelease: (() => void) | null = null;
