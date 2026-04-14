@@ -46,7 +46,7 @@ function extractReadableContent(
             const turndownService = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
             return {
                 title: article.title ?? '',
-                content: turndownService.turndown(article.content) ?? '',
+                content: turndownService.turndown(article.content || '') ?? '',
                 readabilityParsed: true,
             };
         }
@@ -173,10 +173,10 @@ async function readWithFetch(url: string): Promise<{ content: string; title: str
 // Docs: https://docs.scraperapi.com/
 
 async function readWithScraperAPI(url: string, apiKey: string): Promise<{ content: string; title: string }> {
-    const scraperUrl = `http://api.scraperapi.com?api_key=${apiKey}&url=${encodeURIComponent(url)}&render=true`;
+    const scraperUrl = `https://api.scraperapi.com?api_key=${apiKey}&url=${encodeURIComponent(url)}&render=true`;
 
     const res = await fetch(scraperUrl, {
-        signal: AbortSignal.timeout(30000),
+        signal: AbortSignal.timeout(45000),
     });
 
     if (!res.ok) {
@@ -400,11 +400,11 @@ export async function POST(request: NextRequest) {
         const scrapflyKey    = process.env.SCRAPFLY_KEY;
         const firecrawlKey   = process.env.FIRECRAWL_KEY;
 
-        if (scraperApiKey) {
-            services.push({ name: 'scraperapi', credits: '1000/month', fn: () => readWithScraperAPI(url, scraperApiKey) });
-        }
         if (scrapeDoKey) {
             services.push({ name: 'scrape.do', credits: '1000/month', fn: () => readWithScrapeDo(url, scrapeDoKey) });
+        }
+        if (scraperApiKey) {
+            services.push({ name: 'scraperapi', credits: '1000/month', fn: () => readWithScraperAPI(url, scraperApiKey) });
         }
         if (tavilyKey) {
             services.push({ name: 'tavily', credits: '1000/month', fn: () => readWithTavily(url, tavilyKey) });
