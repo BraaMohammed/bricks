@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import Papa from 'papaparse';
 import { useDataStore } from '@/stores/useDataStore';
 import { toast } from '@/hooks/use-toast';
+import localforage from 'localforage';
 
 export interface UseCSVUploadReturn {
   handleCSVUpload: () => void;
@@ -21,7 +22,7 @@ export const useCSVUpload = (): UseCSVUploadReturn => {
    * Auto-save current table to localStorage before loading new CSV
    * Keeps last 5 auto-saves for data recovery
    */
-  const autoSaveCurrentTable = useCallback(() => {
+  const autoSaveCurrentTable = useCallback(async () => {
     try {
       const currentData = {
         headers,
@@ -31,7 +32,7 @@ export const useCSVUpload = (): UseCSVUploadReturn => {
       };
       
       // Get existing auto-saves
-      const existingAutoSaves = localStorage.getItem('auto_saved_tables');
+      const existingAutoSaves = await localforage.getItem<string>('auto_saved_tables');
       let autoSaves = existingAutoSaves ? JSON.parse(existingAutoSaves) : [];
       
       // Keep only last 5 auto-saves
@@ -40,7 +41,7 @@ export const useCSVUpload = (): UseCSVUploadReturn => {
         autoSaves = autoSaves.slice(0, 5);
       }
       
-      localStorage.setItem('auto_saved_tables', JSON.stringify(autoSaves));
+      await localforage.setItem('auto_saved_tables', JSON.stringify(autoSaves));
       
       toast({
         title: "Table Auto-saved",

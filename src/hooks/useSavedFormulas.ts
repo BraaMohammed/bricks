@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from '@/hooks/use-toast';
+import localforage from 'localforage';
 
 const STORAGE_KEY = 'saved_formulas';
 
@@ -32,20 +33,23 @@ export const useSavedFormulas = (): SavedFormulasHook => {
   const [savedFormulas, setSavedFormulas] = useState<SavedFormula[]>([]);
 
   /**
-   * Load saved formulas from localStorage on mount
+   * Load saved formulas from localforage on mount
    */
   useEffect(() => {
-    const savedFormulasFromStorage = localStorage.getItem(STORAGE_KEY);
-    if (savedFormulasFromStorage) {
+    const loadFormulas = async () => {
       try {
-        const parsed = JSON.parse(savedFormulasFromStorage);
-        setSavedFormulas(parsed);
-        console.log(`📚 Loaded ${parsed.length} saved formulas from localStorage`);
+        const savedFormulasFromStorage = await localforage.getItem<string>(STORAGE_KEY);
+        if (savedFormulasFromStorage) {
+          const parsed = JSON.parse(savedFormulasFromStorage);
+          setSavedFormulas(parsed);
+          console.log(`📚 Loaded ${parsed.length} saved formulas from IndexedDB`);
+        }
       } catch (error) {
         console.error('Error loading saved formulas:', error);
         setSavedFormulas([]);
       }
-    }
+    };
+    loadFormulas();
   }, []);
 
   /**
@@ -79,8 +83,8 @@ export const useSavedFormulas = (): SavedFormulasHook => {
       // Remove any existing formula with the same name, then add new one
       const updatedFormulas = [...prev.filter(f => f.name !== newFormula.name), newFormula];
       
-      // Persist to localStorage
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedFormulas));
+      // Persist to indexedDB
+      localforage.setItem(STORAGE_KEY, JSON.stringify(updatedFormulas)).catch(err => console.error('Failed to save formula to indexedDB', err));
       
       console.log(`💾 Saved formula: ${newFormula.name}`);
       
@@ -100,8 +104,8 @@ export const useSavedFormulas = (): SavedFormulasHook => {
     setSavedFormulas(prev => {
       const updatedFormulas = prev.filter(f => f.name !== name);
       
-      // Persist to localStorage
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedFormulas));
+      // Persist to indexedDB
+      localforage.setItem(STORAGE_KEY, JSON.stringify(updatedFormulas)).catch(err => console.error('Failed to delete formula from indexedDB', err));
       
       console.log(`🗑️ Deleted formula: ${name}`);
       
@@ -134,7 +138,7 @@ export const useSavedFormulas = (): SavedFormulasHook => {
    */
   const clearAllFormulas = useCallback(() => {
     setSavedFormulas([]);
-    localStorage.removeItem(STORAGE_KEY);
+    localforage.removeItem(STORAGE_KEY).catch(err => console.error('Failed to clear formulas from indexedDB', err));
     
     console.log('🗑️ Cleared all saved formulas');
     

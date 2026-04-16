@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import localforage from 'localforage';
 
 export interface DataRow {
   [key: string]: string;
@@ -141,6 +142,7 @@ export const useDataStore = create<DataState & DataActions>()(
     }),
     {
       name: 'vibe-sheet-storage',
+      storage: createJSONStorage(() => localforage),
       partialize: (state) => ({
         headers: state.headers,
         rows: state.rows,

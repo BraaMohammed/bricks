@@ -37,7 +37,7 @@ async function hasMxRecords(domain: string): Promise<boolean> {
 
 // ── Service 1: QuickEmailVerification ────────────────────────────────────────
 //
-// GET https://api.quickemailverification.com/v1/verify?token=KEY&email=EMAIL
+// GET https://api.quickemailverification.com/v1/verify?apikey=KEY&email=EMAIL
 // Response: { result: "valid"|"invalid"|"unknown", reason, accept_all, safe_to_send, success }
 // Stop on: result=invalid   Cascade on: result=unknown or HTTP error
 
@@ -45,7 +45,7 @@ async function checkWithQuickEmailVerification(
     email: string,
     apiKey: string,
 ): Promise<ValidateEmailResponse> {
-    const url = `https://api.quickemailverification.com/v1/verify?token=${apiKey}&email=${encodeURIComponent(email)}`;
+    const url = `https://api.quickemailverification.com/v1/verify?apikey=${apiKey}&email=${encodeURIComponent(email)}`;
     const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
 
     if (!res.ok) {
