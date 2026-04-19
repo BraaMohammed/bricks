@@ -123,4 +123,8 @@ The backend is structured as Next.js App Router API endpoints (`app/api/.../rout
 
 ---
 
+<<<<<<< HEAD
 *Backend compute engine for the Bricks local enrichment stack.*
+=======
+*Backend compute engine for the Bricks local enrichment stack.*
+>>>>>>> 60cec4fe74ce4f15fef3d2db352be6ebb2e51dda
