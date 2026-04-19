@@ -40,7 +40,7 @@ export const AIConfiguration = () => {
 
   // Custom hooks handle all state management
   const settings = useAISettings();
-  const ollama = useOllamaConnection(settings.ollamaBaseUrl);
+  const ollama = useOllamaConnection();
 
   // Check Ollama connection when provider switches to Ollama
   useEffect(() => {

@@ -174,7 +174,7 @@ export async function runSearchAgent(options: AgentRunOptions): Promise<AgentRun
 
         const researchSummary = (response.steps ?? [])
           .flatMap(step => step.toolResults ?? [])
-          .map((tr, i) => `[Research result ${i + 1}]\n${JSON.stringify(tr.result, null, 2)}`)
+          .map((tr, i) => `[Research result ${i + 1}]\n${JSON.stringify((tr as any).result, null, 2)}`)
           .join('\n\n');
 
         if (!researchSummary) {

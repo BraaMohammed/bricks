@@ -58,7 +58,7 @@ export function getAgentModel(config: AgentProviderConfig): LanguageModel {
       const baseUrl = config.ollamaBaseUrl || 'http://localhost:11434';
       return ollama(model || 'llama3.1', {
         baseURL: baseUrl,
-      });
+      } as any);
     }
 
     default:

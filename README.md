@@ -1,64 +1,72 @@
 # Bricks 🧱
 
-> Build your own massive-scale data enrichment and sales engine locally. Never pay an overpriced monthly SaaS subscription again.
+> Run data enrichment and outreach automation entirely on your own machine. No monthly subscriptions, no credit systems, no data leaving your computer.
 
 ![1755904265844](https://github.com/user-attachments/assets/38d5df71-ce7b-4a54-998d-81a80ac0cec8)
 
+Most data enrichment platforms charge $200–400/month in base fees, then charge again per enrichment run in their own credit system. You also hand over your entire lead list to a cloud server just to run what is essentially a web search and an AI call.
 
-Looking to generate pipeline and enrich thousands of leads? Platforms like Clay.com are incredible, but they get brutally expensive when you're scaling—charging hefty base subscriptions plus expensive "API credits" every time you run an enrichment.
-
-**Bricks** gives you the exact same enterprise-grade capabilities—web scraping, AI roleplay agents, browser automation, and data synthesis—running entirely on your own machine. 
-
-Whether you want to hook up your own OpenAI API keys to pay wholesale token prices, or run open-source models locally for **literally $0**, Bricks puts the power back in your hands.
+Bricks runs the same workflows — web scraping, AI agents, browser automation, data synthesis — entirely on your own machine, using your own API keys at wholesale prices. Or run local models via Ollama for $0.
 
 ---
 
-## 🔥 Why We Built This (And What It Does)
+## What It Does
 
-We wanted a tool that felt like a beautiful, modern spreadsheet but packed the punch of a full engineering team. Here's what's under the hood:
+### Autonomous Web Research Agent
+Give a column an instruction: *"Find this company's most recent funding round and who led it."*
 
-### 🕵️‍♂️ Autonomous Web Research Agents
-Imagine giving a spreadsheet column a simple instruction: *"Find this company's most recent funding round and who led it."* 
+Bricks spins up a search agent that creates queries, hits the `/api/search` and `/api/reader` backend endpoints, reads the parsed markdown of the pages, and writes the answer directly into your cell. It keeps searching until it finds something concrete.
 
-Under the hood, Bricks spins up an **Autonomous Search Agent**. Powered by the Vercel AI SDK, the agent creates intelligent search queries, hits our custom Next.js `/api/search` and `/api/reader` backend endpoints, reads the parsed markdown of the web pages, and synthesizes the exact answer back into your cell. It's an intern that works 24/7.
+### AI Email Finder
+No third-party email tool needed. The agent takes the lead's data, systematically generates likely email patterns, then validates each one through a cascade of validation APIs (Hunter → MillionVerifier → QuickEmailVerification). It returns only confirmed, deliverable emails.
 
-### 🤖 Dual-Agent Copywriting System
-Most tools just use a basic prompt to generate generic "spray and pray" outreach. Bricks hosts an interactive **AI Roleplay Engine**:
-1. **The Creator Agent**: Writes a highly personalized outreach message using your enriched cell data.
-2. **The Prospect Agent**: A second AI acts as your target customer, receives the message, and critiques it based on the persona.
+Using the free tiers of the validation stack, you can find and verify roughly 2,000–3,000 emails/month at $0.
 
-They'll iterate, argue, and refine the message instantly in the background until the Prospect Agent "approves" it. The best part? You can use OpenAI to write the email, and a free local Llama model to critique it to optimize your costs.
+### Dual-Agent Outreach System
+Standard AI outreach tools use a single prompt and return a draft. This is different.
 
-### 🌐 The Puppeteer Stealth Engine
-Need LinkedIn profile data, competitor pricing, or heavily guarded targeted leads? Standard APIs charge a fortune for this. 
+Two agents run in a loop:
+1. **Writer agent** — receives the lead data and your prompt, writes a message
+2. **Prospect agent** — receives the lead data and role-plays as that specific lead, reads the message, and critiques it
 
-Bricks ships with a built-in **Puppeteer Automation Engine**. Complete with stealth plugins, smart queueing, connection pooling, and human-like delays, it scrapes the hardest sites on the web using your local computer's IP address and browser. And yes, it's 100% free. 
+They loop — writer revises, prospect reviews — until the prospect agent approves the message. The result is outreach that has been pressure-tested against the actual persona before it ever reaches your clipboard.
 
-### 💡 The Unified Formula Orchestrator
-We built a gorgeous, `shadcn/ui` powered interactive data table where every column is deeply programmable. Click a header to open the Formula Editor, which natively supports:
-- Raw JavaScript execution (for data cleaning and formatting).
-- Direct AI prompts.
-- Puppeteer script mapping.
-- Firecrawl integrations.
-- Autonomous Web Agents.
-- **Autonomous Email Finder Agents:** AI agents that systematically guess, test, and verify B2B email patterns using multi-provider validation API cascades.
+You can run the writer on OpenAI and the prospect on a free local Ollama model to keep costs down.
+
+### Built-in Puppeteer Stealth Engine
+Sites that block standard APIs, require JavaScript rendering, or serve different content to known scraper IPs are handled by a local Puppeteer instance running from your own machine with your own IP.
+
+The browser pool includes stealth plugins, smart queueing, connection pooling, and human-like delays. It blocks 30+ analytics/tracker domains at the network layer so `networkidle2` doesn't hang on background requests. No scraping API subscription needed.
+
+### Unified Formula Editor
+Every column is programmable. Click a column header to open the Formula Editor, which supports:
+- Raw JavaScript (data cleaning, formatting, transformation)
+- Direct AI prompts
+- Puppeteer script mapping
+- Autonomous web search agents
+- AI email finder
+- Firecrawl integrations
+
+### Ollama Compatible — Almost 100% Free
+Plug in any local model (Qwen, DeepSeek, Llama) via Ollama and run AI columns for $0. For search and scraping fallbacks, Bricks stacks 6 free-tier services with automatic failover — when one runs out of credits, it moves to the next automatically.
 
 ---
 
-## 💰 The ROI: Bring Your Own AI
+## Bring Your Own Keys
 
-SaaS platforms put massive markups on AI credits. With Bricks, you just plug in your own keys or run locally:
-- **Groq Cloud**: For lightning-fast, cheap processing on Llama 3 models.
-- **OpenAI / Google Gemini**: Connect your API keys and pay base wholesale prices for industry-leading reasoning.
-- **Local Ollama**: Spin up an Ollama instance on your machine, run models like DeepSeek R1 or Qwen locally, and crunch 50,000 spreadsheet rows without spending a single cent. Data privacy guaranteed!
+Bricks doesn't mark up API costs. You connect directly:
+
+- **Groq Cloud** — fast, cheap inference on Llama models
+- **OpenAI / Google Gemini** — plug in your own key, pay provider prices directly
+- **Local Ollama** — run models like DeepSeek R1 or Qwen locally, no API cost, data stays on your machine
 
 ---
 
-## 🚀 Getting Started (Setup Guide)
+## Getting Started
 
-Bricks is structured as a monorepo. You'll need two terminal windows to run the blazing-fast Vite frontend and the Next.js API backend simultaneously.
+Bricks is a monorepo. You need two terminal windows — one for the Vite frontend, one for the Next.js API backend.
 
-**Prerequisites:** Node.js 18+ and `npm`.
+**Prerequisites:** Node.js 18+ and `npm`
 
 ### 1. Clone the repo
 ```bash
@@ -68,57 +76,50 @@ cd bricks
 
 ### 2. Start the Frontend (Terminal 1)
 ```bash
-# Install frontend dependencies (React, Vite, Tailwind, Zustand)
 npm install
-
-# Start the development server
 npm run dev
-# The UI will be live at http://localhost:8080
+# UI runs at http://localhost:8080
 ```
 
 ### 3. Start the Backend API (Terminal 2)
 ```bash
-# Navigate to the Next.js backend
 cd api/bricks-api
-
-# Install backend dependencies (Next.js, Puppeteer Stealth)
 npm install
 
-# Set up your environment variables for Autonomous Web Search, Email Validation, and URL Fetching
-# Create a .env.local file locally and add SERPER_API_KEY=xxx or TAVILY_API_KEY=xxx
-# Be sure to also add your new keys for Email Validation (Hunter, MillionVerifier, etc.) and Page Fetching (Scrape.do, Firecrawl, etc.)
-# (If no keys are provided, Bricks gracefully falls back to free DuckDuckGo scraping)
+# Create a .env.local file — see the backend README for all variables
+# Minimum needed: SERPER_API_KEY or TAVILY_API_KEY for web search
+# If neither is set, falls back to free DuckDuckGo scraping automatically
 
-# Start the Turbo server
 npm run dev
-# The API will be live at http://localhost:3000
+# API runs at http://localhost:3000
 ```
 
-### 4. Configure Your AI
-1. Open the UI at `http://localhost:8080`.
-2. Click the **Settings gear** to pop open the Global Configuration Panel.
-3. Drop in your API keys (OpenAI, Gemini, Groq) or set your local Ollama URL (default: `http://localhost:11434`).
-4. Upload a CSV of target companies and start enriching!
+### 4. Configure AI
+1. Open `http://localhost:8080`
+2. Click the **Settings gear**
+3. Add your API keys (OpenAI, Gemini, Groq) or set your local Ollama URL (`http://localhost:11434`)
+4. Upload a CSV and start enriching
 
 ---
 
-## 🛠️ The Tech Stack
+## Tech Stack
 
-If you're a developer looking to fork, extend, or contribute, here is how the architecture is laid out:
+**Frontend (`/src`)**
+- React 18 + Vite
+- Zustand — column config and API key state
+- Tailwind CSS + shadcn/ui — data table and config panels
 
-- **Frontend (`/src`)**: 
-  - **Framework**: React 18 + Vite for an unbelievably snappy DX.
-  - **State**: `Zustand` handles complex column configurations and global API key persistence.
-  - **UI**: Pure Tailwind CSS meshed with custom `shadcn/ui` components for the interactive data table and configuration sheets.
-- **Backend API (`/api/bricks-api`)**:
-  - **Framework**: Next.js 15 app router API endpoints.
-  - **Browser Pool**: A custom-built Puppeteer queue with memory management to prevent memory leaks when scraping thousands of URLs in sequence.
-  - **AI SDK**: Vercel AI SDK Core (`@ai-sdk/openai`, `@ai-sdk/groq`, etc.) handles structured generation, tool calling, and streaming data extraction.
-
-## 🤝 Let's Build This Together
-Data enrichment shouldn't be locked behind thousands of dollars in SaaS paywalls. We are building the ultimate open-source alternative. 
-
-If this excites you, star the repository, open a pull request, or drop into the discussions!
+**Backend API (`/api/bricks-api`)**
+- Next.js 15 App Router
+- Custom Puppeteer browser pool with memory management and queue system
+- Vercel AI SDK Core — structured generation, tool calling, streaming across providers
 
 ---
-*Bricks 🧱 — Stop renting your pipeline. Build it.*
+
+## Contributing
+
+Open issues, pull requests, and forks are welcome. If you hit a site the Puppeteer engine can't handle, or find a case where the email finder breaks, open an issue with the details.
+
+---
+
+*Bricks — your data, your machine, your keys.*

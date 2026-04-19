@@ -10,44 +10,40 @@ import { useState } from 'react';
 import { PuppeteerDocsDialog } from './PuppeteerDocsDialog';
 import { PuppeteerTemplatesDialog } from './PuppeteerTemplatesDialog';
 
-interface PuppeteerModeEditorProps {
-  headers: string[];
-  firstRow: Record<string, string> | null;
-  // Puppeteer code and configuration
-  code: string;
-  onCodeChange: (value: string) => void;
-  timeout: number;
-  onTimeoutChange: (value: number) => void;
-  headless: boolean;
-  onHeadlessChange: (value: boolean) => void;
-  // Execution state
-  executionLog: string[];
-  onClearLog: () => void;
-  lastResult: { type: 'success' | 'error', message: string } | null;
-  // Change handler
-  onInputChange: () => void;
-}
+import { useDataStore } from '@/stores/useDataStore';
+import { usePuppeteerStore } from '@/stores/editor/usePuppeteerStore';
+import { useUIStore } from '@/stores/editor/useUIStore';
 
-export const PuppeteerModeEditor = ({
-  headers,
-  firstRow,
-  code,
-  onCodeChange,
-  timeout,
-  onTimeoutChange,
-  headless,
-  onHeadlessChange,
-  executionLog,
-  onClearLog,
-  lastResult,
-  onInputChange
-}: PuppeteerModeEditorProps) => {
+export const PuppeteerModeEditor = () => {
+  const { headers, rows } = useDataStore();
+  const firstRow = rows && rows.length > 0 ? rows[0] : null;
+
+  const {
+    puppeteerCode: code,
+    setPuppeteerCode: onCodeChange,
+    puppeteerTimeout: timeout,
+    setPuppeteerTimeout: onTimeoutChange,
+    puppeteerHeadless: headless,
+    setPuppeteerHeadless: onHeadlessChange,
+    puppeteerExecutionLog: executionLog,
+    setPuppeteerExecutionLog: onClearLogRaw,
+    puppeteerLastResult: lastResult
+  } = usePuppeteerStore();
+
+  const { setHasChanges } = useUIStore();
+
   const [docsDialogOpen, setDocsDialogOpen] = useState(false);
   const [templatesDialogOpen, setTemplatesDialogOpen] = useState(false);
 
+  const handleInputChange = () => {
+    setHasChanges(true);
+  };
+
+  const onClearLog = () => onClearLogRaw([]);
+
   const handleTemplateUse = (templateCode: string) => {
     onCodeChange(templateCode);
-    onInputChange();
+    handleInputChange();
     setTemplatesDialogOpen(false);
   };
 
@@ -105,7 +101,7 @@ export const PuppeteerModeEditor = ({
               value={timeout}
               onChange={(e) => {
                 onTimeoutChange(parseInt(e.target.value));
-                onInputChange();
+                handleInputChange();
               }}
               className="w-full"
             />
@@ -123,7 +119,7 @@ export const PuppeteerModeEditor = ({
                 checked={headless}
                 onCheckedChange={(checked) => {
                   onHeadlessChange(checked);
-                  onInputChange();
+                  handleInputChange();
                 }}
               />
               <Label className="text-sm">
@@ -151,7 +147,7 @@ export const PuppeteerModeEditor = ({
             value={code}
             onChange={(e) => {
               onCodeChange(e.target.value);
-              onInputChange();
+              handleInputChange();
             }}
             placeholder="// Enter your Puppeteer automation code here
 // Example: Get page title

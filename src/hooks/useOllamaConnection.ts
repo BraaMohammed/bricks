@@ -5,7 +5,7 @@
  * Handles connection checking, model discovery, and error states.
  */
 
-import { useState, useCallback } from 'react';
+import { create } from 'zustand';
 import { checkOllamaConnection as checkOllamaStatus } from '@/lib/ollama';
 
 export interface OllamaConnection {
@@ -17,51 +17,40 @@ export interface OllamaConnection {
   refreshModels: () => Promise<void>;
 }
 
-/**
- * Hook for managing Ollama connection state
- * 
- * @param baseUrl - The Ollama server base URL (optional, for future use)
- * @returns Ollama connection state and control functions
- */
-export const useOllamaConnection = (baseUrl?: string): OllamaConnection => {
-  const [connected, setConnected] = useState<boolean>(false);
-  const [models, setModels] = useState<string[]>([]);
-  const [checking, setChecking] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+export const useOllamaConnection = create<OllamaConnection>((set, get) => ({
+  connected: false,
+  models: [],
+  checking: false,
+  error: null,
 
-  const checkConnection = useCallback(async () => {
-    setChecking(true);
-    setError(null);
+  checkConnection: async () => {
+    // Prevent overlapping checks
+    if (get().checking) return;
+
+    set({ checking: true, error: null });
     
     try {
       const status = await checkOllamaStatus();
-      setConnected(status.connected);
-      setModels(status.models);
-      
-      if (!status.connected && status.error) {
-        setError(status.error);
-      }
+      set({ 
+        connected: status.connected, 
+        models: status.models,
+        error: !status.connected && status.error ? status.error : null
+      });
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
-      setConnected(false);
-      setModels([]);
+      set({ 
+        error: err instanceof Error ? err.message : 'Unknown error',
+        connected: false,
+        models: []
+      });
     } finally {
-      setChecking(false);
+      set({ checking: false });
     }
-  }, []);
+  },
 
-  const refreshModels = useCallback(async () => {
-    // Alias for checkConnection for semantic clarity
-    await checkConnection();
-  }, [checkConnection]);
+  refreshModels: async () => {
+    await get().checkConnection();
+  }
+}));
 
-  return {
-    connected,
-    models,
-    checking,
-    error,
-    checkConnection,
-    refreshModels,
-  };
-};
+// Fetch initially when the store is initialized
+useOllamaConnection.getState().checkConnection();

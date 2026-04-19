@@ -1,13 +1,3 @@
-/**
- * EmailFinderModeEditor
- *
- * UI for the "Email Finder" formula mode. The user provides a lead context
- * template using {ColumnName} placeholders. When executed, the AI agent
- * autonomously finds and validates the lead's email address for every row.
- *
- * Mirrors AgentModeEditor.tsx in structure and component usage.
- */
-
 import { useEffect } from 'react';
 import { Mail, Zap, Settings2, ChevronDown, Info } from 'lucide-react';
 import { Label } from '@/components/ui/label';
@@ -18,67 +8,57 @@ import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ColumnBadges } from '@/components/FormulaEditor/ColumnBadges';
-import { getProviderModels, PROVIDERS } from '@/lib/constants/aiModels';
+import { PROVIDERS } from '@/lib/constants/aiModels';
 import type { AIProvider } from '@/lib/constants/aiModels';
 import { ThinkingModeToggle } from '../ThinkingModeToggle';
 
-interface EmailFinderModeEditorProps {
-  headers: string[];
-  firstRow: Record<string, string> | null;
-  // Agent config
-  provider: AIProvider;
-  onProviderChange: (provider: AIProvider) => void;
-  model: string;
-  onModelChange: (model: string) => void;
-  maxSteps: number;
-  onMaxStepsChange: (steps: number) => void;
-  temperature: number;
-  onTemperatureChange: (temp: number) => void;
-  thinkingMode: boolean;
-  onThinkingModeChange: (enabled: boolean) => void;
-  // Lead context template
-  context: string;
-  onContextChange: (value: string) => void;
-  // Ollama models (dynamic)
-  ollamaModels?: string[];
-  // Change handler
-  onInputChange: () => void;
-}
+import { useDataStore } from '@/stores/useDataStore';
+import { useEmailFinderStore } from '@/stores/editor/useEmailFinderStore';
+import { useAISettingsStore, getAvailableModels } from '@/stores/useAISettingsStore';
+import { useOllamaConnection } from '@/hooks/useOllamaConnection';
+import { useUIStore } from '@/stores/editor/useUIStore';
 
-export const EmailFinderModeEditor = ({
-  headers,
-  firstRow,
-  provider,
-  onProviderChange,
-  model,
-  onModelChange,
-  maxSteps,
-  onMaxStepsChange,
-  temperature,
-  onTemperatureChange,
-  thinkingMode,
-  onThinkingModeChange,
-  context,
-  onContextChange,
-  ollamaModels,
-  onInputChange,
-}: EmailFinderModeEditorProps) => {
-  const availableModels = getProviderModels(provider, ollamaModels || []);
+export const EmailFinderModeEditor = () => {
+  const { headers, rows } = useDataStore();
+  const firstRow = rows && rows.length > 0 ? rows[0] : null;
+
+  const { 
+    emailProvider: provider, 
+    setEmailProvider: onProviderChange,
+    emailModel: model,
+    setEmailModel: onModelChange,
+    emailMaxSteps: maxSteps,
+    setEmailMaxSteps: onMaxStepsChange,
+    emailTemperature: temperature,
+    setEmailTemperature: onTemperatureChange,
+    emailThinkingMode: thinkingMode,
+    setEmailThinkingMode: onThinkingModeChange,
+    emailContext: context,
+    setEmailContext: onContextChange
+  } = useEmailFinderStore();
+
+  const { models: ollamaModels } = useOllamaConnection();
+  const { setHasChanges } = useUIStore();
+
+  const handleInputChange = () => {
+    setHasChanges(true);
+  };
+
+  const availableModels = getAvailableModels(provider, ollamaModels || []);
 
   const handleProviderChange = (newProvider: string) => {
     const providerId = newProvider as AIProvider;
     onProviderChange(providerId);
-    const firstModel = getProviderModels(providerId, ollamaModels || [])?.[0]?.id ?? '';
+    const firstModel = getAvailableModels(providerId, ollamaModels || [])?.[0]?.id ?? '';
     onModelChange(firstModel);
-    onInputChange();
+    handleInputChange();
   };
 
   const insertColumnPlaceholder = (col: string) => {
     onContextChange(context + `{${col}}`);
-    onInputChange();
+    handleInputChange();
   };
 
-  // Sync model selection when provider or ollama models change
   useEffect(() => {
     if (availableModels.length > 0) {
       const exists = availableModels.some(m => m.id === model);
@@ -88,7 +68,6 @@ export const EmailFinderModeEditor = ({
     }
   }, [availableModels, model, onModelChange]);
 
-  // Live preview — replace {ColumnName} with first row values
   const previewText =
     firstRow && context
       ? context.replace(/\{([^}]+)\}/g, (_, col) => firstRow[col] ?? `{${col}}`)
@@ -96,8 +75,6 @@ export const EmailFinderModeEditor = ({
 
   return (
     <div className="space-y-5">
-
-      {/* Header card */}
       <Card className="p-4 bg-muted/30 border-dashed">
         <div className="flex gap-3 items-start">
           <Mail className="h-5 w-5 text-primary mt-0.5 shrink-0" />
@@ -113,7 +90,6 @@ export const EmailFinderModeEditor = ({
         </div>
       </Card>
 
-      {/* Validation status legend */}
       <Card className="p-3 bg-muted/10 border">
         <div className="flex items-center gap-1.5 mb-2">
           <Info className="h-3.5 w-3.5 text-muted-foreground" />
@@ -139,7 +115,6 @@ export const EmailFinderModeEditor = ({
         </div>
       </Card>
 
-      {/* Provider + Model selectors */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label className="text-sm font-medium">AI Provider</Label>
@@ -159,7 +134,7 @@ export const EmailFinderModeEditor = ({
 
         <div className="space-y-2">
           <Label className="text-sm font-medium">Model</Label>
-          <Select value={model} onValueChange={(v) => { onModelChange(v); onInputChange(); }}>
+          <Select value={model} onValueChange={(v) => { onModelChange(v); handleInputChange(); }}>
             <SelectTrigger>
               <SelectValue placeholder="Select model" />
             </SelectTrigger>
@@ -174,7 +149,6 @@ export const EmailFinderModeEditor = ({
         </div>
       </div>
 
-      {/* Max Steps slider */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label className="text-sm font-medium flex items-center gap-1.5">
@@ -190,7 +164,7 @@ export const EmailFinderModeEditor = ({
           max={30}
           step={1}
           value={[maxSteps]}
-          onValueChange={([v]) => { onMaxStepsChange(v); onInputChange(); }}
+          onValueChange={([v]) => { onMaxStepsChange(v); handleInputChange(); }}
           className="w-full"
         />
         <p className="text-xs text-muted-foreground">
@@ -199,7 +173,6 @@ export const EmailFinderModeEditor = ({
         </p>
       </div>
 
-      {/* Advanced settings */}
       <Collapsible className="border rounded-md p-3 bg-muted/10">
         <CollapsibleTrigger className="flex items-center justify-between w-full text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
           <div className="flex items-center gap-2">
@@ -209,7 +182,6 @@ export const EmailFinderModeEditor = ({
           <ChevronDown className="h-4 w-4" />
         </CollapsibleTrigger>
         <CollapsibleContent className="pt-4 space-y-5">
-          {/* Temperature */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label className="text-sm font-medium">Temperature</Label>
@@ -222,7 +194,7 @@ export const EmailFinderModeEditor = ({
               max={1}
               step={0.1}
               value={[temperature]}
-              onValueChange={([v]) => { onTemperatureChange(v); onInputChange(); }}
+              onValueChange={([v]) => { onTemperatureChange(v); handleInputChange(); }}
               className="w-full"
             />
             <div className="flex justify-between text-xs text-muted-foreground">
@@ -234,23 +206,21 @@ export const EmailFinderModeEditor = ({
             </p>
           </div>
 
-          {/* Thinking Mode (only for supported models) */}
           {availableModels.find(m => m.id === model)?.supportsThinking && (
             <ThinkingModeToggle
               enabled={thinkingMode}
               modelName={model}
-              onToggle={(v) => { onThinkingModeChange(v); onInputChange(); }}
+              onToggle={(v) => { onThinkingModeChange(v); handleInputChange(); }}
             />
           )}
         </CollapsibleContent>
       </Collapsible>
 
-      {/* Lead Context textarea */}
       <div className="space-y-2">
         <Label className="text-sm font-medium">Lead Context</Label>
         <Textarea
           value={context}
-          onChange={(e) => { onContextChange(e.target.value); onInputChange(); }}
+          onChange={(e) => { onContextChange(e.target.value); handleInputChange(); }}
           placeholder={
             '{First Name} {Last Name}, {Job Title} at {Company}.\nWebsite: {Website}\nLinkedIn: {LinkedIn URL}'
           }
@@ -263,7 +233,6 @@ export const EmailFinderModeEditor = ({
         </p>
       </div>
 
-      {/* Column badges */}
       {headers.length > 0 && (
         <div className="space-y-2">
           <Label className="text-sm font-medium text-muted-foreground">Insert column</Label>
@@ -274,7 +243,6 @@ export const EmailFinderModeEditor = ({
         </div>
       )}
 
-      {/* Live preview */}
       {context && (
         <Card className="p-3 bg-muted/20">
           <p className="text-xs font-medium text-muted-foreground mb-1">Preview (row 1):</p>

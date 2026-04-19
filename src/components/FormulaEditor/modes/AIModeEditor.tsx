@@ -8,82 +8,53 @@ import { ThinkingModeToggle } from '@/components/FormulaEditor/ThinkingModeToggl
 import { AdvancedSettings } from '@/components/FormulaEditor/AdvancedSettings';
 import { FormulaPreview } from '@/components/FormulaEditor/FormulaPreview';
 import { ColumnBadges } from '@/components/FormulaEditor/ColumnBadges';
-import type { AIProvider, ModelDefinition } from '@/lib/constants/aiModels';
 
-interface AIModeEditorProps {
-  headers: string[];
-  firstRow: Record<string, string> | null;
-  // Provider settings
-  provider: AIProvider;
-  onProviderChange: (provider: AIProvider) => void;
-  ollamaConnected: boolean;
-  ollamaModels: string[];
-  ollamaBaseUrl: string;
-  onRefreshConnection: () => void;
-  onBaseUrlChange: (url: string) => void;
-  // Model settings
-  availableModels: ModelDefinition[];
-  selectedModel: string;
-  onModelChange: (model: string) => void;
-  // AI settings
-  temperature: number;
-  onTemperatureChange: (value: number) => void;
-  maxTokens: number;
-  onMaxTokensChange: (value: number) => void;
-  topK: number;
-  onTopKChange: (value: number) => void;
-  // Thinking mode
-  thinkingMode: boolean;
-  onThinkingModeChange: (enabled: boolean) => void;
-  // Prompts
-  prompt: string;
-  onPromptChange: (value: string) => void;
-  message: string;
-  onMessageChange: (value: string) => void;
-  // Advanced settings
-  showAdvancedSettings: boolean;
-  onAdvancedSettingsChange: (open: boolean) => void;
-  // Change handler
-  onInputChange: () => void;
-}
+import { useDataStore } from '@/stores/useDataStore';
+import { useAIModeStore } from '@/stores/editor/useAIModeStore';
+import { useAISettingsStore, getAvailableModels } from '@/stores/useAISettingsStore';
+import { useOllamaConnection } from '@/hooks/useOllamaConnection';
+import { useUIStore } from '@/stores/editor/useUIStore';
 
-export const AIModeEditor = ({
-  headers,
-  firstRow,
-  provider,
-  onProviderChange,
-  ollamaConnected,
-  ollamaModels,
-  ollamaBaseUrl,
-  onRefreshConnection,
-  onBaseUrlChange,
-  availableModels,
-  selectedModel,
-  onModelChange,
-  temperature,
-  onTemperatureChange,
-  maxTokens,
-  onMaxTokensChange,
-  topK,
-  onTopKChange,
-  thinkingMode,
-  onThinkingModeChange,
-  prompt,
-  onPromptChange,
-  message,
-  onMessageChange,
-  showAdvancedSettings,
-  onAdvancedSettingsChange,
-  onInputChange
-}: AIModeEditorProps) => {
+export const AIModeEditor = () => {
+  // Store subscriptions
+  const { headers, rows } = useDataStore();
+  const firstRow = rows && rows.length > 0 ? rows[0] : null;
+
+  const { aiPrompt: prompt, aiMessage: message, setAiPrompt: onPromptChange, setAiMessage: onMessageChange } = useAIModeStore();
+
+  const { 
+    aiProvider: provider, 
+    setAiProvider: onProviderChange,
+    model: selectedModel,
+    setModel: onModelChange,
+    temperature,
+    setTemperature: onTemperatureChange,
+    maxTokens,
+    setMaxTokens: onMaxTokensChange,
+    topK,
+    setTopK: onTopKChange,
+    thinkingMode,
+    setThinkingMode: onThinkingModeChange,
+    ollamaBaseUrl,
+    setOllamaBaseUrl: onBaseUrlChange
+  } = useAISettingsStore();
+
+  const { connected: ollamaConnected, models: ollamaModels, checkConnection: onRefreshConnection } = useOllamaConnection();
+  const { showAdvancedSettings, setShowAdvancedSettings: onAdvancedSettingsChange, setHasChanges } = useUIStore();
+
+  const availableModels = getAvailableModels(provider, ollamaModels);
   const selectedModelInfo = availableModels.find(m => m.id === selectedModel);
   const supportsThinking = selectedModelInfo?.supportsThinking || false;
+
+  const handleInputChange = () => {
+    setHasChanges(true);
+  };
 
   const handleColumnClick = (columnName: string) => {
     const insertion = `{${columnName}}`;
     const newPrompt = prompt + (prompt ? ' ' : '') + insertion;
     onPromptChange(newPrompt);
-    onInputChange();
+    handleInputChange();
   };
 
   return (
@@ -96,12 +67,12 @@ export const AIModeEditor = ({
         ollamaBaseUrl={ollamaBaseUrl}
         onProviderChange={(value) => {
           onProviderChange(value);
-          onInputChange();
+          handleInputChange();
         }}
         onRefreshConnection={onRefreshConnection}
         onBaseUrlChange={(url) => {
           onBaseUrlChange(url);
-          onInputChange();
+          handleInputChange();
         }}
       />
 
@@ -119,7 +90,7 @@ export const AIModeEditor = ({
         selectedModel={selectedModel}
         onModelChange={(model) => {
           onModelChange(model);
-          onInputChange();
+          handleInputChange();
         }}
         ollamaConnected={ollamaConnected}
         ollamaModelsCount={ollamaModels.length}
@@ -133,15 +104,15 @@ export const AIModeEditor = ({
         topK={topK}
         onTemperatureChange={(value) => {
           onTemperatureChange(value);
-          onInputChange();
+          handleInputChange();
         }}
         onMaxTokensChange={(value) => {
           onMaxTokensChange(value);
-          onInputChange();
+          handleInputChange();
         }}
         onTopKChange={(value) => {
           onTopKChange(value);
-          onInputChange();
+          handleInputChange();
         }}
         open={showAdvancedSettings}
         onOpenChange={onAdvancedSettingsChange}
@@ -154,7 +125,7 @@ export const AIModeEditor = ({
           modelName={selectedModel}
           onToggle={(enabled) => {
             onThinkingModeChange(enabled);
-            onInputChange();
+            handleInputChange();
           }}
         />
       )}
@@ -170,7 +141,7 @@ export const AIModeEditor = ({
           value={prompt}
           onChange={(e) => {
             onPromptChange(e.target.value);
-            onInputChange();
+            handleInputChange();
           }}
           placeholder="What do you want the AI to do with this row data? For example:
 - Generate a personalized message for {Full Name}
@@ -191,7 +162,7 @@ export const AIModeEditor = ({
           value={message}
           onChange={(e) => {
             onMessageChange(e.target.value);
-            onInputChange();
+            handleInputChange();
           }}
           placeholder="Add any additional context or instructions for the AI..."
           rows={3}

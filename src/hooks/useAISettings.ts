@@ -13,9 +13,10 @@
  * - Available models list based on provider
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useCallback, useMemo } from 'react';
 import { useAPIKeyManager } from '@/hooks/useAPIKeyManager';
 import { aiConfigStorage } from '@/lib/storage/aiConfigStorage';
+import { useAISettingsStore } from '@/stores/useAISettingsStore';
 import {
   STORAGE_KEYS,
   AIProvider,
@@ -120,37 +121,26 @@ export const useAISettings = (ollamaModels: string[] = []): AISettings => {
     initialConfig.firecrawlKey
   );
 
-  // Provider & Model State
-  const [aiProvider, setAiProviderState] = useState<AIProvider>(initialConfig.provider);
-  const [model, setModelState] = useState<string>(initialConfig.model || DEFAULT_OPENAI_MODEL);
-
-  // Custom Prompt State
-  const [customPrompt, setCustomPromptState] = useState<string>(initialConfig.customPrompt);
-
-  // Ollama Configuration State
-  const [ollamaBaseUrl, setOllamaBaseUrlState] = useState<string>(initialConfig.ollamaBaseUrl);
-
-  // Advanced Settings State
-  const [temperature, setTemperatureState] = useState<number>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.AI_TEMPERATURE);
-    return saved ? parseFloat(saved) : 0.7;
-  });
-
-  const [maxTokens, setMaxTokensState] = useState<number>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.AI_MAX_TOKENS);
-    return saved ? parseInt(saved) : 2048;
-  });
-
-  const [topK, setTopKState] = useState<number>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.AI_TOP_K);
-    return saved ? parseInt(saved) : 40;
-  });
-
-  // Thinking Mode State
-  const [thinkingMode, setThinkingModeState] = useState<boolean>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.THINKING_MODE);
-    return saved === 'true';
-  });
+  // Zustand Store
+  const {
+    aiProvider,
+    model,
+    customPrompt,
+    ollamaBaseUrl,
+    temperature,
+    maxTokens,
+    topK,
+    thinkingMode,
+    setAiProvider,
+    setModel,
+    setCustomPrompt,
+    setOllamaBaseUrl,
+    setTemperature,
+    setMaxTokens,
+    setTopK,
+    setThinkingMode,
+    loadSettings: loadStoreSettings
+  } = useAISettingsStore();
 
   // Compute available models based on current provider
   const availableModels = useMemo<ModelDefinition[]>(() => {
@@ -171,9 +161,6 @@ export const useAISettings = (ollamaModels: string[] = []): AISettings => {
     }
   }, [aiProvider, ollamaModels]);
 
-  /**
-   * Load all settings from localStorage
-   */
   const loadSettings = useCallback(() => {
     const config = aiConfigStorage.loadAll();
 
@@ -181,10 +168,9 @@ export const useAISettings = (ollamaModels: string[] = []): AISettings => {
     geminiKeyManager.setKey(config.geminiKey);
     groqKeyManager.setKey(config.groqKey);
     firecrawlKeyManager.setKey(config.firecrawlKey);
-    setAiProviderState(config.provider);
-    setModelState(config.model || DEFAULT_OPENAI_MODEL);
-    setCustomPromptState(config.customPrompt);
-    setOllamaBaseUrlState(config.ollamaBaseUrl);
+    
+    // Load other settings via store
+    loadStoreSettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -205,100 +191,9 @@ export const useAISettings = (ollamaModels: string[] = []): AISettings => {
     if (firecrawlKeyManager.key.trim()) {
       aiConfigStorage.setFirecrawlKey(firecrawlKeyManager.key);
     }
+  }, [openaiKeyManager.key, geminiKeyManager.key, groqKeyManager.key, firecrawlKeyManager.key]);
 
-    // Save other settings
-    aiConfigStorage.setProvider(aiProvider);
-    aiConfigStorage.setModel(model);
-    aiConfigStorage.setCustomPrompt(customPrompt);
-    aiConfigStorage.setOllamaBaseUrl(ollamaBaseUrl);
-
-    // Save advanced settings
-    localStorage.setItem(STORAGE_KEYS.AI_TEMPERATURE, temperature.toString());
-    localStorage.setItem(STORAGE_KEYS.AI_MAX_TOKENS, maxTokens.toString());
-    localStorage.setItem(STORAGE_KEYS.AI_TOP_K, topK.toString());
-    localStorage.setItem(STORAGE_KEYS.THINKING_MODE, thinkingMode.toString());
-  }, [
-    openaiKeyManager.key,
-    geminiKeyManager.key,
-    groqKeyManager.key,
-    firecrawlKeyManager.key,
-    aiProvider,
-    model,
-    customPrompt,
-    ollamaBaseUrl,
-    temperature,
-    maxTokens,
-    topK,
-    thinkingMode,
-  ]);
-
-  /**
-   * Wrapper for setAiProvider that includes persistence logic
-   */
-  const setAiProvider = useCallback((provider: AIProvider) => {
-    setAiProviderState(provider);
-
-    // Reset model when switching providers to prevent conflicts
-    if (provider === 'openai') {
-      setModelState(DEFAULT_OPENAI_MODEL);
-    } else {
-      // Clear model for Ollama until models are loaded
-      setModelState('');
-    }
-  }, []);
-
-  /**
-   * Wrapper for setModel
-   */
-  const setModel = useCallback((newModel: string) => {
-    setModelState(newModel);
-  }, []);
-
-  /**
-   * Wrapper for setCustomPrompt
-   */
-
-  /**
-   * Wrapper for setTemperature with persistence
-   */
-  const setTemperature = useCallback((value: number) => {
-    setTemperatureState(value);
-    localStorage.setItem(STORAGE_KEYS.AI_TEMPERATURE, value.toString());
-  }, []);
-
-  /**
-   * Wrapper for setMaxTokens with persistence
-   */
-  const setMaxTokens = useCallback((value: number) => {
-    setMaxTokensState(value);
-    localStorage.setItem(STORAGE_KEYS.AI_MAX_TOKENS, value.toString());
-  }, []);
-
-  /**
-   * Wrapper for setTopK with persistence
-   */
-  const setTopK = useCallback((value: number) => {
-    setTopKState(value);
-    localStorage.setItem(STORAGE_KEYS.AI_TOP_K, value.toString());
-  }, []);
-
-  /**
-   * Wrapper for setThinkingMode with persistence
-   */
-  const setThinkingMode = useCallback((enabled: boolean) => {
-    setThinkingModeState(enabled);
-    localStorage.setItem(STORAGE_KEYS.THINKING_MODE, enabled.toString());
-  }, []);
-  const setCustomPrompt = useCallback((prompt: string) => {
-    setCustomPromptState(prompt);
-  }, []);
-
-  /**
-   * Wrapper for setOllamaBaseUrl
-   */
-  const setOllamaBaseUrl = useCallback((url: string) => {
-    setOllamaBaseUrlState(url);
-  }, []);
+  // We can strip these out since Zustand now handles persistence automatically on state changes!
 
   /**
    * Wrapper for clearApiKey with persistence

@@ -1,4 +1,4 @@
-import { Users, PenTool, UserCheck, Info, Sparkles, Server, Key, Brain } from 'lucide-react';
+import { Users, PenTool, UserCheck, Sparkles, Server, Key, Brain } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -7,69 +7,60 @@ import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { ColumnBadges } from '@/components/FormulaEditor/ColumnBadges';
-import type { ModelDefinition } from '@/lib/constants/aiModels';
 import { isOllamaModel } from '@/lib/providers/aiProviders';
 
-interface AIAgentsModeEditorProps {
-  headers: string[];
-  firstRow: Record<string, string> | null;
-  // User offer
-  userOfferDetails: string;
-  onUserOfferDetailsChange: (value: string) => void;
-  // Available models (combined from all providers)
-  allAvailableModels: ModelDefinition[];
-  // Message Creator Agent
-  messageCreatorModel: string;
-  onMessageCreatorModelChange: (model: string) => void;
-  messageCreatorThinking: boolean;
-  onMessageCreatorThinkingChange: (enabled: boolean) => void;
-  messageCreatorInstructions: string;
-  onMessageCreatorInstructionsChange: (value: string) => void;
-  // Lead Roleplay Agent
-  leadRoleplayModel: string;
-  onLeadRoleplayModelChange: (model: string) => void;
-  leadRoleplayThinking: boolean;
-  onLeadRoleplayThinkingChange: (enabled: boolean) => void;
-  leadRoleplayInstructions: string;
-  onLeadRoleplayInstructionsChange: (value: string) => void;
-  // Settings
-  maxIterations: number;
-  onMaxIterationsChange: (value: number) => void;
-  // Connection status
-  ollamaConnected: boolean;
-  // Change handler
-  onInputChange: () => void;
-}
+import { useDataStore } from '@/stores/useDataStore';
+import { useAIAgentsStore } from '@/stores/editor/useAIAgentsStore';
+import { useUIStore } from '@/stores/editor/useUIStore';
+import { useOllamaConnection } from '@/hooks/useOllamaConnection';
+import { openAIModels, geminiModels } from '@/lib/constants/aiModels';
 
+export const AIAgentsModeEditor = () => {
+  const { headers, rows } = useDataStore();
+  const firstRow = rows && rows.length > 0 ? rows[0] : null;
 
+  const {
+    userOfferDetails,
+    setUserOfferDetails: onUserOfferDetailsChange,
+    messageCreatorModel,
+    setMessageCreatorModel: onMessageCreatorModelChange,
+    messageCreatorThinking,
+    setMessageCreatorThinking: onMessageCreatorThinkingChange,
+    messageCreatorInstructions,
+    setMessageCreatorInstructions: onMessageCreatorInstructionsChange,
+    leadRoleplayModel,
+    setLeadRoleplayModel: onLeadRoleplayModelChange,
+    leadRoleplayThinking,
+    setLeadRoleplayThinking: onLeadRoleplayThinkingChange,
+    leadRoleplayInstructions,
+    setLeadRoleplayInstructions: onLeadRoleplayInstructionsChange,
+    maxIterations,
+    setMaxIterations: onMaxIterationsChange
+  } = useAIAgentsStore();
 
-export const AIAgentsModeEditor = ({
-  headers,
-  firstRow,
-  userOfferDetails,
-  onUserOfferDetailsChange,
-  allAvailableModels,
-  messageCreatorModel,
-  onMessageCreatorModelChange,
-  messageCreatorThinking,
-  onMessageCreatorThinkingChange,
-  messageCreatorInstructions,
-  onMessageCreatorInstructionsChange,
-  leadRoleplayModel,
-  onLeadRoleplayModelChange,
-  leadRoleplayThinking,
-  onLeadRoleplayThinkingChange,
-  leadRoleplayInstructions,
-  onLeadRoleplayInstructionsChange,
-  maxIterations,
-  onMaxIterationsChange,
-  ollamaConnected,
-  onInputChange
-}: AIAgentsModeEditorProps) => {
+  const { setHasChanges } = useUIStore();
+  const { models: ollamaModelsRaw, connected: ollamaConnected } = useOllamaConnection();
+
+  const handleInputChange = () => {
+    setHasChanges(true);
+  };
+
+  const ollamaModels = ollamaModelsRaw || [];
+  const allAvailableModels = [
+    ...openAIModels,
+    ...geminiModels.map(model => ({ ...model, name: `${model.name} (Gemini)` })),
+    ...ollamaModels.map(model => ({
+      id: model,
+      name: `${model} (Ollama)`,
+      supportsThinking: false,
+      cost: 'Free (Local)'
+    }))
+  ];
+
   const handleColumnClick = (columnName: string) => {
     const insertion = `{${columnName}}`;
     onUserOfferDetailsChange(userOfferDetails + (userOfferDetails ? ' ' : '') + insertion);
-    onInputChange();
+    handleInputChange();
   };
 
   const messageCreatorModelInfo = allAvailableModels.find(m => m.id === messageCreatorModel);
@@ -105,7 +96,7 @@ export const AIAgentsModeEditor = ({
             value={userOfferDetails}
             onChange={(e) => {
               onUserOfferDetailsChange(e.target.value);
-              onInputChange();
+              handleInputChange();
             }}
             rows={3}
           />
@@ -134,7 +125,7 @@ export const AIAgentsModeEditor = ({
                   value={messageCreatorModel} 
                   onValueChange={(value) => {
                     onMessageCreatorModelChange(value);
-                    onInputChange();
+                    handleInputChange();
                   }}
                 >
                   <SelectTrigger>
@@ -161,7 +152,7 @@ export const AIAgentsModeEditor = ({
                   ) : (
                     <span className="flex items-center gap-1">
                       <Key className="h-3 w-3 text-blue-600" />
-                      {messageCreatorModelInfo?.name.includes('Gemini') ? 'Gemini' : 'OpenAI'} (Cloud) - {messageCreatorModelInfo?.cost}
+                      {messageCreatorModelInfo?.name?.includes('Gemini') ? 'Gemini' : 'OpenAI'} (Cloud) - {messageCreatorModelInfo?.cost}
                     </span>
                   )}
                 </p>
@@ -178,7 +169,7 @@ export const AIAgentsModeEditor = ({
                     checked={messageCreatorThinking}
                     onCheckedChange={(checked) => {
                       onMessageCreatorThinkingChange(checked);
-                      onInputChange();
+                      handleInputChange();
                     }}
                   />
                 </div>
@@ -191,7 +182,7 @@ export const AIAgentsModeEditor = ({
                   value={messageCreatorInstructions}
                   onChange={(e) => {
                     onMessageCreatorInstructionsChange(e.target.value);
-                    onInputChange();
+                    handleInputChange();
                   }}
                   rows={3}
                 />
@@ -217,7 +208,7 @@ export const AIAgentsModeEditor = ({
                   value={leadRoleplayModel} 
                   onValueChange={(value) => {
                     onLeadRoleplayModelChange(value);
-                    onInputChange();
+                    handleInputChange();
                   }}
                 >
                   <SelectTrigger>
@@ -244,7 +235,7 @@ export const AIAgentsModeEditor = ({
                   ) : (
                     <span className="flex items-center gap-1">
                       <Key className="h-3 w-3 text-blue-600" />
-                      {leadRoleplayModelInfo?.name.includes('Gemini') ? 'Gemini' : 'OpenAI'} (Cloud) - {leadRoleplayModelInfo?.cost}
+                      {leadRoleplayModelInfo?.name?.includes('Gemini') ? 'Gemini' : 'OpenAI'} (Cloud) - {leadRoleplayModelInfo?.cost}
                     </span>
                   )}
                 </p>
@@ -261,7 +252,7 @@ export const AIAgentsModeEditor = ({
                     checked={leadRoleplayThinking}
                     onCheckedChange={(checked) => {
                       onLeadRoleplayThinkingChange(checked);
-                      onInputChange();
+                      handleInputChange();
                     }}
                   />
                 </div>
@@ -274,7 +265,7 @@ export const AIAgentsModeEditor = ({
                   value={leadRoleplayInstructions}
                   onChange={(e) => {
                     onLeadRoleplayInstructionsChange(e.target.value);
-                    onInputChange();
+                    handleInputChange();
                   }}
                   rows={3}
                 />
@@ -299,7 +290,7 @@ export const AIAgentsModeEditor = ({
                       value={[maxIterations]} 
                       onValueChange={(value) => {
                         onMaxIterationsChange(value[0]);
-                        onInputChange();
+                        handleInputChange();
                       }}
                       max={10} 
                       min={1} 
@@ -348,7 +339,7 @@ export const AIAgentsModeEditor = ({
                     ) : (
                       <Badge variant="outline" className="text-blue-700">
                         <Key className="h-3 w-3 mr-1" />
-                        {messageCreatorModelInfo?.name.includes('Gemini') ? 'Gemini' : 'OpenAI'} Cloud
+                        {messageCreatorModelInfo?.name?.includes('Gemini') ? 'Gemini' : 'OpenAI'} Cloud
                       </Badge>
                     )}
                   </div>
@@ -362,7 +353,7 @@ export const AIAgentsModeEditor = ({
                     ) : (
                       <Badge variant="outline" className="text-blue-700">
                         <Key className="h-3 w-3 mr-1" />
-                        {leadRoleplayModelInfo?.name.includes('Gemini') ? 'Gemini' : 'OpenAI'} Cloud
+                        {leadRoleplayModelInfo?.name?.includes('Gemini') ? 'Gemini' : 'OpenAI'} Cloud
                       </Badge>
                     )}
                   </div>

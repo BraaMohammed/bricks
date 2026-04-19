@@ -18,8 +18,15 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 
-// Store
+// Stores
 import { useDataStore } from '@/stores/useDataStore';
+import { useUIStore } from '@/stores/editor/useUIStore';
+import { useAIModeStore } from '@/stores/editor/useAIModeStore';
+import { useFirecrawlStore } from '@/stores/editor/useFirecrawlStore';
+import { useAIAgentsStore } from '@/stores/editor/useAIAgentsStore';
+import { usePuppeteerStore } from '@/stores/editor/usePuppeteerStore';
+import { useAgentStore } from '@/stores/editor/useAgentStore';
+import { useEmailFinderStore } from '@/stores/editor/useEmailFinderStore';
 
 // Custom Hooks
 import { useAISettings } from '@/hooks/useAISettings';
@@ -78,53 +85,27 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   // LOCAL COMPONENT STATE - UI State Only
   // ============================================================
   const [formula, setFormulaText] = useState('');
-  const [hasChanges, setHasChanges] = useState(false);
-  const [showSlashMenu, setShowSlashMenu] = useState(false);
-  const [slashMenuPosition, setSlashMenuPosition] = useState({ top: 0, left: 0 });
-  const [showRemoveDialog, setShowRemoveDialog] = useState(false);
-  const [formulaName, setFormulaName] = useState('');
-  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const { hasChanges, setHasChanges, showSlashMenu, slashMenuPosition, showRemoveDialog, formulaName, showAdvancedSettings, setShowSlashMenu, setSlashMenuPosition, setShowRemoveDialog, setFormulaName, setShowAdvancedSettings } = useUIStore();
+
   // Mode-specific state (AI mode)
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [aiMessage, setAiMessage] = useState('');
+  const { aiPrompt, aiMessage, setAiPrompt, setAiMessage } = useAIModeStore();
 
   // Mode-specific state (Firecrawl mode)
-  const [firecrawlUrl, setFirecrawlUrl] = useState('');
+  const { firecrawlUrl, setFirecrawlUrl } = useFirecrawlStore();
 
   // Mode-specific state (AI Agents mode)
-  const [userOfferDetails, setUserOfferDetails] = useState('');
-  const [messageCreatorModel, setMessageCreatorModel] = useState('gpt-4o-mini');
-  const [leadRoleplayModel, setLeadRoleplayModel] = useState('gpt-4o-mini');
-  const [messageCreatorThinking, setMessageCreatorThinking] = useState(false);
-  const [leadRoleplayThinking, setLeadRoleplayThinking] = useState(false);
-  const [messageCreatorInstructions, setMessageCreatorInstructions] = useState('');
-  const [leadRoleplayInstructions, setLeadRoleplayInstructions] = useState('');
-  const [maxIterations, setMaxIterations] = useState(5);
+  const { userOfferDetails, messageCreatorModel, leadRoleplayModel, messageCreatorThinking, leadRoleplayThinking, messageCreatorInstructions, leadRoleplayInstructions, maxIterations, setUserOfferDetails, setMessageCreatorModel, setLeadRoleplayModel, setMessageCreatorThinking, setLeadRoleplayThinking, setMessageCreatorInstructions, setLeadRoleplayInstructions, setMaxIterations } = useAIAgentsStore();
 
   // Mode-specific state (Puppeteer mode)
-  const [puppeteerCode, setPuppeteerCode] = useState('');
-  const [puppeteerTimeout, setPuppeteerTimeout] = useState(30000);
-  const [puppeteerHeadless, setPuppeteerHeadless] = useState(true);
-  const [puppeteerExecutionLog, setPuppeteerExecutionLog] = useState<string[]>([]);
-  const [puppeteerLastResult, setPuppeteerLastResult] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+  const { puppeteerCode, puppeteerTimeout, puppeteerHeadless, puppeteerExecutionLog, puppeteerLastResult, setPuppeteerCode, setPuppeteerTimeout, setPuppeteerHeadless, setPuppeteerExecutionLog, setPuppeteerLastResult } = usePuppeteerStore();
 
   // Mode-specific state (Agent mode)
-  const [agentProvider, setAgentProvider] = useState<AIProvider>('openai');
-  const [agentModel, setAgentModel] = useState('gpt-4o-mini');
-  const [agentMaxSteps, setAgentMaxSteps] = useState(10);
-  const [agentTemperature, setAgentTemperature] = useState(0.7);
-  const [agentThinkingMode, setAgentThinkingMode] = useState(false);
-  const [agentInstruction, setAgentInstruction] = useState('');
+  const { agentProvider, agentModel, agentMaxSteps, agentTemperature, agentThinkingMode, agentInstruction, setAgentProvider, setAgentModel, setAgentMaxSteps, setAgentTemperature, setAgentThinkingMode, setAgentInstruction } = useAgentStore();
 
   // Mode-specific state (Email Finder mode)
-  const [emailProvider, setEmailProvider] = useState<AIProvider>('openai');
-  const [emailModel, setEmailModel] = useState('gpt-4o-mini');
-  const [emailMaxSteps, setEmailMaxSteps] = useState(15);
-  const [emailTemperature, setEmailTemperature] = useState(0.3);
-  const [emailThinkingMode, setEmailThinkingMode] = useState(false);
-  const [emailContext, setEmailContext] = useState('');
+  const { emailProvider, emailModel, emailMaxSteps, emailTemperature, emailThinkingMode, emailContext, setEmailProvider, setEmailModel, setEmailMaxSteps, setEmailTemperature, setEmailThinkingMode, setEmailContext } = useEmailFinderStore();
 
   // ============================================================
   // COMPUTED VALUES
@@ -482,130 +463,27 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
               </TabsContent>
 
               <TabsContent value="ai" className="space-y-4">
-                <AIModeEditor
-                  headers={headers}
-                  firstRow={firstRow}
-                  provider={aiSettings.aiProvider}
-                  onProviderChange={aiSettings.setAiProvider}
-                  ollamaConnected={ollamaConnection.connected}
-                  ollamaModels={ollamaConnection.models}
-                  ollamaBaseUrl={aiSettings.ollamaBaseUrl}
-                  onRefreshConnection={ollamaConnection.checkConnection}
-                  onBaseUrlChange={aiSettings.setOllamaBaseUrl}
-                  availableModels={aiSettings.availableModels}
-                  selectedModel={aiSettings.model}
-                  onModelChange={aiSettings.setModel}
-                  temperature={aiSettings.temperature}
-                  onTemperatureChange={aiSettings.setTemperature}
-                  maxTokens={aiSettings.maxTokens}
-                  onMaxTokensChange={aiSettings.setMaxTokens}
-                  topK={aiSettings.topK}
-                  onTopKChange={aiSettings.setTopK}
-                  thinkingMode={aiSettings.thinkingMode}
-                  onThinkingModeChange={aiSettings.setThinkingMode}
-                  prompt={aiPrompt}
-                  onPromptChange={setAiPrompt}
-                  message={aiMessage}
-                  onMessageChange={setAiMessage}
-                  showAdvancedSettings={showAdvancedSettings}
-                  onAdvancedSettingsChange={setShowAdvancedSettings}
-                  onInputChange={handleAIInputChange}
-                />
+                <AIModeEditor />
               </TabsContent>
 
               <TabsContent value="firecrawl" className="space-y-4">
-                <FirecrawlModeEditor
-                  headers={headers}
-                  firstRow={firstRow}
-                  url={firecrawlUrl}
-                  onUrlChange={setFirecrawlUrl}
-                  onInputChange={handleAIInputChange}
-                />
+                <FirecrawlModeEditor />
               </TabsContent>
 
               <TabsContent value="ai-agents" className="space-y-4">
-                <AIAgentsModeEditor
-                  headers={headers}
-                  firstRow={firstRow}
-                  userOfferDetails={userOfferDetails}
-                  onUserOfferDetailsChange={setUserOfferDetails}
-                  messageCreatorModel={messageCreatorModel}
-                  onMessageCreatorModelChange={setMessageCreatorModel}
-                  leadRoleplayModel={leadRoleplayModel}
-                  onLeadRoleplayModelChange={setLeadRoleplayModel}
-                  messageCreatorThinking={messageCreatorThinking}
-                  onMessageCreatorThinkingChange={setMessageCreatorThinking}
-                  leadRoleplayThinking={leadRoleplayThinking}
-                  onLeadRoleplayThinkingChange={setLeadRoleplayThinking}
-                  messageCreatorInstructions={messageCreatorInstructions}
-                  onMessageCreatorInstructionsChange={setMessageCreatorInstructions}
-                  leadRoleplayInstructions={leadRoleplayInstructions}
-                  onLeadRoleplayInstructionsChange={setLeadRoleplayInstructions}
-                  maxIterations={maxIterations}
-                  onMaxIterationsChange={setMaxIterations}
-                  allAvailableModels={allAvailableModels}
-                  ollamaConnected={ollamaConnection.connected}
-                  onInputChange={handleAIInputChange}
-                />
+                <AIAgentsModeEditor />
               </TabsContent>
 
               <TabsContent value="puppeteer" className="space-y-4">
-                <PuppeteerModeEditor
-                  headers={headers}
-                  firstRow={firstRow}
-                  code={puppeteerCode}
-                  onCodeChange={setPuppeteerCode}
-                  timeout={puppeteerTimeout}
-                  onTimeoutChange={setPuppeteerTimeout}
-                  headless={puppeteerHeadless}
-                  onHeadlessChange={setPuppeteerHeadless}
-                  executionLog={puppeteerExecutionLog}
-                  onClearLog={() => setPuppeteerExecutionLog([])}
-                  lastResult={puppeteerLastResult}
-                  onInputChange={handleAIInputChange}
-                />
+                <PuppeteerModeEditor />
               </TabsContent>
 
               <TabsContent value="agent" className="space-y-4">
-                <AgentModeEditor
-                  headers={headers}
-                  firstRow={firstRow}
-                  provider={agentProvider}
-                  onProviderChange={setAgentProvider}
-                  model={agentModel}
-                  onModelChange={setAgentModel}
-                  maxSteps={agentMaxSteps}
-                  onMaxStepsChange={setAgentMaxSteps}
-                  temperature={agentTemperature}
-                  onTemperatureChange={setAgentTemperature}
-                  thinkingMode={agentThinkingMode}
-                  onThinkingModeChange={setAgentThinkingMode}
-                  instruction={agentInstruction}
-                  onInstructionChange={setAgentInstruction}
-                  onInputChange={handleAIInputChange}
-                  ollamaModels={ollamaConnection.models}
-                />
+                <AgentModeEditor />
               </TabsContent>
 
               <TabsContent value="email-finder" className="space-y-4">
-                <EmailFinderModeEditor
-                  headers={headers}
-                  firstRow={firstRow}
-                  provider={emailProvider}
-                  onProviderChange={setEmailProvider}
-                  model={emailModel}
-                  onModelChange={setEmailModel}
-                  maxSteps={emailMaxSteps}
-                  onMaxStepsChange={setEmailMaxSteps}
-                  temperature={emailTemperature}
-                  onTemperatureChange={setEmailTemperature}
-                  thinkingMode={emailThinkingMode}
-                  onThinkingModeChange={setEmailThinkingMode}
-                  context={emailContext}
-                  onContextChange={setEmailContext}
-                  onInputChange={handleAIInputChange}
-                  ollamaModels={ollamaConnection.models}
-                />
+                <EmailFinderModeEditor />
               </TabsContent>
             </Tabs>
 

@@ -5,26 +5,26 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { FormulaPreview } from '@/components/FormulaEditor/FormulaPreview';
 import { ColumnBadges } from '@/components/FormulaEditor/ColumnBadges';
 
-interface FirecrawlModeEditorProps {
-  headers: string[];
-  firstRow: Record<string, string> | null;
-  url: string;
-  onUrlChange: (url: string) => void;
-  onInputChange: () => void;
-}
+import { useDataStore } from '@/stores/useDataStore';
+import { useFirecrawlStore } from '@/stores/editor/useFirecrawlStore';
+import { useUIStore } from '@/stores/editor/useUIStore';
 
-export const FirecrawlModeEditor = ({
-  headers,
-  firstRow,
-  url,
-  onUrlChange,
-  onInputChange
-}: FirecrawlModeEditorProps) => {
+export const FirecrawlModeEditor = () => {
+  const { headers, rows } = useDataStore();
+  const firstRow = rows && rows.length > 0 ? rows[0] : null;
+
+  const { firecrawlUrl: url, setFirecrawlUrl: onUrlChange } = useFirecrawlStore();
+  const { setHasChanges } = useUIStore();
+
+  const handleInputChange = () => {
+    setHasChanges(true);
+  };
+
   const handleColumnClick = (columnName: string) => {
     const insertion = `{${columnName}}`;
     const newUrl = url + insertion;
     onUrlChange(newUrl);
-    onInputChange();
+    handleInputChange();
   };
 
   return (
@@ -58,7 +58,7 @@ export const FirecrawlModeEditor = ({
             value={url}
             onChange={(e) => {
               onUrlChange(e.target.value);
-              onInputChange();
+              handleInputChange();
             }}
             className="w-full"
           />
