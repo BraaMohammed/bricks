@@ -5,8 +5,6 @@
 
 > Run data enrichment and outreach automation entirely on your own machine. No monthly subscriptions, no credit systems, no data leaving your computer.
 
-![1755904265844](https://github.com/user-attachments/assets/38d5df71-ce7b-4a54-998d-81a80ac0cec8)
-
 https://github.com/user-attachments/assets/7995b9ee-ab2c-4d15-b38e-6171345ee409
 
 Most data enrichment platforms charge $200–400/month in base fees, then charge again per enrichment run in their own credit system. You also hand over your entire lead list to a cloud server just to run what is essentially a web search and an AI call.
