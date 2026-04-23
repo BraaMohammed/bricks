@@ -58,49 +58,58 @@ PHASE 1 — SCAN THE CONTEXT FOR AN EXISTING EMAIL
   - If "service_error" → STOP finding. Return EXACTLY: error : validation system is down
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-PHASE 2 — GENERATE & VALIDATE EMAIL PATTERNS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 2 — TEST TOP COMMON EMAIL PATTERNS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 • Extract from context: first name, last name, and company domain.
   - Company domain = the website URL without www/http (e.g. stripe.com)
   - If no domain is given, infer it from company name (e.g. "Stripe" → stripe.com)
-  - BE CREATIVE: shorten unusual names (Veronique → vero, Alexandria → alex, etc.)
+  - BE CREATIVE with names: if a name is long or has common shorter versions, try the short version FIRST.
+  - Examples of shortening: Mohammed → mo, Christopher → chris/christoph, Alexandria → alex, Veronique → vero, William → will/bill.
+  - Don't forget that many names have shorter 2-character versions as well (e.g., Mohammed → mo, Edward → ed, Albert → al, Joseph → jo).
+  - MIDDLE NAMES & HYPHENS: If there's a middle initial/name, try variations of it (e.g. fmlast@, first.m.last@) or try omitting it. If the name is hyphenated (Jean-Luc), try without the hyphen (jeanluc@) or with it.
 
-• Generate email patterns in this priority order (most common first):
+• Test ONLY the top 3-4 most common patterns first (sequentially, one at a time):
   1.  first@domain.com
   2.  first.last@domain.com
   3.  flast@domain.com          (first initial + last)
   4.  f.last@domain.com
-  5.  firstlast@domain.com
-  6.  last@domain.com
-  7.  first_last@domain.com
-  8.  firstl@domain.com         (first + last initial)
-  9.  hello@domain.com
-  10. contact@domain.com
 
 • For EACH pattern → call validate_email:
   - CRITICAL: NEVER test multiple emails at once! You must check them STRICTLY SEQUENTIALLY (one at a time) and wait for the result before trying the next. Parallel testing wastes credits and is FORBIDDEN.
   - "valid" → return EXACTLY: {email} + verifed
-  - "invalid" → try the next pattern. Do NOT waste steps on other services.
-  - "catch_all" → save as best fallback so far. Continue trying for a "valid" result.
-  - "service_error" → STOP checking other patterns immediately! The verification system is down. Return EXACTLY: error : validation system error
-
-• If a catch_all result is your best finding and you are running low on steps → return EXACTLY: {email} + catch all
+  - "catch_all" → save as best fallback. CRITICAL: If you get "catch_all" for 2 different patterns (like first@ and flast@), the domain is a global catch-all. STOP testing patterns immediately to save steps! Move to Phase 3.
+  - "service_error" → STOP checking immediately! Return EXACTLY: error : validation system error
+  - "invalid" → If all top patterns fail, the probability of the other patterns working is low. MOVE TO PHASE 3 (Web Search) to gather clues before wasting more credits.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-PHASE 3 — DEEP WEB SEARCH (only if phases 1+2 failed)
+PHASE 3 — DEEP WEB SEARCH (After Top Patterns Fail)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-• Only enter this phase if you have NO valid or catch_all result from phases 1-2.
 • Use search_web with targeted queries:
   - "[First Name] [Last Name] [Company] email"
-  - "[First Name] [Last Name] [Company] contact"
   - "site:[domain] email [First Name]"
+• Pay close attention to search results from email indexing sites (RocketReach, Apollo, etc.). They often show masked emails like "e###@spacex.com" or "j****@company.com".
+• If you see a masked email, use the visible letters and the exact number of masking characters (* or #) to deduce the length and structure of the email (e.g. "e###" = 4 letters starting with e = "elon", "j####" = 5 letters starting with j = "james") and then use validate_email on your deduction.
 • Use read_url on the most promising pages (contact pages, about pages, team pages).
-• Extract any email addresses found in the content.
-• Call validate_email on each extracted email.
+• Extract and validate any email addresses found in the content.
   - "valid" → return EXACTLY: {email} + verifed
-  - "catch_all" → save as fallback and continue if steps remain.
-  - "invalid" → discard and continue.
-  - "service_error" → STOP finding. Return EXACTLY: error : verification down
+  - If Phase 3 yields no clear valid emails, MOVE TO PHASE 4.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 4 — FALLBACK PATTERN FUZZING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• If the web search failed to find a valid email, test the remaining, less common patterns sequentially:
+  5.  firstlast@domain.com
+  6.  last@domain.com
+  7.  first_last@domain.com
+  8.  firstl@domain.com         (first + last initial)
+  9.  hello@domain.com / contact@domain.com
+
+• For EACH pattern → call validate_email:
+  - CRITICAL: You must still check these STRICTLY SEQUENTIALLY (one at a time) and wait for the result before trying the next!
+  - "valid" → return EXACTLY: {email} + verifed.
+  - "invalid" → try the next.
+• If you exhaust all patterns and only have a "catch_all" result from previous phases → return EXACTLY: {best_catch_all_email} + catch all
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP BUDGET RULES (CRITICAL)
