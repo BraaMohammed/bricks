@@ -8,11 +8,39 @@ import { isAgentFormula, decodeAgentFormula } from '@/lib/agents/agentFormula';
 import { runSearchAgent } from '@/lib/agents/executor';
 import { isEmailFinderFormula, decodeEmailFinderFormula } from '@/lib/agents/emailFinderFormula';
 import { runEmailFinderAgent } from '@/lib/agents/emailFinderExecutor';
+import { cellHasError, DEFAULT_ERROR_KEYWORDS } from '@/lib/utils/errorDetector';
+
+/**
+ * Options that control which rows get processed during a column execution.
+ */
+export interface ExecutionOptions {
+  /** 'all'          → process every row (default)
+   *  'first-x'     → only the first `firstX` rows
+   *  'range'       → rows fromRow..toRow (1-indexed, inclusive)
+   *  'errors-only' → rows whose current cell content contains an error keyword
+   *  'column-filter'→ rows where another column's value matches a condition
+   */
+  mode: 'all' | 'first-x' | 'range' | 'errors-only' | 'column-filter';
+  /** Used when mode === 'first-x' */
+  firstX?: number;
+  /** Used when mode === 'range' (1-indexed) */
+  fromRow?: number;
+  /** Used when mode === 'range' (1-indexed, inclusive) */
+  toRow?: number;
+  /** Used when mode === 'errors-only'; defaults to DEFAULT_ERROR_KEYWORDS */
+  errorKeywords?: string[];
+  /** Used when mode === 'column-filter': which column to check */
+  filterColumn?: string;
+  /** Used when mode === 'column-filter': the value to match */
+  filterValue?: string;
+  /** Used when mode === 'column-filter': how to compare (default: 'equals') */
+  filterMatchMode?: 'equals' | 'contains' | 'not-equals' | 'not-contains';
+}
 
 export interface UseFormulaExecutionReturn {
   executingColumn: string | null;
   executingCells: Set<string>;
-  executeFormula: (column: string) => Promise<void>;
+  executeFormula: (column: string, options?: ExecutionOptions) => Promise<void>;
   executeCellFormula: (rowIndex: number, column: string) => Promise<void>;
   executionProgress: { completed: number; total: number } | null;
 }
@@ -31,7 +59,61 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
    * Execute formula on all rows in a column
    * Runs all rows in parallel with individual error handling per row
    */
-  const executeFormula = async (column: string) => {
+  /**
+   * Resolve which row indices to process based on the user's ExecutionOptions.
+   * Returns an array of original row indices (into `rows`) to execute.
+   */
+  const resolveTargetIndices = (
+    column: string,
+    options: ExecutionOptions = { mode: 'all' },
+  ): number[] => {
+    const allIndices = rows.map((_, i) => i);
+
+    switch (options.mode) {
+      case 'first-x': {
+        const limit = Math.max(1, options.firstX ?? 1);
+        return allIndices.slice(0, limit);
+      }
+
+      case 'range': {
+        // Convert 1-indexed user input → 0-indexed slice args
+        const from = Math.max(1, options.fromRow ?? 1) - 1;
+        const to = Math.min(rows.length, options.toRow ?? rows.length);
+        return allIndices.slice(from, to);
+      }
+
+      case 'errors-only': {
+        const keywords = options.errorKeywords ?? DEFAULT_ERROR_KEYWORDS;
+        return allIndices.filter((i) =>
+          cellHasError((rows[i] as Record<string, string>)[column], keywords),
+        );
+      }
+
+      case 'column-filter': {
+        const { filterColumn, filterValue = '', filterMatchMode = 'equals' } = options;
+        if (!filterColumn) return allIndices; // no column chosen → run all
+
+        const needle = filterValue.toLowerCase().trim();
+
+        return allIndices.filter((i) => {
+          const cellVal = ((rows[i] as Record<string, string>)[filterColumn] ?? '').toLowerCase().trim();
+          switch (filterMatchMode) {
+            case 'contains':     return cellVal.includes(needle);
+            case 'not-equals':   return cellVal !== needle;
+            case 'not-contains': return !cellVal.includes(needle);
+            case 'equals':
+            default:             return cellVal === needle;
+          }
+        });
+      }
+
+      case 'all':
+      default:
+        return allIndices;
+    }
+  };
+
+  const executeFormula = async (column: string, options: ExecutionOptions = { mode: 'all' }) => {
     const formula = getFormula(column);
 
     if (!formula.trim()) {
@@ -65,7 +147,11 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
           description: `Agent mode: ${providerRateConfig.description}`,
         };
 
-        const rowTasks = rows.map((row, i) => async () => {
+        const targetIndices = resolveTargetIndices(column, options);
+        console.log(`🎯 Agent mode: executing ${targetIndices.length} of ${rows.length} rows (mode: ${options.mode})`);
+
+        const rowTasks = targetIndices.map((i) => async () => {
+          const row = rows[i];
           try {
             const result = await runSearchAgent({
               instruction: agentConfig.instruction,
@@ -127,7 +213,11 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
           description: `Email Finder: Concurrency capped to protect validation APIs`,
         };
 
-        const rowTasks = rows.map((row, i) => async () => {
+        const targetIndices = resolveTargetIndices(column, options);
+        console.log(`🎯 Email Finder mode: executing ${targetIndices.length} of ${rows.length} rows (mode: ${options.mode})`);
+
+        const rowTasks = targetIndices.map((i) => async () => {
+          const row = rows[i];
           try {
             // Interpolate {ColumnName} placeholders in context with row data
             const interpolatedContext = emailConfig.context.replace(
@@ -194,7 +284,11 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
       console.warn(`⚠️ CRITICAL: Starting execution of ${rows.length} rows with above config`);
 
       // Create array of promise-returning functions (not promises yet!)
-      const rowTasks = rows.map((row, i) => async () => {
+      const targetIndices = resolveTargetIndices(column, options);
+      console.log(`🎯 Regular AI mode: executing ${targetIndices.length} of ${rows.length} rows (mode: ${options.mode})`);
+
+      const rowTasks = targetIndices.map((i) => async () => {
+        const row = rows[i];
         try {
           console.log(`🚀 Starting row ${i + 1}/${rows.length} with individual timeout per API call`);
 

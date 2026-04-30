@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { useDataStore } from '@/stores/useDataStore';
 import { toast } from '@/hooks/use-toast';
+import localforage from 'localforage';
 
 interface SavedTable {
   id: string;
@@ -33,11 +34,10 @@ export const TablesManager = () => {
     loadSavedTables();
   }, []);
 
-  const loadSavedTables = () => {
+  const loadSavedTables = async () => {
     try {
-      const saved = localStorage.getItem('vibe-sheet-saved-tables');
-      if (saved) {
-        const tables = JSON.parse(saved);
+      const tables = await localforage.getItem<SavedTable[]>('vibe-sheet-saved-tables');
+      if (tables) {
         setSavedTables(tables);
       }
     } catch (error) {
@@ -45,7 +45,7 @@ export const TablesManager = () => {
     }
   };
 
-  const saveCurrentTable = () => {
+  const saveCurrentTable = async () => {
     if (!tableName.trim()) {
       toast({
         title: "Invalid Name",
@@ -55,7 +55,10 @@ export const TablesManager = () => {
       return;
     }
 
-    if (headers.length === 0) {
+    // Read fresh state directly from the store to avoid stale closure values
+    const { headers: currentHeaders, rows: currentRows, formulas: currentFormulas } = useDataStore.getState();
+
+    if (currentHeaders.length === 0) {
       toast({
         title: "No Data",
         description: "There's no data to save.",
@@ -70,11 +73,11 @@ export const TablesManager = () => {
       name: tableName.trim(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      headers: [...headers],
-      rows: [...rows],
-      formulas: { ...formulas },
-      rowCount: rows.length,
-      columnCount: headers.length,
+      headers: [...currentHeaders],
+      rows: [...currentRows],
+      formulas: { ...currentFormulas },
+      rowCount: currentRows.length,
+      columnCount: currentHeaders.length,
     };
 
     const currentTables = [...savedTables];
@@ -85,16 +88,23 @@ export const TablesManager = () => {
       currentTables.splice(50);
     }
 
-    setSavedTables(currentTables);
-    localStorage.setItem('vibe-sheet-saved-tables', JSON.stringify(currentTables));
-
-    setTableName('');
-    setShowSaveDialog(false);
-
-    toast({
-      title: "Table Saved",
-      description: `Table "${newTable.name}" has been saved successfully.`,
-    });
+    try {
+      await localforage.setItem('vibe-sheet-saved-tables', currentTables);
+      setSavedTables(currentTables);
+      setTableName('');
+      setShowSaveDialog(false);
+      toast({
+        title: "Table Saved",
+        description: `Table "${newTable.name}" has been saved successfully.`,
+      });
+    } catch (error) {
+      console.error('Error saving table:', error);
+      toast({
+        title: "Save Failed",
+        description: "Could not save the table. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const loadTable = (table: SavedTable) => {
@@ -113,16 +123,24 @@ export const TablesManager = () => {
     });
   };
 
-  const deleteTable = (tableId: string) => {
+  const deleteTable = async (tableId: string) => {
     if (window.confirm('Are you sure you want to delete this table? This action cannot be undone.')) {
       const updatedTables = savedTables.filter(table => table.id !== tableId);
-      setSavedTables(updatedTables);
-      localStorage.setItem('vibe-sheet-saved-tables', JSON.stringify(updatedTables));
-
-      toast({
-        title: "Table Deleted",
-        description: "The table has been deleted successfully.",
-      });
+      try {
+        await localforage.setItem('vibe-sheet-saved-tables', updatedTables);
+        setSavedTables(updatedTables);
+        toast({
+          title: "Table Deleted",
+          description: "The table has been deleted successfully.",
+        });
+      } catch (error) {
+        console.error('Error deleting table:', error);
+        toast({
+          title: "Delete Failed",
+          description: "Could not delete the table. Please try again.",
+          variant: "destructive",
+        });
+      }
     }
   };
 

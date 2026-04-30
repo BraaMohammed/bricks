@@ -109,6 +109,8 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
                   isSorted={sortColumn === header}
                   sortDirection={sortDirection}
                   columnToRemove={columnToRemove}
+                  totalRows={rows.length}
+                  headers={headers}
                   onSort={handleSort}
                   onEditFormula={onEditFormula}
                   onExecuteFormula={executeFormula}

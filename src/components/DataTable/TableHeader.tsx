@@ -1,17 +1,20 @@
+import { useState } from 'react';
 import { Settings, Play, ChevronUp, ChevronDown, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  AlertDialog, 
-  AlertDialogAction, 
-  AlertDialogCancel, 
-  AlertDialogContent, 
-  AlertDialogDescription, 
-  AlertDialogFooter, 
-  AlertDialogHeader, 
-  AlertDialogTitle, 
-  AlertDialogTrigger 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { ExecutionOptionsDialog } from './ExecutionOptionsDialog';
+import type { ExecutionOptions } from '@/hooks/useFormulaExecution';
 
 interface TableHeaderProps {
   header: string;
@@ -20,9 +23,12 @@ interface TableHeaderProps {
   isSorted: boolean;
   sortDirection: 'asc' | 'desc';
   columnToRemove: string | null;
+  totalRows: number;
+  /** All column headers — passed to the execution dialog for column-filter mode */
+  headers: string[];
   onSort: (column: string) => void;
   onEditFormula: (column: string) => void;
-  onExecuteFormula: (column: string) => void;
+  onExecuteFormula: (column: string, options?: ExecutionOptions) => void;
   onRemoveColumn: (column: string) => void;
   onSetColumnToRemove: (column: string | null) => void;
 }
@@ -30,6 +36,7 @@ interface TableHeaderProps {
 /**
  * TableHeader component for individual column headers
  * Includes sorting, formula badge, and action buttons (Settings, Execute, Remove)
+ * Clicking ▶ opens the ExecutionOptionsDialog before running.
  */
 export const TableHeader = ({
   header,
@@ -38,12 +45,20 @@ export const TableHeader = ({
   isSorted,
   sortDirection,
   columnToRemove,
+  totalRows,
+  headers,
   onSort,
   onEditFormula,
   onExecuteFormula,
   onRemoveColumn,
   onSetColumnToRemove,
 }: TableHeaderProps) => {
+  const [showExecutionDialog, setShowExecutionDialog] = useState(false);
+
+  const handleConfirm = (options: ExecutionOptions) => {
+    onExecuteFormula(header, options);
+  };
+
   return (
     <th className="table-header relative group">
       <div className="flex items-center justify-between gap-2">
@@ -53,19 +68,19 @@ export const TableHeader = ({
         >
           <span className="truncate max-w-[120px]">{header}</span>
           {isSorted && (
-            sortDirection === 'asc' ? 
-              <ChevronUp className="h-3 w-3" /> : 
+            sortDirection === 'asc' ?
+              <ChevronUp className="h-3 w-3" /> :
               <ChevronDown className="h-3 w-3" />
           )}
         </button>
-        
+
         <div className="flex items-center gap-1">
           {hasFormula && (
             <Badge variant="secondary" className="text-xs py-0 px-1">
               f(x)
             </Badge>
           )}
-          
+
           <Button
             variant="ghost"
             size="sm"
@@ -74,11 +89,12 @@ export const TableHeader = ({
           >
             <Settings className="h-3 w-3" />
           </Button>
-          
+
+          {/* ▶ Execute button — opens options dialog */}
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => onExecuteFormula(header)}
+            onClick={() => setShowExecutionDialog(true)}
             disabled={!hasFormula || isExecuting}
             className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
           >
@@ -88,7 +104,7 @@ export const TableHeader = ({
               <Play className="h-3 w-3" />
             )}
           </Button>
-          
+
           <AlertDialog open={columnToRemove === header} onOpenChange={(open) => !open && onSetColumnToRemove(null)}>
             <AlertDialogTrigger asChild>
               <Button
@@ -109,7 +125,7 @@ export const TableHeader = ({
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction 
+                <AlertDialogAction
                   onClick={() => onRemoveColumn(header)}
                   className="bg-red-600 hover:bg-red-700"
                 >
@@ -120,6 +136,16 @@ export const TableHeader = ({
           </AlertDialog>
         </div>
       </div>
+
+      {/* Execution Options Dialog */}
+      <ExecutionOptionsDialog
+        open={showExecutionDialog}
+        column={header}
+        totalRows={totalRows}
+        headers={headers}
+        onClose={() => setShowExecutionDialog(false)}
+        onConfirm={handleConfirm}
+      />
     </th>
   );
 };
