@@ -201,7 +201,7 @@ async function readWithScraperAPI(url: string, apiKey: string): Promise<{ conten
 // Docs: https://scrape.do/docs
 
 async function readWithScrapeDo(url: string, apiKey: string): Promise<{ content: string; title: string }> {
-    const scrapeDoUrl = `https://api.scrape.do/?token=${apiKey}&url=${encodeURIComponent(url)}&output=markdown`;
+    const scrapeDoUrl = `https://api.scrape.do/?token=${apiKey}&url=${encodeURIComponent(url)}&output=markdown&render=true`;
 
     const res = await fetch(scrapeDoUrl, {
         signal: AbortSignal.timeout(30000),

@@ -67,7 +67,7 @@ Bricks doesn't mark up API costs. You connect directly:
 
 ## Getting Started
 
-Bricks is a monorepo. You need two terminal windows — one for the Vite frontend, one for the Next.js API backend.
+> **The frontend is already deployed** at **[https://use-bricks.netlify.app/](https://use-bricks.netlify.app/)** — you still need to clone the repo and run the backend API locally, but you do **not** need to run the Vite dev server for the frontend.
 
 **Prerequisites:** Node.js 18+ and `npm`
 
@@ -77,14 +77,7 @@ git clone https://github.com/BraaMohammed/bricks.git
 cd bricks
 ```
 
-### 2. Start the Frontend (Terminal 1)
-```bash
-npm install
-npm run dev
-# UI runs at http://localhost:8080
-```
-
-### 3. Start the Backend API (Terminal 2)
+### 2. Start the Backend API
 ```bash
 cd api/bricks-api
 npm install
@@ -97,11 +90,46 @@ npm run dev
 # API runs at http://localhost:3000
 ```
 
-### 4. Configure AI
-1. Open `http://localhost:8080`
+> **Optional — run the frontend locally:** If you want to develop or self-host the UI, run `npm install && npm run dev` from the repo root. The UI will be at `http://localhost:8080`.
+
+### 3. Configure AI
+1. Open **[https://use-bricks.netlify.app/](https://use-bricks.netlify.app/)** (or `http://localhost:8080` if running locally)
 2. Click the **Settings gear**
 3. Add your API keys (OpenAI, Gemini, Groq) or set your local Ollama URL (`http://localhost:11434`)
 4. Upload a CSV and start enriching
+
+---
+
+## Required Browser Setup
+
+Because the UI is served from `https://use-bricks.netlify.app/` (a public HTTPS page) and the backend API runs on your local machine, Chromium-based browsers (Chrome, Edge, Brave) will block those requests by default. **This affects every feature** — web search, the reader, Puppeteer, the email finder, and Ollama.
+
+### Step 1 — Bypass Chrome's Local Network Block *(required for everything)*
+
+1. Paste this URL into your browser's address bar:
+   ```
+   chrome://flags/#local-network-access-check
+   ```
+2. Change the highlighted setting to **Disabled**.
+3. Click the **Relaunch** button at the bottom of the browser.
+
+### Step 2 — Allow Cross-Origin Requests in Ollama *(only if using Ollama)*
+
+If you want to use a local Ollama model, you also need to tell Ollama it is allowed to accept requests from Bricks.
+
+**Windows** — open CMD and run:
+```cmd
+setx OLLAMA_ORIGINS "*"
+```
+
+**Mac / Linux:**
+```bash
+export OLLAMA_ORIGINS="*"
+```
+
+> ⚠️ **Critical:** You must completely quit Ollama from your system tray / menu bar and restart it for this change to take effect.
+
+Once both steps are done, select **Ollama** in the Bricks settings and it will instantly connect.
 
 ---
 
