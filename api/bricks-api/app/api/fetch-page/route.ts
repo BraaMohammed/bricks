@@ -201,7 +201,7 @@ async function readWithScraperAPI(url: string, apiKey: string): Promise<{ conten
 // Docs: https://scrape.do/docs
 
 async function readWithScrapeDo(url: string, apiKey: string): Promise<{ content: string; title: string }> {
-    const scrapeDoUrl = `https://api.scrape.do/?token=${apiKey}&url=${encodeURIComponent(url)}&output=markdown&render=true`;
+    const scrapeDoUrl = `https://api.scrape.do/?token=${apiKey}&url=${encodeURIComponent(url)}&output=markdown&render=true&super=true`;
 
     const res = await fetch(scrapeDoUrl, {
         signal: AbortSignal.timeout(30000),
@@ -394,11 +394,11 @@ export async function POST(request: NextRequest) {
         type ServiceDef = { name: string; fn: () => Promise<{ content: string; title: string }>; credits: string };
         const services: ServiceDef[] = [];
 
-        const scraperApiKey  = process.env.SCRAPER_API_KEY;
-        const scrapeDoKey    = process.env.SCRAPE_DO_KEY;
-        const tavilyKey      = process.env.TAVILY_API_KEY;
-        const scrapflyKey    = process.env.SCRAPFLY_KEY;
-        const firecrawlKey   = process.env.FIRECRAWL_KEY;
+        const scraperApiKey = process.env.SCRAPER_API_KEY;
+        const scrapeDoKey = process.env.SCRAPE_DO_KEY;
+        const tavilyKey = process.env.TAVILY_API_KEY;
+        const scrapflyKey = process.env.SCRAPFLY_KEY;
+        const firecrawlKey = process.env.FIRECRAWL_KEY;
 
         if (scrapeDoKey) {
             services.push({ name: 'scrape.do', credits: '1000/month', fn: () => readWithScrapeDo(url, scrapeDoKey) });
