@@ -32,11 +32,12 @@ export interface AIFormulaParams {
  * AI Agents configuration
  */
 export interface AIAgentsConfig {
+  creatorProvider: 'openai' | 'ollama' | 'gemini' | 'groq';
+  roleplayProvider: 'openai' | 'ollama' | 'gemini' | 'groq';
   messageCreatorModel: string;
   leadRoleplayModel: string;
   messageCreatorThinking: boolean;
   leadRoleplayThinking: boolean;
-  userOfferDetails: string;
   messageCreatorInstructions: string;
   leadRoleplayInstructions: string;
   maxIterations: number;
@@ -413,12 +414,9 @@ return fetch('https://api.firecrawl.dev/v2/scrape', {
 });`;
 };
 
-/**
- * Generates AI Agents formula code
- */
 export const generateAIAgentsFormulaCode = (config: AIAgentsConfig): string => {
-  // Detect provider from the models being used
-  const provider = isGroqModel(config.messageCreatorModel) ? 'groq' : 'openai';
+  // Use the explicitly selected creator provider
+  const provider = config.creatorProvider;
   return `// @provider: ${provider}
 // @model: ${config.messageCreatorModel}
 // AI Copy Agents Formula

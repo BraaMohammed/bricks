@@ -1,7 +1,10 @@
 import { create } from 'zustand';
 
+import type { AIProvider } from '@/lib/constants/aiModels';
+
 interface AIAgentsState {
-  userOfferDetails: string;
+  creatorProvider: AIProvider;
+  roleplayProvider: AIProvider;
   messageCreatorModel: string;
   leadRoleplayModel: string;
   messageCreatorThinking: boolean;
@@ -10,7 +13,8 @@ interface AIAgentsState {
   leadRoleplayInstructions: string;
   maxIterations: number;
 
-  setUserOfferDetails: (details: string) => void;
+  setCreatorProvider: (provider: AIProvider) => void;
+  setRoleplayProvider: (provider: AIProvider) => void;
   setMessageCreatorModel: (model: string) => void;
   setLeadRoleplayModel: (model: string) => void;
   setMessageCreatorThinking: (thinking: boolean) => void;
@@ -21,7 +25,8 @@ interface AIAgentsState {
 }
 
 export const useAIAgentsStore = create<AIAgentsState>((set) => ({
-  userOfferDetails: '',
+  creatorProvider: 'openai',
+  roleplayProvider: 'openai',
   messageCreatorModel: 'gpt-4o-mini',
   leadRoleplayModel: 'gpt-4o-mini',
   messageCreatorThinking: false,
@@ -30,7 +35,8 @@ export const useAIAgentsStore = create<AIAgentsState>((set) => ({
   leadRoleplayInstructions: '',
   maxIterations: 5,
 
-  setUserOfferDetails: (details) => set({ userOfferDetails: details }),
+  setCreatorProvider: (provider) => set({ creatorProvider: provider }),
+  setRoleplayProvider: (provider) => set({ roleplayProvider: provider }),
   setMessageCreatorModel: (model) => set({ messageCreatorModel: model }),
   setLeadRoleplayModel: (model) => set({ leadRoleplayModel: model }),
   setMessageCreatorThinking: (thinking) => set({ messageCreatorThinking: thinking }),

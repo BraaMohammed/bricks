@@ -1,27 +1,31 @@
-import { Users, PenTool, UserCheck, Sparkles, Server, Key, Brain } from 'lucide-react';
+import { useEffect } from 'react';
+import { Users, PenTool, UserCheck, Sparkles, Brain, Key, Server } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
-import { Badge } from '@/components/ui/badge';
 import { ColumnBadges } from '@/components/FormulaEditor/ColumnBadges';
-import { isOllamaModel } from '@/lib/providers/aiProviders';
+import { toast } from 'sonner';
 
 import { useDataStore } from '@/stores/useDataStore';
 import { useAIAgentsStore } from '@/stores/editor/useAIAgentsStore';
 import { useUIStore } from '@/stores/editor/useUIStore';
 import { useOllamaConnection } from '@/hooks/useOllamaConnection';
-import { openAIModels, geminiModels } from '@/lib/constants/aiModels';
+import { getAvailableModels } from '@/stores/useAISettingsStore';
+import { PROVIDERS } from '@/lib/constants/aiModels';
+import type { AIProvider } from '@/lib/constants/aiModels';
 
 export const AIAgentsModeEditor = () => {
   const { headers, rows } = useDataStore();
   const firstRow = rows && rows.length > 0 ? rows[0] : null;
 
   const {
-    userOfferDetails,
-    setUserOfferDetails: onUserOfferDetailsChange,
+    creatorProvider,
+    setCreatorProvider: onCreatorProviderChange,
+    roleplayProvider,
+    setRoleplayProvider: onRoleplayProviderChange,
     messageCreatorModel,
     setMessageCreatorModel: onMessageCreatorModelChange,
     messageCreatorThinking,
@@ -40,31 +44,50 @@ export const AIAgentsModeEditor = () => {
 
   const { setHasChanges } = useUIStore();
   const { models: ollamaModelsRaw, connected: ollamaConnected } = useOllamaConnection();
+  const ollamaModels = ollamaModelsRaw || [];
 
   const handleInputChange = () => {
     setHasChanges(true);
   };
 
-  const ollamaModels = ollamaModelsRaw || [];
-  const allAvailableModels = [
-    ...openAIModels,
-    ...geminiModels.map(model => ({ ...model, name: `${model.name} (Gemini)` })),
-    ...ollamaModels.map(model => ({
-      id: model,
-      name: `${model} (Ollama)`,
-      supportsThinking: false,
-      cost: 'Free (Local)'
-    }))
-  ];
-
   const handleColumnClick = (columnName: string) => {
     const insertion = `{${columnName}}`;
-    onUserOfferDetailsChange(userOfferDetails + (userOfferDetails ? ' ' : '') + insertion);
-    handleInputChange();
+    navigator.clipboard.writeText(insertion).then(() => {
+      toast.success(`Copied \${insertion} to clipboard!`);
+    }).catch(() => {
+      toast.error('Failed to copy to clipboard');
+    });
   };
 
-  const messageCreatorModelInfo = allAvailableModels.find(m => m.id === messageCreatorModel);
-  const leadRoleplayModelInfo = allAvailableModels.find(m => m.id === leadRoleplayModel);
+  const availableCreatorModels = getAvailableModels(creatorProvider, ollamaModels);
+  const availableRoleplayModels = getAvailableModels(roleplayProvider, ollamaModels);
+
+  // Auto-select first model if current isn't in list
+  useEffect(() => {
+    if (availableCreatorModels.length > 0 && !availableCreatorModels.find(m => m.id === messageCreatorModel)) {
+      onMessageCreatorModelChange(availableCreatorModels[0].id);
+    }
+  }, [availableCreatorModels, messageCreatorModel, onMessageCreatorModelChange]);
+
+  useEffect(() => {
+    if (availableRoleplayModels.length > 0 && !availableRoleplayModels.find(m => m.id === leadRoleplayModel)) {
+      onLeadRoleplayModelChange(availableRoleplayModels[0].id);
+    }
+  }, [availableRoleplayModels, leadRoleplayModel, onLeadRoleplayModelChange]);
+
+  const creatorModelInfo = availableCreatorModels.find(m => m.id === messageCreatorModel);
+  const roleplayModelInfo = availableRoleplayModels.find(m => m.id === leadRoleplayModel);
+
+  const resolvePreview = (text: string) => {
+    if (!text || !firstRow) return text;
+    return text.replace(/\{([^}]+)\}/g, (match, columnName) => {
+      const value = firstRow[columnName.trim()];
+      return value ? String(value) : match;
+    });
+  };
+
+  const creatorPreview = resolvePreview(messageCreatorInstructions);
+  const roleplayPreview = resolvePreview(leadRoleplayInstructions);
 
   return (
     <Card>
@@ -78,32 +101,13 @@ export const AIAgentsModeEditor = () => {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        
+
         {/* Available columns */}
         <ColumnBadges
           headers={headers}
           onColumnClick={handleColumnClick}
-          helpText="Click on a column to add it to your instructions. The AI agents will have access to all this data:"
+          helpText="Click on a column to copy it, then paste it into the custom instructions below to inject row data:"
         />
-
-        {/* User Offer Details */}
-        <div>
-          <Label className="text-base font-semibold mb-3 block">
-            Your Offer Details
-          </Label>
-          <Textarea 
-            placeholder="Describe your product/service/offer that will be mentioned in messages..."
-            value={userOfferDetails}
-            onChange={(e) => {
-              onUserOfferDetailsChange(e.target.value);
-              handleInputChange();
-            }}
-            rows={3}
-          />
-          <p className="text-xs text-muted-foreground mt-1">
-            💡 Tip: Use {`{Column Name}`} to reference lead data in your offer description
-          </p>
-        </div>
 
         {/* Agent Configuration Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -119,10 +123,32 @@ export const AIAgentsModeEditor = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Provider</Label>
+                <Select
+                  value={creatorProvider}
+                  onValueChange={(value: AIProvider) => {
+                    onCreatorProviderChange(value);
+                    handleInputChange();
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROVIDERS.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
                 <Label className="text-sm font-medium">Model</Label>
-                <Select 
-                  value={messageCreatorModel} 
+                <Select
+                  value={messageCreatorModel}
                   onValueChange={(value) => {
                     onMessageCreatorModelChange(value);
                     handleInputChange();
@@ -132,34 +158,23 @@ export const AIAgentsModeEditor = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {allAvailableModels.map((model) => (
+                    {availableCreatorModels.map((model) => (
                       <SelectItem key={model.id} value={model.id}>
                         <div className="flex items-center gap-2">
                           {model.name}
-                          {model.supportsThinking && <Brain className="h-3 w-3" />}
-                          {isOllamaModel(model.id) && <Server className="h-3 w-3 text-green-600" />}
+                          {model.supportsThinking && <Brain className="h-3 w-3 text-purple-500" />}
                         </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {isOllamaModel(messageCreatorModel) ? (
-                    <span className="flex items-center gap-1">
-                      <Server className="h-3 w-3 text-green-600" />
-                      Ollama (Local) - {messageCreatorModelInfo?.cost}
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1">
-                      <Key className="h-3 w-3 text-blue-600" />
-                      {messageCreatorModelInfo?.name?.includes('Gemini') ? 'Gemini' : 'OpenAI'} (Cloud) - {messageCreatorModelInfo?.cost}
-                    </span>
-                  )}
-                </p>
+                {creatorProvider === 'ollama' && !ollamaConnected && (
+                  <p className="text-xs text-red-500">Ollama not running</p>
+                )}
               </div>
 
               {/* Thinking Mode Toggle */}
-              {messageCreatorModelInfo?.supportsThinking && (
+              {creatorModelInfo?.supportsThinking && (
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label className="text-sm font-medium">Thinking Mode</Label>
@@ -176,15 +191,15 @@ export const AIAgentsModeEditor = () => {
               )}
 
               <div>
-                <Label className="text-sm font-medium">Custom Instructions (Optional)</Label>
+                <Label className="text-sm font-medium">Custom Instructions & Context</Label>
                 <Textarea
-                  placeholder="Additional instructions for the message creator..."
+                  placeholder="Describe the offer and give specific instructions. You can use {Column Name} tags to inject data."
                   value={messageCreatorInstructions}
                   onChange={(e) => {
                     onMessageCreatorInstructionsChange(e.target.value);
                     handleInputChange();
                   }}
-                  rows={3}
+                  rows={5}
                 />
               </div>
             </CardContent>
@@ -202,10 +217,32 @@ export const AIAgentsModeEditor = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Provider</Label>
+                <Select
+                  value={roleplayProvider}
+                  onValueChange={(value: AIProvider) => {
+                    onRoleplayProviderChange(value);
+                    handleInputChange();
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROVIDERS.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
                 <Label className="text-sm font-medium">Model</Label>
-                <Select 
-                  value={leadRoleplayModel} 
+                <Select
+                  value={leadRoleplayModel}
                   onValueChange={(value) => {
                     onLeadRoleplayModelChange(value);
                     handleInputChange();
@@ -215,34 +252,23 @@ export const AIAgentsModeEditor = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {allAvailableModels.map((model) => (
+                    {availableRoleplayModels.map((model) => (
                       <SelectItem key={model.id} value={model.id}>
                         <div className="flex items-center gap-2">
                           {model.name}
-                          {model.supportsThinking && <Brain className="h-3 w-3" />}
-                          {isOllamaModel(model.id) && <Server className="h-3 w-3 text-green-600" />}
+                          {model.supportsThinking && <Brain className="h-3 w-3 text-purple-500" />}
                         </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {isOllamaModel(leadRoleplayModel) ? (
-                    <span className="flex items-center gap-1">
-                      <Server className="h-3 w-3 text-green-600" />
-                      Ollama (Local) - {leadRoleplayModelInfo?.cost}
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1">
-                      <Key className="h-3 w-3 text-blue-600" />
-                      {leadRoleplayModelInfo?.name?.includes('Gemini') ? 'Gemini' : 'OpenAI'} (Cloud) - {leadRoleplayModelInfo?.cost}
-                    </span>
-                  )}
-                </p>
+                {roleplayProvider === 'ollama' && !ollamaConnected && (
+                  <p className="text-xs text-red-500">Ollama not running</p>
+                )}
               </div>
 
               {/* Thinking Mode Toggle */}
-              {leadRoleplayModelInfo?.supportsThinking && (
+              {roleplayModelInfo?.supportsThinking && (
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label className="text-sm font-medium">Thinking Mode</Label>
@@ -259,15 +285,15 @@ export const AIAgentsModeEditor = () => {
               )}
 
               <div>
-                <Label className="text-sm font-medium">Custom Instructions (Optional)</Label>
+                <Label className="text-sm font-medium">Lead Profile & Instructions</Label>
                 <Textarea
-                  placeholder="Additional instructions for the lead roleplay..."
+                  placeholder="Describe the lead's persona. Use {Column Name} to provide their specific data."
                   value={leadRoleplayInstructions}
                   onChange={(e) => {
                     onLeadRoleplayInstructionsChange(e.target.value);
                     handleInputChange();
                   }}
-                  rows={3}
+                  rows={5}
                 />
               </div>
             </CardContent>
@@ -286,15 +312,15 @@ export const AIAgentsModeEditor = () => {
                 <div className="flex items-center gap-3">
                   <span className="text-sm text-muted-foreground">{maxIterations}</span>
                   <div className="w-32">
-                    <Slider 
-                      value={[maxIterations]} 
+                    <Slider
+                      value={[maxIterations]}
                       onValueChange={(value) => {
                         onMaxIterationsChange(value[0]);
                         handleInputChange();
                       }}
-                      max={10} 
-                      min={1} 
-                      step={1} 
+                      max={10}
+                      min={1}
+                      step={1}
                     />
                   </div>
                 </div>
@@ -304,75 +330,29 @@ export const AIAgentsModeEditor = () => {
         </Card>
 
         {/* Preview */}
-        {userOfferDetails && firstRow && (
+        {(messageCreatorInstructions || leadRoleplayInstructions) && firstRow && (
           <Card className="p-4 bg-muted/50">
-            <h4 className="font-semibold mb-2 flex items-center gap-2">
+            <h4 className="font-semibold mb-3 flex items-center gap-2">
               <Sparkles className="h-4 w-4" />
-              Preview with First Row Data
+              Instructions Preview (Row 1 Data)
             </h4>
-            <div className="space-y-2">
-              <div>
-                <p className="text-sm text-muted-foreground">Lead Profile:</p>
-                <code className="text-xs bg-background px-2 py-1 rounded block overflow-x-auto">
-                  {JSON.stringify(firstRow, null, 2)}
-                </code>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Your Offer (processed):</p>
-                <span className="font-mono bg-background px-2 py-1 rounded text-sm block">
-                  {userOfferDetails.replace(/\{([^}]+)\}/g, (match, columnName) => {
-                    const value = firstRow[columnName.trim()];
-                    return value || `[${columnName.trim()} not found]`;
-                  })}
-                </span>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Provider Configuration:</p>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono">Creator:</span>
-                    {isOllamaModel(messageCreatorModel) ? (
-                      <Badge variant="outline" className="text-green-700">
-                        <Server className="h-3 w-3 mr-1" />
-                        Ollama Local
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-blue-700">
-                        <Key className="h-3 w-3 mr-1" />
-                        {messageCreatorModelInfo?.name?.includes('Gemini') ? 'Gemini' : 'OpenAI'} Cloud
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono">Roleplay:</span>
-                    {isOllamaModel(leadRoleplayModel) ? (
-                      <Badge variant="outline" className="text-green-700">
-                        <Server className="h-3 w-3 mr-1" />
-                        Ollama Local
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-blue-700">
-                        <Key className="h-3 w-3 mr-1" />
-                        {leadRoleplayModelInfo?.name?.includes('Gemini') ? 'Gemini' : 'OpenAI'} Cloud
-                      </Badge>
-                    )}
-                  </div>
+            <div className="space-y-4">
+              {messageCreatorInstructions && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Creator Instructions:</p>
+                  <span className="font-mono bg-background px-2 py-1.5 rounded text-xs block whitespace-pre-wrap border">
+                    {creatorPreview}
+                  </span>
                 </div>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">API Key Status:</p>
-                <div className="space-y-1">
-                  <Badge variant={localStorage.getItem('openai_api_key') ? "default" : "destructive"}>
-                    {localStorage.getItem('openai_api_key') ? "✅ OpenAI API Key Found" : "❌ No OpenAI API Key"}
-                  </Badge>
-                  <Badge variant={ollamaConnected ? "default" : "destructive"}>
-                    {ollamaConnected ? "✅ Ollama Connected" : "❌ Ollama Disconnected"}
-                  </Badge>
+              )}
+              {leadRoleplayInstructions && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Roleplay Instructions:</p>
+                  <span className="font-mono bg-background px-2 py-1.5 rounded text-xs block whitespace-pre-wrap border">
+                    {roleplayPreview}
+                  </span>
                 </div>
-              </div>
-            </div>
-            <div className="mt-2 text-xs text-muted-foreground">
-              The AI agents will use this data to create and evaluate personalized messages.
+              )}
             </div>
           </Card>
         )}

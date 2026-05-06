@@ -96,7 +96,7 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
   const { firecrawlUrl, setFirecrawlUrl } = useFirecrawlStore();
 
   // Mode-specific state (AI Agents mode)
-  const { userOfferDetails, messageCreatorModel, leadRoleplayModel, messageCreatorThinking, leadRoleplayThinking, messageCreatorInstructions, leadRoleplayInstructions, maxIterations, setUserOfferDetails, setMessageCreatorModel, setLeadRoleplayModel, setMessageCreatorThinking, setLeadRoleplayThinking, setMessageCreatorInstructions, setLeadRoleplayInstructions, setMaxIterations } = useAIAgentsStore();
+  const { creatorProvider, roleplayProvider, messageCreatorModel, leadRoleplayModel, messageCreatorThinking, leadRoleplayThinking, messageCreatorInstructions, leadRoleplayInstructions, maxIterations } = useAIAgentsStore();
 
   // Mode-specific state (Puppeteer mode)
   const { puppeteerCode, puppeteerTimeout, puppeteerHeadless, puppeteerExecutionLog, puppeteerLastResult, setPuppeteerCode, setPuppeteerTimeout, setPuppeteerHeadless, setPuppeteerExecutionLog, setPuppeteerLastResult } = usePuppeteerStore();
@@ -305,17 +305,18 @@ export const FormulaEditor = ({ open, onOpenChange }: FormulaEditorProps) => {
 
         case 'ai-agents': {
           // Validate AI Agents inputs
-          if (!userOfferDetails.trim()) {
+          if (!messageCreatorInstructions || !messageCreatorInstructions.trim()) {
             toast({
               title: "Validation Error",
-              description: "Please enter your offer details for the AI agents.",
+              description: "Please enter instructions for the Message Creator agent.",
               variant: "destructive",
             });
             return;
           }
 
           finalFormula = formulaGenerators.generateAIAgentsFormula({
-            userOfferDetails,
+            creatorProvider,
+            roleplayProvider,
             messageCreatorModel,
             leadRoleplayModel,
             messageCreatorThinking,

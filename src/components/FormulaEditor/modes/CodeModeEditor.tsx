@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { FormulaValidator } from '@/components/FormulaValidator';
 import { SavedFormulas } from '@/components/FormulaEditor/SavedFormulas';
 import { ColumnBadges } from '@/components/FormulaEditor/ColumnBadges';
+import { CodeDocsDialog } from './CodeDocsDialog';
+import { useState } from 'react';
 
 interface SavedFormula {
   name: string;
@@ -39,6 +41,7 @@ export const CodeModeEditor = ({
   onSlashMenuTrigger
 }: CodeModeEditorProps) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [docsDialogOpen, setDocsDialogOpen] = useState(false);
 
   const handleColumnClick = (columnName: string) => {
     const insertion = `row['${columnName}']`;
@@ -48,7 +51,7 @@ export const CodeModeEditor = ({
       const end = textarea.selectionEnd;
       const newValue = formula.substring(0, start) + insertion + formula.substring(end);
       onFormulaChange(newValue);
-      
+
       // Restore cursor position
       setTimeout(() => {
         textarea.focus();
@@ -60,7 +63,7 @@ export const CodeModeEditor = ({
   return (
     <div className="space-y-6">
       {/* Available columns */}
-      <ColumnBadges 
+      <ColumnBadges
         headers={headers}
         onColumnClick={handleColumnClick}
         helpText="Click on a column to insert it into your formula:"
@@ -70,10 +73,9 @@ export const CodeModeEditor = ({
       <div>
         <div className="flex items-center justify-between mb-3">
           <h4 className="font-semibold">JavaScript Formula</h4>
-          <Badge variant="outline" className="flex items-center gap-1 text-xs">
-            <Sparkles className="h-3 w-3" />
-            Type / for AI templates
-          </Badge>
+          <div className="flex items-center gap-2">
+            <CodeDocsDialog open={docsDialogOpen} onOpenChange={setDocsDialogOpen} />
+          </div>
         </div>
         <Textarea
           ref={textareaRef}

@@ -23,7 +23,7 @@ export interface FormulaValidationParams {
   ollamaConnected?: boolean;
   ollamaModels?: string[];
   firecrawlUrl?: string;
-  userOfferDetails?: string;
+  messageCreatorInstructions?: string;
   hasOpenAIKey?: boolean;
   hasGeminiKey?: boolean;
   hasGroqKey?: boolean;
@@ -53,7 +53,7 @@ export const useFormulaValidation = (): FormulaValidationHook => {
       ollamaConnected,
       ollamaModels = [],
       firecrawlUrl,
-      userOfferDetails,
+      messageCreatorInstructions,
       hasOpenAIKey,
       hasGeminiKey,
       hasGroqKey,
@@ -114,9 +114,9 @@ export const useFormulaValidation = (): FormulaValidationHook => {
         break;
 
       case 'ai-agents':
-        // Check for offer details
-        if (!userOfferDetails || !userOfferDetails.trim()) {
-          errors.push('Please enter your offer details for the AI agents.');
+        // Check for instructions
+        if (!messageCreatorInstructions || !messageCreatorInstructions.trim()) {
+          errors.push('Please enter instructions for the AI agents.');
         }
 
         // Note: Model validation is handled separately in the actual save handler

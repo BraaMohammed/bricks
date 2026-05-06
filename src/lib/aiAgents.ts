@@ -3,11 +3,12 @@ import { isGroqModel, sendGroqChatRequest } from './groq';
 import type { AIProvider } from './constants/aiModels';
 
 interface AgentConfig {
+  creatorProvider: AIProvider;
+  roleplayProvider: AIProvider;
   messageCreatorModel: string;
   leadRoleplayModel: string;
   messageCreatorThinking: boolean;
   leadRoleplayThinking: boolean;
-  userOfferDetails: string;
   messageCreatorInstructions: string;
   leadRoleplayInstructions: string;
   maxIterations: number;
@@ -41,8 +42,7 @@ function getModelProvider(modelName: string): AIProvider {
 }
 
 // Helper function to get API endpoint and headers
-function getApiConfig(modelName: string) {
-  const provider = getModelProvider(modelName);
+function getApiConfig(modelName: string, provider: AIProvider) {
   
   if (provider === 'gemini') {
     const apiKey = localStorage.getItem('gemini_api_key');
@@ -92,18 +92,12 @@ function getApiConfig(modelName: string) {
 
 interface MessageResult {
   message: string;
-  reasoning?: string;
-  improvements_made?: string[];
-  personalization_used?: string[];
 }
 
 interface FeedbackResult {
   approved: boolean;
   score: number;
   feedback: string;
-  specific_issues?: string[];
-  suggested_improvements?: string[];
-  decision_reasoning?: string;
 }
 
 interface HistoryItem {
@@ -117,8 +111,8 @@ type RowData = Record<string, string | number | boolean | null | undefined>;
 
 export async function runAIAgents(config: AgentConfig, row: RowData): Promise<string> {
   // Check API requirements for both models
-  const creatorConfig = getApiConfig(config.messageCreatorModel);
-  const roleplayConfig = getApiConfig(config.leadRoleplayModel);
+  const creatorConfig = getApiConfig(config.messageCreatorModel, config.creatorProvider);
+  const roleplayConfig = getApiConfig(config.leadRoleplayModel, config.roleplayProvider);
   
   // Validate API keys for OpenAI models
   if (creatorConfig.requiresApiKey && !creatorConfig.apiKey) {
@@ -131,8 +125,8 @@ export async function runAIAgents(config: AgentConfig, row: RowData): Promise<st
   console.log('🤖 AI Copy Agents Starting...', { 
     leadData: row, 
     config,
-    creatorProvider: getModelProvider(config.messageCreatorModel),
-    roleplayProvider: getModelProvider(config.leadRoleplayModel)
+    creatorProvider: config.creatorProvider,
+    roleplayProvider: config.roleplayProvider
   });
 
   const chatHistory: HistoryItem[] = [];
@@ -146,14 +140,15 @@ export async function runAIAgents(config: AgentConfig, row: RowData): Promise<st
       
       // Message Creator Agent
       console.log('✍️ Message Creator Agent working...');
-      const messageResult = await callMessageCreator(config, row, chatHistory);
+      const lastIteration = chatHistory.length > 0 ? chatHistory[chatHistory.length - 1] : null;
+      const messageResult = await callMessageCreator(config, row, lastIteration);
       currentMessage = messageResult.message || messageResult.toString();
       
       console.log('📝 Created message:', messageResult);
       
       // Lead Roleplay Agent
       console.log('🎭 Lead Roleplay Agent evaluating...');
-      const feedback = await callLeadRoleplay(config, row, currentMessage, chatHistory);
+      const feedback = await callLeadRoleplay(config, row, currentMessage);
       
       console.log('🎯 Lead feedback:', feedback);
       
@@ -195,44 +190,45 @@ export async function runAIAgents(config: AgentConfig, row: RowData): Promise<st
 async function callMessageCreator(
   config: AgentConfig, 
   row: RowData, 
-  chatHistory: HistoryItem[]
+  lastIteration: HistoryItem | null
 ): Promise<MessageResult> {
-  const apiConfig = getApiConfig(config.messageCreatorModel);
+  const apiConfig = getApiConfig(config.messageCreatorModel, config.creatorProvider);
   
   const baseCreatorInstructions = `You are an expert copywriter creating personalized DM messages. 
 
-CRITICAL: You MUST respond with ONLY a valid JSON object. No other text before or after.
+CRITICAL: You MUST respond with ONLY a valid JSON object. Do NOT include explanations, reasoning, markdown formatting, or any other text. Output ONLY the raw JSON object.
 
 REQUIRED JSON FORMAT:
 {
-  "message": "Your personalized message here",
-  "reasoning": "Why this approach was chosen",
-  "improvements_made": ["List of improvements based on previous feedback"],
-  "personalization_used": ["Specific data points used for personalization"]
+  "message": "Your personalized message here"
 }
 
 CONTEXT:
-- Lead Data: {columns}
-- User's Offer: {userOfferDetails}
-- Chat History: {previousIterations}
-- Additional Instructions: {customInstructions}
+- Previous Attempt Feedback: {previousFeedback}
+- Instructions: {customInstructions}
 
 GUIDELINES:
 - Keep under 200 characters for DMs
-- Integrate user's offer naturally
-- Personalize using lead data
-- Learn from chat history feedback
+- Integrate offer naturally
+- Personalize using the lead context provided in instructions
+- Fix the issues mentioned in the previous attempt feedback (if any)
 - Follow user's additional instructions
 - Include clear value proposition
-- End with soft CTA
+- End with soft CTA`;
 
-REMEMBER: Output ONLY the JSON object, nothing else.`;
+  // Resolve {ColumnName} in creator instructions
+  let resolvedCreatorInstructions = config.messageCreatorInstructions || 'No additional instructions.';
+  for (const [key, value] of Object.entries(row)) {
+    resolvedCreatorInstructions = resolvedCreatorInstructions.replace(new RegExp(`\\{${key}\\}`, 'g'), String(value || ''));
+  }
+
+  const previousFeedbackStr = lastIteration 
+    ? `Failed Message: "${lastIteration.created_message}"\nFeedback: "${lastIteration.lead_feedback.feedback}"\nScore: ${lastIteration.lead_feedback.score}/10` 
+    : 'None (First attempt)';
 
   const creatorPrompt = baseCreatorInstructions
-    .replace('{columns}', JSON.stringify(row))
-    .replace('{userOfferDetails}', config.userOfferDetails || 'No offer details provided')
-    .replace('{previousIterations}', JSON.stringify(chatHistory))
-    .replace('{customInstructions}', config.messageCreatorInstructions || 'No additional instructions.');
+    .replace('{previousFeedback}', previousFeedbackStr)
+    .replace('{customInstructions}', resolvedCreatorInstructions);
 
   const creatorRequestBody = {
     model: config.messageCreatorModel,
@@ -332,42 +328,38 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
 async function callLeadRoleplay(
   config: AgentConfig, 
   row: RowData, 
-  currentMessage: string,
-  chatHistory: HistoryItem[]
+  currentMessage: string
 ): Promise<FeedbackResult> {
-  const apiConfig = getApiConfig(config.leadRoleplayModel);
+  const apiConfig = getApiConfig(config.leadRoleplayModel, config.roleplayProvider);
   
   const baseRoleplayInstructions = `You roleplay as this lead prospect. Evaluate the message critically and decide approval.
 
-CRITICAL: You MUST respond with ONLY a valid JSON object. No other text before or after.
+CRITICAL: You MUST respond with ONLY a valid JSON object. Do NOT include explanations, reasoning, markdown formatting, or any other text. Output ONLY the raw JSON object.
 
 REQUIRED JSON FORMAT:
 {
   "approved": true/false,
   "score": 1-10,
-  "feedback": "Your honest reaction as the lead",
-  "specific_issues": ["List specific problems"],
-  "suggested_improvements": ["Specific actionable suggestions"],
-  "decision_reasoning": "Why you approved/rejected this message"
+  "feedback": "Exactly one concise sentence of feedback explaining your decision."
 }
 
 CONTEXT:
-- Your Profile: {columns}
 - Message to Evaluate: {message}
-- Previous Iterations: {chatHistory}
-- Additional Instructions: {customInstructions}
+- Instructions: {customInstructions}
 
-ROLEPLAY AS: {lead characteristics based on data}
+ROLEPLAY AS: The person described in the instructions.
 ONLY approve (true) if message is 8+ score and genuinely compelling.
-Consider: relevance, personalization, offer appeal, professionalism, likelihood to respond.
+Consider: relevance, personalization, offer appeal, professionalism, likelihood to respond.`;
 
-REMEMBER: Output ONLY the JSON object, nothing else.`;
+  // Resolve {ColumnName} in roleplay instructions
+  let resolvedRoleplayInstructions = config.leadRoleplayInstructions || 'No additional instructions.';
+  for (const [key, value] of Object.entries(row)) {
+    resolvedRoleplayInstructions = resolvedRoleplayInstructions.replace(new RegExp(`\\{${key}\\}`, 'g'), String(value || ''));
+  }
 
   const roleplayPrompt = baseRoleplayInstructions
-    .replace('{columns}', JSON.stringify(row))
     .replace('{message}', currentMessage)
-    .replace('{chatHistory}', JSON.stringify(chatHistory))
-    .replace('{customInstructions}', config.leadRoleplayInstructions || 'No additional instructions.');
+    .replace('{customInstructions}', resolvedRoleplayInstructions);
 
   const roleplayRequestBody = {
     model: config.leadRoleplayModel,
@@ -473,10 +465,7 @@ REMEMBER: Output ONLY the JSON object, nothing else.`;
     return { 
       approved: false, 
       score: 5, 
-      feedback: rawRoleplayContent, 
-      specific_issues: ['Failed to parse JSON response'],
-      suggested_improvements: ['Try again with clearer instructions'],
-      decision_reasoning: 'Could not parse response properly'
+      feedback: rawRoleplayContent
     };
   }
 }
