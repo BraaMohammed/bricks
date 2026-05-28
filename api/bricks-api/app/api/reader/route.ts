@@ -66,6 +66,23 @@ function extractReadableContent(
     }
 }
 
+// Check for common bot-protection challenges (Cloudflare, Datadome, PerimeterX)
+function isCaptchaOrChallenge(html: string, textContent: string): boolean {
+    const lowerHtml = html.toLowerCase();
+    const lowerText = textContent.toLowerCase();
+
+    if (lowerHtml.includes('__cf$cv$params')) return true;
+    if (lowerHtml.includes('cf-browser-verification')) return true;
+    if (lowerHtml.includes('cf-challenge-form')) return true;
+    if (lowerHtml.includes('geo.captcha-delivery.com')) return true; // Datadome
+    if (lowerHtml.includes('datadome')) return true;
+    if (lowerHtml.includes('px-captcha')) return true;
+    if (lowerText.includes('checking if the site connection is secure')) return true;
+    if (lowerText.includes('please verify you are a human')) return true;
+
+    return false;
+}
+
 // ── Provider 1: Plain fetch + Readability (fastest, no cost) ─────────────────
 // Works well for static/SSR pages. Fails for JS-heavy SPAs.
 //
@@ -199,6 +216,10 @@ async function readWithPuppeteer(url: string): Promise<{ content: string; title:
 
     const html = await page.content();
     const extracted = extractReadableContent(html, url);
+
+    if (isCaptchaOrChallenge(html, extracted.content)) {
+        throw new Error('Puppeteer hit a CAPTCHA/Challenge page (Cloudflare/Datadome)');
+    }
 
     return {
         ...extracted,

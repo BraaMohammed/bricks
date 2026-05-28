@@ -176,7 +176,7 @@ async function readWithScraperAPI(url: string, apiKey: string): Promise<{ conten
     const scraperUrl = `https://api.scraperapi.com?api_key=${apiKey}&url=${encodeURIComponent(url)}&render=true`;
 
     const res = await fetch(scraperUrl, {
-        signal: AbortSignal.timeout(45000),
+        signal: AbortSignal.timeout(30000), // Reduced from 45000 to avoid hitting Vercel's 60s maxDuration
     });
 
     if (!res.ok) {
@@ -201,7 +201,7 @@ async function readWithScraperAPI(url: string, apiKey: string): Promise<{ conten
 // Docs: https://scrape.do/docs
 
 async function readWithScrapeDo(url: string, apiKey: string): Promise<{ content: string; title: string }> {
-    const scrapeDoUrl = `https://api.scrape.do/?token=${apiKey}&url=${encodeURIComponent(url)}&output=markdown&render=true&super=true`;
+    const scrapeDoUrl = `https://api.scrape.do/?token=${apiKey}&url=${encodeURIComponent(url)}&render=true&super=true`;
 
     const res = await fetch(scrapeDoUrl, {
         signal: AbortSignal.timeout(30000),
@@ -211,13 +211,14 @@ async function readWithScrapeDo(url: string, apiKey: string): Promise<{ content:
         throw new Error(`scrape.do failed: ${res.status} ${res.statusText}`);
     }
 
-    const markdown = await res.text();
+    const html = await res.text();
+    const extracted = extractReadableContent(html, url);
 
-    if (!markdown || markdown.trim().length === 0) {
-        throw new Error('scrape.do returned empty markdown');
+    if (!extracted.readabilityParsed) {
+        throw new Error('scrape.do returned a JS-rendered SPA — Readability could not parse readable content');
     }
 
-    return { content: markdown, title: '' };
+    return extracted;
 }
 
 // ── Provider 4: Tavily Extract ────────────────────────────────────────────────
@@ -273,7 +274,7 @@ async function readWithTavily(url: string, apiKey: string): Promise<{ content: s
 // Docs: https://scrapfly.io/docs/scrape-api/getting-started
 
 async function readWithScrapfly(url: string, apiKey: string): Promise<{ content: string; title: string }> {
-    const scrapflyUrl = `https://api.scrapfly.io/scrape?key=${apiKey}&url=${encodeURIComponent(url)}&format=markdown`;
+    const scrapflyUrl = `https://api.scrapfly.io/scrape?key=${apiKey}&url=${encodeURIComponent(url)}`;
 
     const res = await fetch(scrapflyUrl, {
         signal: AbortSignal.timeout(30000),
@@ -286,12 +287,17 @@ async function readWithScrapfly(url: string, apiKey: string): Promise<{ content:
     const data = await res.json();
 
     // Scrapfly wraps all payload inside result{}
-    const content: string = data?.result?.content ?? '';
-    if (!content) {
+    const html: string = data?.result?.content ?? '';
+    if (!html) {
         throw new Error(`Scrapfly: empty content in response (status_code=${data?.result?.status_code ?? 'unknown'})`);
     }
 
-    return { content, title: '' };
+    const extracted = extractReadableContent(html, url);
+    if (!extracted.readabilityParsed) {
+        throw new Error('Scrapfly returned a JS-rendered SPA — Readability could not parse readable content');
+    }
+
+    return extracted;
 }
 
 // ── Provider 6: Firecrawl ─────────────────────────────────────────────────────
@@ -312,7 +318,7 @@ async function readWithFirecrawl(url: string, apiKey: string): Promise<{ content
         },
         body: JSON.stringify({
             url,
-            formats: ['markdown'],
+            formats: ['html'],
         }),
         signal: AbortSignal.timeout(30000),
     });
@@ -333,14 +339,18 @@ async function readWithFirecrawl(url: string, apiKey: string): Promise<{ content
         throw new Error(`Firecrawl: API returned success=false — ${data.error ?? 'unknown error'}`);
     }
 
-    const content: string = data?.data?.markdown ?? '';
-    const title: string = data?.data?.metadata?.title ?? '';
+    const html: string = data?.data?.html ?? '';
 
-    if (!content) {
-        throw new Error('Firecrawl: empty markdown in response');
+    if (!html) {
+        throw new Error('Firecrawl: empty html in response');
     }
 
-    return { content, title };
+    const extracted = extractReadableContent(html, url);
+    if (!extracted.readabilityParsed) {
+        throw new Error('Firecrawl returned a JS-rendered SPA — Readability could not parse readable content');
+    }
+
+    return extracted;
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
