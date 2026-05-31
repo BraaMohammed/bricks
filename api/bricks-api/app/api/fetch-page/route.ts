@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Readability } from '@mozilla/readability';
 import { JSDOM } from 'jsdom';
 import TurndownService from 'turndown';
+import dns from 'dns/promises';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -16,7 +17,7 @@ const MAX_CONTENT_LENGTH = 8000;
 
 // If extracted text is below this threshold we consider it a failed/skeleton page
 // and fall through to the next provider.
-const MIN_USEFUL_CHARS = 300;
+const MIN_USEFUL_CHARS = 100;
 
 export interface FetchPageResponse {
     url: string;
@@ -37,8 +38,13 @@ function extractReadableContent(
     html: string,
     url: string,
 ): { content: string; title: string; readabilityParsed: boolean } {
+    // Strip CSS/styles to prevent JSDOM parsing crashes and terminal noise
+    const cleanHtml = html
+        .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<link\b[^>]*>/gi, '');
+
     try {
-        const dom = new JSDOM(html, { url });
+        const dom = new JSDOM(cleanHtml, { url });
         const reader = new Readability(dom.window.document);
         const article = reader.parse();
 
@@ -57,7 +63,7 @@ function extractReadableContent(
     // Readability couldn't parse — fall back to raw textContent.
     // Flag readabilityParsed=false so callers know this is likely JS code, not prose.
     try {
-        const dom = new JSDOM(html);
+        const dom = new JSDOM(cleanHtml);
         const text = dom.window.document.body?.textContent ?? '';
         return { title: '', content: text.replace(/\s+/g, ' ').trim(), readabilityParsed: false };
     } catch {
@@ -221,6 +227,65 @@ async function readWithScrapeDo(url: string, apiKey: string): Promise<{ content:
     return extracted;
 }
 
+// ── Provider 3.5: Diffbot Analyze API ─────────────────────────────────────────
+//
+// GET https://api.diffbot.com/v3/analyze?token=KEY&url=URL
+// Intelligently extracts articles, lists, and discussions natively.
+// Free: 10,000 requests/month
+// Docs: https://docs.diffbot.com/reference/extract-analyze
+
+async function readWithDiffbot(url: string, apiKey: string, useProxy: boolean = false): Promise<{ content: string; title: string }> {
+    let apiUrl = `https://api.diffbot.com/v3/analyze?token=${apiKey}&url=${encodeURIComponent(url)}&timeout=30000`;
+    if (useProxy) apiUrl += '&proxy';
+
+    const res = await fetch(apiUrl, { signal: AbortSignal.timeout(40000) });
+
+    if (res.status === 401) throw new Error('Diffbot: 401 Unauthorized');
+    if (res.status === 429) throw new Error('Diffbot: 429 Rate limit exceeded');
+
+    const data = await res.json();
+
+    if (data.errorCode || data.error) {
+        if (!useProxy && (data.errorCode === 404 || data.errorCode === 403 || data.errorCode === 500)) {
+            console.log(`  ⚠️ Diffbot blocked by target site (${data.errorCode}) — retrying with proxy...`);
+            return readWithDiffbot(url, apiKey, true);
+        }
+        throw new Error(`Diffbot error ${data.errorCode}: ${data.error}`);
+    }
+
+    const obj = data.objects?.[0] ?? {};
+    const type = obj.type ?? data.type ?? '(no type)';
+    const title = obj.title ?? data.title ?? '';
+
+    let text = '';
+    if (type === 'list' && Array.isArray(obj.items) && obj.items.length > 0) {
+        text = obj.items
+            .slice(0, 30)
+            .map((item: any) => {
+                const parts = [];
+                if (item.title) parts.push(item.title);
+                if (item.summary) parts.push(item.summary);
+                if (item.link) parts.push(`[${item.link}]`);
+                return parts.join(' — ');
+            })
+            .join('\n');
+    } else if (type === 'discussion' && Array.isArray(obj.posts) && obj.posts.length > 0) {
+        text = obj.posts
+            .slice(0, 20)
+            .map((p: any) => `${p.author ?? 'anon'}: ${p.text ?? ''}`)
+            .filter((s: string) => s.length > 10)
+            .join('\n\n');
+    } else {
+        text = obj.text ?? obj.description ?? obj.html ?? '';
+    }
+
+    if (!text) {
+        throw new Error(`Diffbot returned empty text for type: ${type}`);
+    }
+
+    return { content: text, title };
+}
+
 // ── Provider 4: Tavily Extract ────────────────────────────────────────────────
 //
 // POST https://api.tavily.com/extract
@@ -367,11 +432,21 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        let hostname = '';
         try {
-            new URL(url);
+            hostname = new URL(url).hostname;
         } catch {
             return NextResponse.json(
                 { url, content: '', title: '', provider: 'none', error: 'Invalid URL provided' } satisfies FetchPageResponse,
+                { status: 400, headers: corsHeaders }
+            );
+        }
+
+        try {
+            await dns.lookup(hostname);
+        } catch {
+            return NextResponse.json(
+                { url, content: '', title: '', provider: 'none', error: `DNS resolution failed for hostname "${hostname}". The website may not exist or is offline.` } satisfies FetchPageResponse,
                 { status: 400, headers: corsHeaders }
             );
         }
@@ -406,6 +481,7 @@ export async function POST(request: NextRequest) {
 
         const scraperApiKey = process.env.SCRAPER_API_KEY;
         const scrapeDoKey = process.env.SCRAPE_DO_KEY;
+        const diffbotKey = process.env.DIFFBOT_TOKEN;
         const tavilyKey = process.env.TAVILY_API_KEY;
         const scrapflyKey = process.env.SCRAPFLY_KEY;
         const firecrawlKey = process.env.FIRECRAWL_KEY;
@@ -415,6 +491,9 @@ export async function POST(request: NextRequest) {
         }
         if (scraperApiKey) {
             services.push({ name: 'scraperapi', credits: '1000/month', fn: () => readWithScraperAPI(url, scraperApiKey) });
+        }
+        if (diffbotKey) {
+            services.push({ name: 'diffbot', credits: '10000/month', fn: () => readWithDiffbot(url, diffbotKey) });
         }
         if (tavilyKey) {
             services.push({ name: 'tavily', credits: '1000/month', fn: () => readWithTavily(url, tavilyKey) });

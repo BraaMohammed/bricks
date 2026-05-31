@@ -11,7 +11,7 @@ Runs separately from the Vite frontend. Handles anything that can't run client-s
 - **Puppeteer Stealth Engine (`/api/puppeteer`)** — Queue-based browser pool. Handles JS-heavy pages, bot-detection bypass, screenshot tasks, and bulk automations with memory management.
 - **Autonomous Web Search (`/api/search`)** — Routes queries through Serper → Tavily → DuckDuckGo (free fallback). Used as the search layer for web research agents.
 - **Web Content Reader (`/api/reader`)** — 3-layer fallback chain that converts any URL into clean, AI-ready markdown, including JS-rendered SPAs.
-- **Serverless Page Fetcher (`/api/fetch-page`)** — Puppeteer-free URL reading waterfall: Fetch → ScraperAPI → scrape.do → Tavily → Scrapfly → Firecrawl.
+- **Serverless Page Fetcher (`/api/fetch-page`)** — Puppeteer-free URL reading waterfall: Fetch → ScraperAPI → Diffbot → scrape.do → Tavily → Scrapfly → Firecrawl.
 - **Email Validation Cascade (`/api/validate-email`)** — Routes email validation through Hunter → MillionVerifier → QuickEmailVerification in sequence to maximize accuracy and stay within free tiers.
 
 ---
@@ -41,6 +41,8 @@ TAVILY_API_KEY=your_tavily_key_here
 SCRAPER_API_KEY=your_scraperapi_key_here
 
 # ── Serverless Page Fetcher (/api/fetch-page) ─────────────────────────────────
+# Diffbot — 10,000 free requests/month (Smart AI extraction)
+DIFFBOT_TOKEN=your_diffbot_token_here
 SCRAPE_DO_KEY=your_scrape_do_key_here
 SCRAPFLY_KEY=your_scrapfly_key_here
 FIRECRAWL_KEY=your_firecrawl_key_here
@@ -123,8 +125,4 @@ The backend is structured as Next.js App Router API endpoints (`app/api/.../rout
 
 ---
 
-<<<<<<< HEAD
 *Backend compute engine for the Bricks local enrichment stack.*
-=======
-*Backend compute engine for the Bricks local enrichment stack.*
->>>>>>> 60cec4fe74ce4f15fef3d2db352be6ebb2e51dda
