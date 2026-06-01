@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 
 export const runtime = 'nodejs';
-export const maxDuration = 30;
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -37,7 +36,8 @@ async function searchWithSerper(query: string, apiKey: string): Promise<SearchRe
     });
 
     if (!res.ok) {
-        throw new Error(`Serper error: ${res.status} ${res.statusText}`);
+        const errorText = await res.text();
+        throw new Error(`Serper error: ${res.status} ${res.statusText} - ${errorText}`);
     }
 
     const data = await res.json();
@@ -66,7 +66,8 @@ async function searchWithTavily(query: string, apiKey: string): Promise<SearchRe
     });
 
     if (!res.ok) {
-        throw new Error(`Tavily error: ${res.status} ${res.statusText}`);
+        const errorText = await res.text();
+        throw new Error(`Tavily error: ${res.status} ${res.statusText} - ${errorText}`);
     }
 
     const data = await res.json();
@@ -76,6 +77,39 @@ async function searchWithTavily(query: string, apiKey: string): Promise<SearchRe
         title: r.title ?? '',
         url: r.url ?? '',
         snippet: r.content ? r.content.slice(0, 300) : '',
+    }));
+}
+
+// ── Provider: DuckDuckGo (HTML scrape, no key) ────────────────────────────────
+
+// ── Provider: Exa (formerly Metaphor) ─────────────────────────────────────────
+
+async function searchWithExa(query: string, apiKey: string): Promise<SearchResult[]> {
+    const res = await fetch('https://api.exa.ai/search', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+        },
+        body: JSON.stringify({
+            query,
+            numResults: 5,
+            contents: { text: true }
+        }),
+    });
+
+    if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Exa error: ${res.status} ${res.statusText} - ${errorText}`);
+    }
+
+    const data = await res.json();
+    const items: Array<Record<string, any>> = data?.results ?? [];
+
+    return items.slice(0, 5).map((r) => ({
+        title: r.title ?? '',
+        url: r.url ?? '',
+        snippet: r.text ? r.text.slice(0, 300) : '',
     }));
 }
 
@@ -149,12 +183,16 @@ export async function POST(request: NextRequest) {
 
         const serperKey = process.env.SERPER_API_KEY;
         const tavilyKey = process.env.TAVILY_API_KEY;
+        const exaKey = process.env.EXA_API_KEY;
 
         // Try each provider in order
         const providers: Array<{ name: string; fn: () => Promise<SearchResult[]> }> = [];
 
         if (serperKey) {
             providers.push({ name: 'serper', fn: () => searchWithSerper(query, serperKey) });
+        }
+        if (exaKey) {
+            providers.push({ name: 'exa', fn: () => searchWithExa(query, exaKey) });
         }
         if (tavilyKey) {
             providers.push({ name: 'tavily', fn: () => searchWithTavily(query, tavilyKey) });

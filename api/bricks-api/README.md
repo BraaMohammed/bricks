@@ -9,7 +9,7 @@ Runs separately from the Vite frontend. Handles anything that can't run client-s
 ## Capabilities
 
 - **Puppeteer Stealth Engine (`/api/puppeteer`)** — Queue-based browser pool. Handles JS-heavy pages, bot-detection bypass, screenshot tasks, and bulk automations with memory management.
-- **Autonomous Web Search (`/api/search`)** — Routes queries through Serper → Tavily → DuckDuckGo (free fallback). Used as the search layer for web research agents.
+- **Autonomous Web Search (`/api/search`)** — Routes queries through Serper → Exa → Tavily → DuckDuckGo (free fallback). Used as the search layer for web research agents.
 - **Web Content Reader (`/api/reader`)** — 3-layer fallback chain that converts any URL into clean, AI-ready markdown, including JS-rendered SPAs.
 - **Serverless Page Fetcher (`/api/fetch-page`)** — Puppeteer-free URL reading waterfall: Fetch → ScraperAPI → Diffbot → scrape.do → Tavily → Scrapfly → Firecrawl.
 - **Email Validation Cascade (`/api/validate-email`)** — Routes email validation through Hunter → MillionVerifier → QuickEmailVerification in sequence to maximize accuracy and stay within free tiers.
@@ -32,6 +32,7 @@ AI provider keys (OpenAI, Gemini, Groq) are set in the frontend UI. This file ha
 # ── Web Search Providers ─────────────────────────────────────────────────────
 # Falls back to free DuckDuckGo scraping if neither is set.
 SERPER_API_KEY=your_serper_key_here
+EXA_API_KEY=your_exa_key_here
 TAVILY_API_KEY=your_tavily_key_here
 
 # ── Web Reader — ScraperAPI (Optional) ───────────────────────────────────────
@@ -76,7 +77,7 @@ npm run dev
 ## API Endpoints
 
 ### Web Reading and Search
-- **`POST /api/search`** — Takes `{ query }`, returns URL and snippet results. Tries Serper → Tavily → DuckDuckGo.
+- **`POST /api/search`** — Takes `{ query }`, returns URL and snippet results. Tries Serper → Exa → Tavily → DuckDuckGo.
 - **`POST /api/reader`** — Takes `{ url }`, returns `{ content, title, provider, error }`. See fallback chain below.
 - **`POST /api/fetch-page`** — Puppeteer-free URL reader with multi-provider fallback stack.
 - **`POST /api/validate-email`** — Takes `{ email }`, cascades through validation providers, returns deliverability status.
