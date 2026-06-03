@@ -132,9 +132,9 @@ export function getRateLimitConfig(provider: string, model?: string): {
 
     case 'gemini': {
       const config = {
-        maxConcurrent: 30,
-        delayMs: 500,
-        description: 'Gemini (60 req/min)'
+        maxConcurrent: 5,
+        delayMs: 4000,
+        description: 'Gemini (15 req/min)'
       };
       console.log('✅ Gemini config selected:', config);
       return config;

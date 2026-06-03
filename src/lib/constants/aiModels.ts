@@ -115,6 +115,8 @@ export const geminiModels: ModelDefinition[] = [
   { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', supportsThinking: false, cost: '$1.25/M tokens' },
   { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', supportsThinking: false, cost: '$0.40/M tokens' },
   { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite', supportsThinking: false, cost: '$0.10/M tokens' },
+  { id: "gemma-4-31b-it", name: "Gemma 4 31B (Reasoning)", supportsThinking: true, cost: 'TBD' },
+  { id: "gemini-3.1-flash-lite", name: "Gemini 3.1 flash lite (preview)", supportsThinking: true, cost: 'TBD' }
 ];
 
 /**
