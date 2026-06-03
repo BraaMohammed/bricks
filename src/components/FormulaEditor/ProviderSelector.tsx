@@ -2,26 +2,32 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PROVIDERS, type AIProvider } from '@/lib/constants/aiModels';
+import { PROVIDERS, type AIProvider, CustomProvider } from '@/lib/constants/aiModels';
+import { SelectSeparator } from '@/components/ui/select';
+import { Globe } from 'lucide-react';
 
 interface ProviderSelectorProps {
   provider: AIProvider;
-  ollamaConnected: boolean;
-  ollamaModels: string[];
-  ollamaBaseUrl: string;
+  customProviders?: CustomProvider[];
+  ollamaConnected?: boolean;
+  ollamaModels?: string[];
+  ollamaBaseUrl?: string;
   onProviderChange: (provider: AIProvider) => void;
-  onRefreshConnection: () => void;
-  onBaseUrlChange: (url: string) => void;
+  onRefreshConnection?: () => void;
+  onBaseUrlChange?: (url: string) => void;
+  compact?: boolean;
 }
 
 export const ProviderSelector = ({
   provider,
-  ollamaConnected,
-  ollamaModels,
-  ollamaBaseUrl,
+  customProviders = [],
+  ollamaConnected = false,
+  ollamaModels = [],
+  ollamaBaseUrl = 'http://localhost:11434',
   onProviderChange,
   onRefreshConnection,
-  onBaseUrlChange
+  onBaseUrlChange,
+  compact = false
 }: ProviderSelectorProps) => {
   const ollamaProvider = PROVIDERS.find(p => p.id === 'ollama');
   const ServerIcon = ollamaProvider?.icon;
@@ -30,10 +36,15 @@ export const ProviderSelector = ({
     <div className="space-y-4">
       {/* Provider Selection */}
       <div>
-        <Label className="text-base font-semibold flex items-center gap-2 mb-3">
-          {ServerIcon && <ServerIcon className="h-4 w-4" />}
-          AI Provider
-        </Label>
+        {!compact && (
+          <Label className="text-base font-semibold flex items-center gap-2 mb-3">
+            {ServerIcon && <ServerIcon className="h-4 w-4" />}
+            AI Provider
+          </Label>
+        )}
+        {compact && (
+          <Label className="text-sm font-medium mb-2 block">AI Provider</Label>
+        )}
         <Select value={provider} onValueChange={onProviderChange}>
           <SelectTrigger>
             <SelectValue placeholder="Select AI provider" />
@@ -50,9 +61,23 @@ export const ProviderSelector = ({
                 </SelectItem>
               );
             })}
+            
+            {customProviders.length > 0 && (
+              <>
+                <SelectSeparator />
+                {customProviders.map(cp => (
+                  <SelectItem key={cp.id} value={cp.id}>
+                    <div className="flex items-center gap-2">
+                      <Globe className="h-4 w-4" />
+                      {cp.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </>
+            )}
           </SelectContent>
         </Select>
-        {provider === 'ollama' && (
+        {!compact && provider === 'ollama' && onRefreshConnection && (
           <div className="mt-2 flex items-center gap-2 text-sm">
             {ollamaConnected ? (
               <div className="flex items-center gap-2 text-green-700">
@@ -78,7 +103,7 @@ export const ProviderSelector = ({
       </div>
 
       {/* Ollama Base URL Configuration */}
-      {provider === 'ollama' && (
+      {!compact && provider === 'ollama' && onBaseUrlChange && (
         <div>
           <Label className="text-base font-semibold flex items-center gap-2 mb-3">
             {ServerIcon && <ServerIcon className="h-4 w-4" />}

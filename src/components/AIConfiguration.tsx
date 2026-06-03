@@ -27,6 +27,7 @@ import { GeminiConfiguration } from '@/components/AIConfiguration/GeminiConfigur
 import { GroqConfiguration } from '@/components/AIConfiguration/GroqConfiguration';
 import { ModelSelector } from '@/components/AIConfiguration/ModelSelector';
 import { CustomPromptSection } from '@/components/AIConfiguration/CustomPromptSection';
+import { CustomProviderSection } from '@/components/AIConfiguration/CustomProviderSection';
 
 // Utilities
 import { testGeminiConnection } from '@/lib/gemini';
@@ -80,8 +81,9 @@ export const AIConfiguration = () => {
     return await testGroqConnection();
   };
 
-  const handleProviderChange = (provider: 'openai' | 'ollama' | 'gemini' | 'groq') => {
-    settings.setAiProvider(provider);
+  const handleProviderChange = (provider: string) => {
+    // Need to cast to any to handle custom provider strings
+    settings.setAiProvider(provider as any);
 
     // Trigger Ollama connection check if switching to Ollama
     if (provider === 'ollama') {
@@ -97,7 +99,7 @@ export const AIConfiguration = () => {
         <Button variant="outline" size="sm" className="flex items-center gap-2">
           <KeyRound className="h-4 w-4" />
           API Keys
-          {(settings.hasApiKey || settings.hasGeminiKey || settings.hasGroqKey) && <div className="w-2 h-2 bg-green-500 rounded-full" />}
+          {(settings.hasApiKey || settings.hasGeminiKey || settings.hasGroqKey || settings.customProviders.some(p => !!p.apiKey)) && <div className="w-2 h-2 bg-green-500 rounded-full" />}
         </Button>
       </DialogTrigger>
 
@@ -133,6 +135,7 @@ export const AIConfiguration = () => {
           {/* Provider Selection */}
           <ProviderSelector
             provider={settings.aiProvider}
+            customProviders={settings.customProviders}
             onProviderChange={handleProviderChange}
           />
 
@@ -168,9 +171,17 @@ export const AIConfiguration = () => {
             </Card>
           )}
 
+          {/* Custom Providers Configuration */}
+          <CustomProviderSection
+            customProviders={settings.customProviders}
+            addCustomProvider={settings.addCustomProvider}
+            removeCustomProvider={settings.removeCustomProvider}
+          />
+
           {/* Model Selection */}
           <ModelSelector
             provider={settings.aiProvider}
+            customProvider={settings.customProviders.find(p => p.id === settings.aiProvider)}
             model={settings.model}
             setModel={settings.setModel}
             availableModels={

@@ -28,7 +28,6 @@ function isOllamaModel(modelName: string): boolean {
          lowerModel.includes(':') && !lowerModel.startsWith('gpt'); // Ollama models often have version tags
 }
 
-// Helper function to determine which provider a model belongs to
 function getModelProvider(modelName: string): AIProvider {
   if (isGeminiModel(modelName)) {
     return 'gemini';
@@ -37,6 +36,7 @@ function getModelProvider(modelName: string): AIProvider {
   } else if (isOllamaModel(modelName)) {
     return 'ollama';
   } else {
+    // If it's none of the above, we'll let the calling code pass the explicit provider from config
     return 'openai';
   }
 }
@@ -74,6 +74,38 @@ function getApiConfig(modelName: string, provider: AIProvider) {
       },
       requiresApiKey: false,
       provider: 'ollama' as const
+    };
+  } else if (provider.startsWith('custom:')) {
+    // Handle custom providers
+    let customProvider;
+    try {
+      const raw = localStorage.getItem('custom_ai_providers');
+      if (raw) {
+        const providers = JSON.parse(raw);
+        customProvider = providers.find((p: any) => p.id === provider);
+      }
+    } catch (e) {
+      console.error('Failed to parse custom providers', e);
+    }
+
+    if (!customProvider) {
+      throw new Error(`Custom provider ${provider} not found`);
+    }
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    
+    if (customProvider.apiKey) {
+      headers['Authorization'] = `Bearer ${customProvider.apiKey}`;
+    }
+
+    return {
+      endpoint: `${customProvider.baseUrl}/chat/completions`,
+      headers,
+      requiresApiKey: false, // Don't enforce here, it might be a local model without auth
+      apiKey: customProvider.apiKey,
+      provider: provider as AIProvider
     };
   } else {
     const apiKey = localStorage.getItem('openai_api_key');

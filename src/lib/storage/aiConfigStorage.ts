@@ -6,7 +6,7 @@
  * error handling.
  */
 
-import { STORAGE_KEYS, DEFAULT_OPENAI_MODEL, DEFAULT_OLLAMA_BASE_URL, AIProvider } from '@/lib/constants/aiModels';
+import { STORAGE_KEYS, DEFAULT_OPENAI_MODEL, DEFAULT_OLLAMA_BASE_URL, AIProvider, CustomProvider } from '@/lib/constants/aiModels';
 
 /**
  * Complete AI configuration interface
@@ -20,6 +20,7 @@ export interface AIConfig {
   model: string;
   customPrompt: string;
   ollamaBaseUrl: string;
+  customProviders: CustomProvider[];
 }
 
 /**
@@ -160,7 +161,14 @@ export const aiConfigStorage = {
    */
   getProvider: (): AIProvider => {
     const provider = getItem(STORAGE_KEYS.AI_PROVIDER);
-    return (provider === 'openai' || provider === 'ollama' || provider === 'gemini' || provider === 'groq') ? provider : 'openai';
+    if (!provider) return 'openai';
+    
+    // Built-in providers or custom providers
+    if (provider === 'openai' || provider === 'ollama' || provider === 'gemini' || provider === 'groq' || provider.startsWith('custom:')) {
+      return provider;
+    }
+    
+    return 'openai';
   },
 
   /**
@@ -219,6 +227,57 @@ export const aiConfigStorage = {
     setItem(STORAGE_KEYS.OLLAMA_BASE_URL, url);
   },
 
+  // ==================== Custom Providers ====================
+
+  /**
+   * Get the stored custom providers
+   */
+  getCustomProviders: (): CustomProvider[] => {
+    const data = getItem(STORAGE_KEYS.CUSTOM_PROVIDERS);
+    if (!data) return [];
+    try {
+      return JSON.parse(data);
+    } catch (e) {
+      console.error('Failed to parse custom providers', e);
+      return [];
+    }
+  },
+
+  /**
+   * Save all custom providers
+   */
+  saveCustomProviders: (providers: CustomProvider[]): void => {
+    setItem(STORAGE_KEYS.CUSTOM_PROVIDERS, JSON.stringify(providers));
+  },
+
+  /**
+   * Add a new custom provider or update an existing one by id
+   */
+  addCustomProvider: (provider: CustomProvider): void => {
+    const providers = aiConfigStorage.getCustomProviders();
+    const existingIndex = providers.findIndex(p => p.id === provider.id);
+    if (existingIndex >= 0) {
+      providers[existingIndex] = provider;
+    } else {
+      providers.push(provider);
+    }
+    aiConfigStorage.saveCustomProviders(providers);
+  },
+
+  /**
+   * Remove a custom provider by id
+   */
+  removeCustomProvider: (id: string): void => {
+    const providers = aiConfigStorage.getCustomProviders();
+    const updated = providers.filter(p => p.id !== id);
+    aiConfigStorage.saveCustomProviders(updated);
+    
+    // If the active provider is being deleted, fallback to openai
+    if (aiConfigStorage.getProvider() === id) {
+      aiConfigStorage.setProvider('openai');
+    }
+  },
+
   // ==================== Bulk Operations ====================
 
   /**
@@ -272,6 +331,10 @@ export const aiConfigStorage = {
     if (config.ollamaBaseUrl !== undefined) {
       aiConfigStorage.setOllamaBaseUrl(config.ollamaBaseUrl);
     }
+
+    if (config.customProviders !== undefined) {
+      aiConfigStorage.saveCustomProviders(config.customProviders);
+    }
   },
 
   /**
@@ -287,6 +350,7 @@ export const aiConfigStorage = {
       model: aiConfigStorage.getModel() || DEFAULT_OPENAI_MODEL,
       customPrompt: aiConfigStorage.getCustomPrompt() || '',
       ollamaBaseUrl: aiConfigStorage.getOllamaBaseUrl(),
+      customProviders: aiConfigStorage.getCustomProviders(),
     };
   },
 
@@ -302,5 +366,6 @@ export const aiConfigStorage = {
     removeItem(STORAGE_KEYS.AI_PROVIDER);
     removeItem(STORAGE_KEYS.CUSTOM_PROMPT);
     removeItem(STORAGE_KEYS.OLLAMA_BASE_URL);
+    removeItem(STORAGE_KEYS.CUSTOM_PROVIDERS);
   },
 };

@@ -36,8 +36,13 @@ export const AIModeEditor = () => {
     thinkingMode,
     setThinkingMode: onThinkingModeChange,
     ollamaBaseUrl,
-    setOllamaBaseUrl: onBaseUrlChange
+    setOllamaBaseUrl: onBaseUrlChange,
+    customProviders
   } = useAISettingsStore();
+
+  const customProvider = provider.startsWith('custom:') 
+    ? customProviders.find(p => p.id === provider)
+    : undefined;
 
   const { connected: ollamaConnected, models: ollamaModels, checkConnection: onRefreshConnection } = useOllamaConnection();
   const { showAdvancedSettings, setShowAdvancedSettings: onAdvancedSettingsChange, setHasChanges } = useUIStore();
@@ -62,6 +67,7 @@ export const AIModeEditor = () => {
       {/* Provider Selection */}
       <ProviderSelector
         provider={provider}
+        customProviders={customProviders}
         ollamaConnected={ollamaConnected}
         ollamaModels={ollamaModels}
         ollamaBaseUrl={ollamaBaseUrl}
@@ -86,6 +92,7 @@ export const AIModeEditor = () => {
       {/* Model Selection */}
       <ModelSelector
         provider={provider}
+        customProvider={customProvider}
         availableModels={availableModels}
         selectedModel={selectedModel}
         onModelChange={(model) => {

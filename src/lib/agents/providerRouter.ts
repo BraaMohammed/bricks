@@ -12,12 +12,14 @@ import { ollama } from 'ai-sdk-ollama';
 import type { LanguageModel } from 'ai';
 
 export interface AgentProviderConfig {
-  provider: 'openai' | 'gemini' | 'groq' | 'ollama';
+  provider: 'openai' | 'gemini' | 'groq' | 'ollama' | string;
   model: string;
   openaiKey?: string;
   geminiKey?: string;
   groqKey?: string;
   ollamaBaseUrl?: string;
+  customBaseUrl?: string;
+  customApiKey?: string;
 }
 
 /**
@@ -62,6 +64,13 @@ export function getAgentModel(config: AgentProviderConfig): LanguageModel {
     }
 
     default:
+      if (provider.startsWith('custom:')) {
+        const client = createOpenAI({ 
+          apiKey: config.customApiKey || '', 
+          baseURL: config.customBaseUrl 
+        });
+        return client(model || 'default-model');
+      }
       throw new Error(`Unsupported provider: ${provider}`);
   }
 }
@@ -76,5 +85,27 @@ export function readAgentKeysFromStorage(): Omit<AgentProviderConfig, 'provider'
     geminiKey: localStorage.getItem('gemini_api_key') ?? undefined,
     groqKey: localStorage.getItem('groq_api_key') ?? undefined,
     ollamaBaseUrl: localStorage.getItem('ollama_base_url') ?? 'http://localhost:11434',
+    // Read custom providers array directly from localStorage
+    ...(() => {
+      try {
+        const raw = localStorage.getItem('custom_ai_providers');
+        if (!raw) return {};
+        const providers = JSON.parse(raw);
+        // Find the active custom provider based on ai_provider setting
+        const activeProviderId = localStorage.getItem('ai_provider');
+        if (activeProviderId?.startsWith('custom:')) {
+          const active = providers.find((p: any) => p.id === activeProviderId);
+          if (active) {
+            return {
+              customBaseUrl: active.baseUrl,
+              customApiKey: active.apiKey
+            };
+          }
+        }
+        return {};
+      } catch (e) {
+        return {};
+      }
+    })()
   };
 }

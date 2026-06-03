@@ -8,15 +8,16 @@ import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ColumnBadges } from '@/components/FormulaEditor/ColumnBadges';
-import { PROVIDERS } from '@/lib/constants/aiModels';
-import type { AIProvider } from '@/lib/constants/aiModels';
 import { ThinkingModeToggle } from '../ThinkingModeToggle';
+import { ProviderSelector } from '../ProviderSelector';
+import { ModelSelector } from '../ModelSelector';
 
 import { useDataStore } from '@/stores/useDataStore';
 import { useEmailFinderStore } from '@/stores/editor/useEmailFinderStore';
 import { useAISettingsStore, getAvailableModels } from '@/stores/useAISettingsStore';
 import { useOllamaConnection } from '@/hooks/useOllamaConnection';
 import { useUIStore } from '@/stores/editor/useUIStore';
+import type { AIProvider } from '@/lib/constants/aiModels';
 
 export const EmailFinderModeEditor = () => {
   const { headers, rows } = useDataStore();
@@ -39,6 +40,11 @@ export const EmailFinderModeEditor = () => {
 
   const { models: ollamaModels } = useOllamaConnection();
   const { setHasChanges } = useUIStore();
+  const { customProviders } = useAISettingsStore();
+
+  const customProvider = provider.startsWith('custom:') 
+    ? customProviders.find(p => p.id === provider)
+    : undefined;
 
   const handleInputChange = () => {
     setHasChanges(true);
@@ -116,37 +122,21 @@ export const EmailFinderModeEditor = () => {
       </Card>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">AI Provider</Label>
-          <Select value={provider} onValueChange={handleProviderChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select provider" />
-            </SelectTrigger>
-            <SelectContent>
-              {PROVIDERS.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <ProviderSelector
+          provider={provider}
+          customProviders={customProviders}
+          onProviderChange={handleProviderChange}
+          compact={true}
+        />
 
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Model</Label>
-          <Select value={model} onValueChange={(v) => { onModelChange(v); handleInputChange(); }}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select model" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableModels.map((m) => (
-                <SelectItem key={m.id} value={m.id}>
-                  {m.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <ModelSelector
+          provider={provider}
+          customProvider={customProvider}
+          availableModels={availableModels}
+          selectedModel={model}
+          onModelChange={(v) => { onModelChange(v); handleInputChange(); }}
+          compact={true}
+        />
       </div>
 
       <div className="space-y-2">

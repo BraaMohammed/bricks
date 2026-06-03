@@ -43,7 +43,7 @@ export const detectThinkingSupport = (modelName: string): boolean => {
  * @returns The API endpoint URL
  */
 export const getAPIEndpoint = (
-  provider: 'openai' | 'ollama' | 'gemini' | 'groq',
+  provider: string,
   model: string,
   baseUrl?: string
 ): string => {
@@ -55,7 +55,12 @@ export const getAPIEndpoint = (
     case 'gemini':
       return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
     case 'openai':
+      return 'https://api.openai.com/v1/chat/completions';
     default:
+      // Custom providers fall through here since they pass their baseUrl explicitly or it's resolved before
+      if (provider.startsWith('custom:') && baseUrl) {
+        return `${baseUrl}/chat/completions`;
+      }
       return 'https://api.openai.com/v1/chat/completions';
   }
 };
@@ -69,7 +74,7 @@ export const getAPIEndpoint = (
  * @returns The request body object
  */
 export const buildRequestBody = (
-  provider: 'openai' | 'ollama' | 'gemini' | 'groq',
+  provider: string,
   model: string,
   prompt: string,
   settings: {
@@ -196,7 +201,7 @@ export const buildRequestBody = (
  * @returns The headers object
  */
 export const getAuthHeader = (
-  provider: 'openai' | 'ollama' | 'gemini' | 'groq',
+  provider: string,
   apiKey?: string
 ): Record<string, string> => {
   const baseHeaders: Record<string, string> = {
@@ -228,6 +233,7 @@ export const getAuthHeader = (
     
     case 'openai':
     default:
+      // OpenAI and Custom Providers use the same Bearer token auth
       if (apiKey) {
         return {
           ...baseHeaders,

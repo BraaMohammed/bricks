@@ -1,53 +1,157 @@
-import { Wand2, Brain } from 'lucide-react';
+import { useState } from 'react';
+import { Wand2, Brain, RefreshCw } from 'lucide-react';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { ModelDefinition, AIProvider } from '@/lib/constants/aiModels';
+import { toast } from '@/hooks/use-toast';
+import type { ModelDefinition, AIProvider, CustomProvider } from '@/lib/constants/aiModels';
 
 interface ModelSelectorProps {
   provider: AIProvider;
+  customProvider?: CustomProvider;
   availableModels: ModelDefinition[];
   selectedModel: string;
   onModelChange: (model: string) => void;
   ollamaConnected?: boolean;
   ollamaModelsCount?: number;
+  compact?: boolean;
 }
 
 export const ModelSelector = ({
   provider,
+  customProvider,
   availableModels,
   selectedModel,
   onModelChange,
   ollamaConnected,
-  ollamaModelsCount
+  ollamaModelsCount,
+  compact = false
 }: ModelSelectorProps) => {
   const selectedModelInfo = availableModels.find(m => m.id === selectedModel);
+  const isCustomProvider = provider.startsWith('custom:') && !!customProvider;
+  
+  const [fetchingModels, setFetchingModels] = useState(false);
+  const [customModels, setCustomModels] = useState<string[]>([]);
+
+  const handleFetchCustomModels = async () => {
+    if (!customProvider) return;
+    
+    setFetchingModels(true);
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (customProvider.apiKey) {
+        headers['Authorization'] = `Bearer ${customProvider.apiKey}`;
+      }
+      
+      const response = await fetch(`${customProvider.baseUrl}/models`, {
+        method: 'GET',
+        headers,
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      if (data && Array.isArray(data.data)) {
+        const models = data.data.map((m: any) => m.id).filter(Boolean);
+        setCustomModels(models);
+        toast({
+          title: "Models Fetched",
+          description: `Successfully fetched ${models.length} models.`,
+        });
+      } else {
+        throw new Error('Unexpected API response format');
+      }
+    } catch (error) {
+      console.error('Error fetching custom models:', error);
+      toast({
+        title: "Failed to fetch models",
+        description: error instanceof Error ? error.message : "Could not fetch models from the provider.",
+        variant: "destructive",
+      });
+    } finally {
+      setFetchingModels(false);
+    }
+  };
 
   return (
     <div>
-      <Label htmlFor="ai-model" className="text-base font-semibold flex items-center gap-2 mb-3">
-        <Wand2 className="h-4 w-4" />
-        AI Model
-      </Label>
-      <Select 
-        value={availableModels.length > 0 ? selectedModel : undefined} 
-        onValueChange={onModelChange}
-        disabled={availableModels.length === 0}
-      >
-        <SelectTrigger>
-          <SelectValue placeholder="Select AI model" />
-        </SelectTrigger>
-        <SelectContent>
-          {availableModels.map((model) => (
-            <SelectItem key={model.id} value={model.id}>
-              <div className="flex items-center gap-2">
-                {model.name}
-                {model.supportsThinking && <Brain className="h-3 w-3" />}
-              </div>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {availableModels.length === 0 && (
+      {!compact && (
+        <Label htmlFor="ai-model" className="text-base font-semibold flex items-center gap-2 mb-3">
+          <Wand2 className="h-4 w-4" />
+          AI Model
+        </Label>
+      )}
+      {compact && (
+        <Label htmlFor="ai-model" className="text-sm font-medium mb-2 block">
+          AI Model
+        </Label>
+      )}
+      
+      {isCustomProvider ? (
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <Input
+              id="model-input"
+              placeholder="Enter model ID..."
+              value={selectedModel || ''}
+              onChange={(e) => onModelChange(e.target.value)}
+              className="flex-1"
+            />
+            <Button 
+              variant="outline" 
+              onClick={handleFetchCustomModels}
+              disabled={fetchingModels}
+              className="flex-shrink-0"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${fetchingModels ? 'animate-spin' : ''}`} />
+              Fetch
+            </Button>
+          </div>
+          
+          {customModels.length > 0 && (
+            <Select value={selectedModel || ''} onValueChange={onModelChange}>
+              <SelectTrigger id="custom-model-select">
+                <SelectValue placeholder="Or select from fetched models..." />
+              </SelectTrigger>
+              <SelectContent>
+                {customModels.map((modelOption) => (
+                  <SelectItem key={modelOption} value={modelOption}>
+                    {modelOption}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+      ) : (
+        <Select 
+          value={availableModels.length > 0 ? selectedModel : undefined} 
+          onValueChange={onModelChange}
+          disabled={availableModels.length === 0}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select AI model" />
+          </SelectTrigger>
+          <SelectContent>
+            {availableModels.map((model) => (
+              <SelectItem key={model.id} value={model.id}>
+                <div className="flex items-center gap-2">
+                  {model.name}
+                  {model.supportsThinking && <Brain className="h-3 w-3" />}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+
+      {!isCustomProvider && availableModels.length === 0 && (
         <p className="text-sm text-orange-600 mt-2 p-2 bg-orange-50 rounded border border-orange-200">
           {provider === 'ollama' 
             ? (ollamaConnected ? 'No models installed. Run: ollama pull llama2' : 'Connect to Ollama first')

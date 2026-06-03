@@ -7,7 +7,8 @@ import {
   ModelDefinition,
   openAIModels,
   geminiModels,
-  groqModels
+  groqModels,
+  CustomProvider
 } from '@/lib/constants/aiModels';
 
 interface AISettingsState {
@@ -19,6 +20,7 @@ interface AISettingsState {
   maxTokens: number;
   topK: number;
   thinkingMode: boolean;
+  customProviders: CustomProvider[];
 
   setAiProvider: (provider: AIProvider) => void;
   setModel: (model: string) => void;
@@ -28,6 +30,9 @@ interface AISettingsState {
   setMaxTokens: (value: number) => void;
   setTopK: (value: number) => void;
   setThinkingMode: (enabled: boolean) => void;
+  setCustomProviders: (providers: CustomProvider[]) => void;
+  addCustomProvider: (provider: CustomProvider) => void;
+  removeCustomProvider: (id: string) => void;
 
   loadSettings: () => void;
 }
@@ -44,6 +49,7 @@ export const useAISettingsStore = create<AISettingsState>((set, get) => ({
   maxTokens: parseInt(localStorage.getItem(STORAGE_KEYS.AI_MAX_TOKENS) || '2048'),
   topK: parseInt(localStorage.getItem(STORAGE_KEYS.AI_TOP_K) || '40'),
   thinkingMode: localStorage.getItem(STORAGE_KEYS.THINKING_MODE) === 'true',
+  customProviders: initialConfig.customProviders || [],
 
   setAiProvider: (provider) => {
     set({ aiProvider: provider });
@@ -90,6 +96,40 @@ export const useAISettingsStore = create<AISettingsState>((set, get) => ({
     localStorage.setItem(STORAGE_KEYS.THINKING_MODE, enabled.toString());
   },
 
+  setCustomProviders: (providers) => {
+    set({ customProviders: providers });
+    aiConfigStorage.saveCustomProviders(providers);
+  },
+
+  addCustomProvider: (provider) => {
+    set((state) => {
+      const providers = [...state.customProviders];
+      const existingIndex = providers.findIndex(p => p.id === provider.id);
+      if (existingIndex >= 0) {
+        providers[existingIndex] = provider;
+      } else {
+        providers.push(provider);
+      }
+      aiConfigStorage.saveCustomProviders(providers);
+      return { customProviders: providers };
+    });
+  },
+
+  removeCustomProvider: (id) => {
+    set((state) => {
+      const providers = state.customProviders.filter(p => p.id !== id);
+      aiConfigStorage.saveCustomProviders(providers);
+      
+      // If the active provider is being deleted, fallback to openai
+      if (state.aiProvider === id) {
+        aiConfigStorage.setProvider('openai');
+        return { customProviders: providers, aiProvider: 'openai' };
+      }
+      
+      return { customProviders: providers };
+    });
+  },
+
   loadSettings: () => {
     const config = aiConfigStorage.loadAll();
     set({
@@ -101,6 +141,7 @@ export const useAISettingsStore = create<AISettingsState>((set, get) => ({
       maxTokens: parseInt(localStorage.getItem(STORAGE_KEYS.AI_MAX_TOKENS) || '2048'),
       topK: parseInt(localStorage.getItem(STORAGE_KEYS.AI_TOP_K) || '40'),
       thinkingMode: localStorage.getItem(STORAGE_KEYS.THINKING_MODE) === 'true',
+      customProviders: config.customProviders || [],
     });
   }
 }));

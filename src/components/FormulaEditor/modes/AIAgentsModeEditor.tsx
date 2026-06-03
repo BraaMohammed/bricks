@@ -13,9 +13,10 @@ import { useDataStore } from '@/stores/useDataStore';
 import { useAIAgentsStore } from '@/stores/editor/useAIAgentsStore';
 import { useUIStore } from '@/stores/editor/useUIStore';
 import { useOllamaConnection } from '@/hooks/useOllamaConnection';
-import { getAvailableModels } from '@/stores/useAISettingsStore';
-import { PROVIDERS } from '@/lib/constants/aiModels';
+import { getAvailableModels, useAISettingsStore } from '@/stores/useAISettingsStore';
 import type { AIProvider } from '@/lib/constants/aiModels';
+import { ProviderSelector } from '../ProviderSelector';
+import { ModelSelector } from '../ModelSelector';
 
 export const AIAgentsModeEditor = () => {
   const { headers, rows } = useDataStore();
@@ -45,6 +46,15 @@ export const AIAgentsModeEditor = () => {
   const { setHasChanges } = useUIStore();
   const { models: ollamaModelsRaw, connected: ollamaConnected } = useOllamaConnection();
   const ollamaModels = ollamaModelsRaw || [];
+  const { customProviders } = useAISettingsStore();
+
+  const customCreatorProvider = creatorProvider.startsWith('custom:')
+    ? customProviders.find(p => p.id === creatorProvider)
+    : undefined;
+
+  const customRoleplayProvider = roleplayProvider.startsWith('custom:')
+    ? customProviders.find(p => p.id === roleplayProvider)
+    : undefined;
 
   const handleInputChange = () => {
     setHasChanges(true);
@@ -123,55 +133,30 @@ export const AIAgentsModeEditor = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Provider</Label>
-                <Select
-                  value={creatorProvider}
-                  onValueChange={(value: AIProvider) => {
-                    onCreatorProviderChange(value);
-                    handleInputChange();
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PROVIDERS.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <ProviderSelector
+                provider={creatorProvider}
+                customProviders={customProviders}
+                onProviderChange={(value: AIProvider) => {
+                  onCreatorProviderChange(value);
+                  handleInputChange();
+                }}
+                compact={true}
+              />
 
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Model</Label>
-                <Select
-                  value={messageCreatorModel}
-                  onValueChange={(value) => {
-                    onMessageCreatorModelChange(value);
-                    handleInputChange();
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableCreatorModels.map((model) => (
-                      <SelectItem key={model.id} value={model.id}>
-                        <div className="flex items-center gap-2">
-                          {model.name}
-                          {model.supportsThinking && <Brain className="h-3 w-3 text-purple-500" />}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {creatorProvider === 'ollama' && !ollamaConnected && (
-                  <p className="text-xs text-red-500">Ollama not running</p>
-                )}
-              </div>
+              <ModelSelector
+                provider={creatorProvider}
+                customProvider={customCreatorProvider}
+                availableModels={availableCreatorModels}
+                selectedModel={messageCreatorModel}
+                onModelChange={(value) => {
+                  onMessageCreatorModelChange(value);
+                  handleInputChange();
+                }}
+                compact={true}
+              />
+              {creatorProvider === 'ollama' && !ollamaConnected && (
+                <p className="text-xs text-red-500">Ollama not running</p>
+              )}
 
               {/* Thinking Mode Toggle */}
               {creatorModelInfo?.supportsThinking && (
@@ -217,55 +202,30 @@ export const AIAgentsModeEditor = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Provider</Label>
-                <Select
-                  value={roleplayProvider}
-                  onValueChange={(value: AIProvider) => {
-                    onRoleplayProviderChange(value);
-                    handleInputChange();
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PROVIDERS.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <ProviderSelector
+                provider={roleplayProvider}
+                customProviders={customProviders}
+                onProviderChange={(value: AIProvider) => {
+                  onRoleplayProviderChange(value);
+                  handleInputChange();
+                }}
+                compact={true}
+              />
 
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Model</Label>
-                <Select
-                  value={leadRoleplayModel}
-                  onValueChange={(value) => {
-                    onLeadRoleplayModelChange(value);
-                    handleInputChange();
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableRoleplayModels.map((model) => (
-                      <SelectItem key={model.id} value={model.id}>
-                        <div className="flex items-center gap-2">
-                          {model.name}
-                          {model.supportsThinking && <Brain className="h-3 w-3 text-purple-500" />}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {roleplayProvider === 'ollama' && !ollamaConnected && (
-                  <p className="text-xs text-red-500">Ollama not running</p>
-                )}
-              </div>
+              <ModelSelector
+                provider={roleplayProvider}
+                customProvider={customRoleplayProvider}
+                availableModels={availableRoleplayModels}
+                selectedModel={leadRoleplayModel}
+                onModelChange={(value) => {
+                  onLeadRoleplayModelChange(value);
+                  handleInputChange();
+                }}
+                compact={true}
+              />
+              {roleplayProvider === 'ollama' && !ollamaConnected && (
+                <p className="text-xs text-red-500">Ollama not running</p>
+              )}
 
               {/* Thinking Mode Toggle */}
               {roleplayModelInfo?.supportsThinking && (

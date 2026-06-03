@@ -24,7 +24,8 @@ import {
   openAIModels,
   geminiModels,
   groqModels,
-  ModelDefinition
+  ModelDefinition,
+  CustomProvider
 } from '@/lib/constants/aiModels';
 import { detectThinkingSupport } from '@/lib/providers/aiProviders';
 import { toast } from '@/hooks/use-toast';
@@ -60,6 +61,11 @@ export interface AISettings {
   model: string;
   setModel: (model: string) => void;
   availableModels: ModelDefinition[];
+
+  // Custom Providers
+  customProviders: CustomProvider[];
+  addCustomProvider: (provider: CustomProvider) => void;
+  removeCustomProvider: (id: string) => void;
 
   // Custom Prompt
   customPrompt: string;
@@ -139,6 +145,9 @@ export const useAISettings = (ollamaModels: string[] = []): AISettings => {
     setMaxTokens,
     setTopK,
     setThinkingMode,
+    customProviders,
+    addCustomProvider,
+    removeCustomProvider,
     loadSettings: loadStoreSettings
   } = useAISettingsStore();
 
@@ -258,6 +267,11 @@ export const useAISettings = (ollamaModels: string[] = []): AISettings => {
     model,
     setModel,
     availableModels,
+
+    // Custom Providers
+    customProviders,
+    addCustomProvider,
+    removeCustomProvider,
 
     // Custom Prompt
     customPrompt,

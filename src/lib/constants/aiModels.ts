@@ -27,6 +27,16 @@ export interface ModelDefinition {
 }
 
 /**
+ * Custom Provider definition interface
+ */
+export interface CustomProvider {
+  id: string;
+  name: string;
+  baseUrl: string;
+  apiKey: string;
+}
+
+/**
  * ==========================================
  * AI PROVIDERS CONFIGURATION
  * ==========================================
@@ -64,9 +74,10 @@ export const PROVIDERS = [
 ] as const;
 
 /**
- * AI Provider type - automatically derived from PROVIDERS array
+ * AI Provider type
+ * Includes built-in providers and allows for custom provider IDs (e.g. 'custom:openrouter')
  */
-export type AIProvider = typeof PROVIDERS[number]['id'];
+export type AIProvider = typeof PROVIDERS[number]['id'] | string;
 
 /**
  * Helper function to get provider metadata by id
@@ -289,6 +300,9 @@ export const STORAGE_KEYS = {
   AI_TEMPERATURE: 'ai_temperature',
   AI_MAX_TOKENS: 'ai_max_tokens',
   AI_TOP_K: 'ai_top_k',
+
+  // Custom Providers
+  CUSTOM_PROVIDERS: 'custom_ai_providers',
 
   // Add new storage keys here as needed
 } as const;

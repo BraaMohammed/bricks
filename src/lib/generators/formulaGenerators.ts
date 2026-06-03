@@ -15,7 +15,7 @@ export interface AIFormulaParams {
   prompt: string;
   message: string;
   model: string;
-  provider: 'openai' | 'ollama' | 'gemini' | 'groq';
+  provider: 'openai' | 'ollama' | 'gemini' | 'groq' | string;
   temperature: number;
   maxTokens: number;
   topK: number;
@@ -32,8 +32,8 @@ export interface AIFormulaParams {
  * AI Agents configuration
  */
 export interface AIAgentsConfig {
-  creatorProvider: 'openai' | 'ollama' | 'gemini' | 'groq';
-  roleplayProvider: 'openai' | 'ollama' | 'gemini' | 'groq';
+  creatorProvider: 'openai' | 'ollama' | 'gemini' | 'groq' | string;
+  roleplayProvider: 'openai' | 'ollama' | 'gemini' | 'groq' | string;
   messageCreatorModel: string;
   leadRoleplayModel: string;
   messageCreatorThinking: boolean;
@@ -92,6 +92,7 @@ export const generateAIFormulaCode = (params: AIFormulaParams): string => {
   const isOllamaProvider = provider === 'ollama';
   const isGeminiModel = provider === 'gemini';
   const isGroqProvider = provider === 'groq';
+  const isCustomProvider = provider.startsWith('custom:');
 
   // API endpoint
   let apiEndpoint = '';
@@ -101,7 +102,7 @@ export const generateAIFormulaCode = (params: AIFormulaParams): string => {
     apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
   } else if (isGroqProvider) {
     apiEndpoint = 'https://api.groq.com/openai/v1/chat/completions';
-  } else {
+  } else if (!isCustomProvider) {
     apiEndpoint = 'https://api.openai.com/v1/chat/completions';
   }
 
@@ -113,6 +114,24 @@ export const generateAIFormulaCode = (params: AIFormulaParams): string => {
     apiKeyCheck = `const apiKey = localStorage.getItem('gemini_api_key');\n\nif (!apiKey) {\n  return 'Please set your Gemini API key in AI Settings';\n}`;
   } else if (isGroqProvider) {
     apiKeyCheck = `const apiKey = localStorage.getItem('groq_api_key');\n\nif (!apiKey) {\n  return 'Please set your Groq API key in AI Settings';\n}`;
+  } else if (isCustomProvider) {
+    apiKeyCheck = `const customProvidersStr = localStorage.getItem('custom_ai_providers');
+let apiKey = null;
+let customBaseUrl = '';
+if (customProvidersStr) {
+  try {
+    const customProviders = JSON.parse(customProvidersStr);
+    const cp = customProviders.find(p => p.id === '${provider}');
+    if (cp) {
+      apiKey = cp.apiKey;
+      customBaseUrl = cp.baseUrl;
+    }
+  } catch(e) {}
+}
+
+if (!apiKey) {
+  return 'Please set your custom provider API key in AI Settings';
+}`;
   } else {
     apiKeyCheck = `const apiKey = localStorage.getItem('openai_api_key');\n\nif (!apiKey) {\n  return 'Please set your OpenAI API key in AI Settings';\n}`;
   }
@@ -135,7 +154,12 @@ export const generateAIFormulaCode = (params: AIFormulaParams): string => {
   // Newer models (GPT-5, o-series) use 'max_completion_tokens'
   const useMaxCompletionTokens = model.startsWith('gpt-5') || model.startsWith('o');
 
-  const providerName = isGeminiModel ? 'Gemini' : isGroqProvider ? 'Groq' : isOllamaProvider ? 'Ollama' : 'OpenAI';
+  // Generate provider name
+  const providerName = isGeminiModel ? 'Gemini' : isGroqProvider ? 'Groq' : isOllamaProvider ? 'Ollama' : isCustomProvider ? provider : 'OpenAI';
+
+  const endpointStr = isCustomProvider 
+    ? '`${customBaseUrl.replace(/\\/$/, \'\')}/chat/completions`' 
+    : `'${apiEndpoint}'`;
 
   // Build request body based on provider
   let requestBodyCode = '';
@@ -291,7 +315,7 @@ ${isReasoningModel ? `console.log('🧠 Thinking mode:', ${thinkingMode});` : ''
 ${requestBodyCode}
 
 
-return fetch('${apiEndpoint}', {
+return fetch(${endpointStr}, {
   method: 'POST',
   headers: {
 ${authHeader}
