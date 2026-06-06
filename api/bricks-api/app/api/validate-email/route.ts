@@ -452,6 +452,78 @@ async function checkWithHunter(
     throw new Error(`Hunter: uncertain result — status=${status}`);
 }
 
+// ── Service 6: Reoon Email Verifier ──────────────────────────────────────────
+//
+// GET https://emailverifier.reoon.com/api/v1/verify?email=EMAIL&mode=power&key=KEY
+// Mode: "power" performs a deep SMTP inbox check (preferred for last-resort slot)
+// Response: { status: "safe"|"valid"|"invalid"|"catch_all"|"disposable"|"role"|"inbox_full",
+//             email, mx_found, smtp_check, disposable, role_account, syntax_valid, suggestion }
+// Status mapping:
+//   safe | valid         → valid (confirmed deliverable)
+//   catch_all            → catch_all
+//   role                 → valid (deliverable role address)
+//   invalid | inbox_full → invalid
+//   disposable           → invalid (reason: disposable_email)
+// Cascade on: any other status or HTTP error
+
+async function checkWithReoon(
+    email: string,
+    apiKey: string,
+): Promise<ValidateEmailResponse> {
+    const url = `https://emailverifier.reoon.com/api/v1/verify?email=${encodeURIComponent(email)}&mode=power&key=${apiKey}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
+
+    if (res.status === 429) {
+        throw new Error('Reoon: rate limit exceeded (429)');
+    }
+    if (!res.ok) {
+        throw new Error(`Reoon HTTP ${res.status} ${res.statusText}`);
+    }
+
+    const data = await res.json();
+
+    // API-level error check (Reoon may return HTTP 200 with an error field)
+    if (data.error) {
+        throw new Error(`Reoon API error: ${data.error}`);
+    }
+
+    const status: string = data.status ?? '';
+
+    if (status === 'safe' || status === 'valid') {
+        return {
+            email, status: 'valid', service: 'reoon',
+            reason: data.smtp_check ?? 'accepted_email', error: null,
+        };
+    }
+    if (status === 'catch_all') {
+        return {
+            email, status: 'catch_all', service: 'reoon',
+            reason: 'catch_all_domain', error: null,
+        };
+    }
+    if (status === 'role') {
+        // Role-based address (e.g. support@, info@) — deliverable
+        return {
+            email, status: 'valid', service: 'reoon',
+            reason: 'role_address', error: null,
+        };
+    }
+    if (status === 'disposable') {
+        return {
+            email, status: 'invalid', service: 'reoon',
+            reason: 'disposable_email', error: null,
+        };
+    }
+    if (status === 'invalid' || status === 'inbox_full') {
+        return {
+            email, status: 'invalid', service: 'reoon',
+            reason: status === 'inbox_full' ? 'inbox_full' : 'rejected_email', error: null,
+        };
+    }
+    // Unknown or unexpected status → cascade
+    throw new Error(`Reoon: uncertain result — status=${status}`);
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
@@ -526,6 +598,11 @@ export async function POST(request: NextRequest) {
         }
         if (bvKey) {
             services.push({ name: 'billionverify', fn: () => checkWithBillionVerify(email, bvKey) });
+        }
+
+        const reoonKey = process.env.REOON_API_KEY;
+        if (reoonKey) {
+            services.push({ name: 'reoon', fn: () => checkWithReoon(email, reoonKey) });
         }
 
         if (services.length === 0) {
