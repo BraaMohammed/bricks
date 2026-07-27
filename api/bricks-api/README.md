@@ -8,6 +8,7 @@ Runs separately from the Vite frontend. Handles anything that can't run client-s
 
 ## Capabilities
 
+- **AI Waterfall Gateway (`/api/ai/v1`)** — OpenAI-compatible chat completions across 6 free-tier providers (Ollama → Nvidia NIM → Cloudflare → OpenRouter → Google AI Studio → Groq) with automatic failover, per-provider cooldowns, and model aliasing. Point any OpenAI SDK at it and never pay for inference again.
 - **Puppeteer Stealth Engine (`/api/puppeteer`)** — Queue-based browser pool. Handles JS-heavy pages, bot-detection bypass, screenshot tasks, and bulk automations with memory management.
 - **Autonomous Web Search (`/api/search`)** — Routes queries through Serper → Exa → Tavily → DuckDuckGo (free fallback). Used as the search layer for web research agents.
 - **Web Content Reader (`/api/reader`)** — 3-layer fallback chain that converts any URL into clean, AI-ready markdown, including JS-rendered SPAs.
@@ -24,9 +25,9 @@ npm install
 ```
 
 ### 2. Environment Variables (`.env.local`)
-Create `.env.local` at the root of `api/bricks-api`.
+Copy `.env.example` to `.env.local` at the root of `api/bricks-api` and fill in what you use — anything left blank is skipped.
 
-AI provider keys (OpenAI, Gemini, Groq) are set in the frontend UI. This file handles backend-only keys for scraping, search, and email validation.
+AI provider keys used **by the frontend agents** (OpenAI, Gemini, Groq) are still set in the frontend UI. The keys below are backend-only: scraping, search, email validation, and the AI Waterfall Gateway (`/api/ai/v1`), which reads its provider keys from this file.
 
 ```env
 # ── Web Search Providers ─────────────────────────────────────────────────────
@@ -64,7 +65,22 @@ PUPPETEER_MAX_BROWSERS=5
 # Optional: path to a local Chromium-based binary (Chrome, Edge, Brave).
 # Leave commented to use Puppeteer's bundled Chromium.
 # PUPPETEER_BROWSER_PATH=C:\Program Files\Google\Chrome\Application\chrome.exe
+
+# ── AI Waterfall Gateway (/api/ai/v1) ─────────────────────────────────────────
+# Provider priority: Ollama → Nvidia NIM → Cloudflare → OpenRouter →
+# Google AI Studio → Groq. Leave blank to skip a provider.
+WATERFALL_MODE=stateful            # or "serverless" (no health state; Vercel-safe)
+WATERFALL_PERSIST_HEALTH=false     # persist cooldowns to provider-health.json
+OLLAMA_BASE_URL=                   # e.g. http://localhost:11434 — disabled when blank
+NVIDIA_NIM_API_KEY=                # https://build.nvidia.com — generous free tier
+CLOUDFLARE_TOKEN=
+CLOUDFLARE_ACCOUNT_ID=
+OPENROUTER_API_KEY=                # https://openrouter.ai — many :free models
+GOOGLE_AI_STUDIO_API_KEY=          # https://aistudio.google.com
+GROQ_API_KEY=                      # https://console.groq.com — very fast
 ```
+
+> See `.env.example` for the complete, commented list of every supported variable.
 
 ### 3. Run the Dev Server
 ```bash
@@ -81,6 +97,10 @@ npm run dev
 - **`POST /api/reader`** — Takes `{ url }`, returns `{ content, title, provider, error }`. See fallback chain below.
 - **`POST /api/fetch-page`** — Puppeteer-free URL reader with multi-provider fallback stack.
 - **`POST /api/validate-email`** — Takes `{ email }`, cascades through validation providers, returns deliverability status.
+
+### AI Waterfall Gateway
+- **`POST /api/ai/v1/chat/completions`** — Standard OpenAI chat completion body. Tries each configured provider in priority order until one succeeds. Extra response headers: `x-provider-used`, `x-attempts`.
+- **`GET /api/ai/v1/models`** — OpenAI-compatible model list. Only returns models servable by your configured providers, with `x_providers` and `x_available` extensions.
 
 ### Puppeteer Automation Engine
 - **`POST /api/puppeteer`** — Runs a mapped JavaScript automation command.
@@ -117,6 +137,44 @@ Request
 ```
 
 Every response includes a `provider` field (`"fetch"`, `"puppeteer"`, `"scraperapi"`, or `"none"`) so you can monitor which layer fired.
+
+---
+
+## AI Waterfall Gateway — How It Works
+
+`/api/ai/v1` is a drop-in OpenAI-compatible gateway. Instead of paying one provider, it waterfalls each request across free-tier providers in priority order until one responds successfully:
+
+```
+Request (OpenAI chat completion format)
+   │
+   ▼
+1️⃣  Ollama (local/cloud) — free, no key, no rate limits
+2️⃣  Nvidia NIM — generous free tier
+3️⃣  Cloudflare AI Workers
+4️⃣  OpenRouter — aggregator, many :free models
+5️⃣  Google AI Studio — free tier
+6️⃣  Groq — very fast, low free-tier limits
+   │
+   ▼
+Standard OpenAI response + x-provider-used / x-attempts headers
+```
+
+- **Cooldowns** — a provider that returns 429 or 5xx is skipped for a per-provider cooldown period (`stateful` mode, in-memory). Set `WATERFALL_MODE=serverless` for Vercel/Lambda where memory doesn't persist.
+- **Model aliasing** — callers use canonical IDs (e.g. `llama-3.1-8b`); `app/api/ai/providers.config.ts` maps them to each provider's exact model string. Run `npx tsx scripts/discover-providers.ts` to list live model IDs from your keys.
+- **Non-streaming only** — `stream: true` is currently downgraded to a regular response.
+
+Usage with any OpenAI SDK:
+
+```ts
+const openai = new OpenAI({
+  baseURL: 'http://localhost:3000/api/ai/v1',
+  apiKey: 'not-needed',           // gateway keys live server-side
+});
+await openai.chat.completions.create({
+  model: 'gpt-oss-120b',
+  messages: [{ role: 'user', content: 'Hello' }],
+});
+```
 
 ---
 

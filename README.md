@@ -53,6 +53,11 @@ Every column is programmable. Click a column header to open the Formula Editor, 
 ### Ollama Compatible — Almost 100% Free
 Plug in any local model (Qwen, DeepSeek, Llama) via Ollama and run AI columns for $0. For search and scraping fallbacks, Bricks stacks 6 free-tier services with automatic failover — when one runs out of credits, it moves to the next automatically.
 
+### Free AI Waterfall Gateway
+The backend ships an OpenAI-compatible gateway at `/api/ai/v1` that waterfalls every chat completion across 6 free-tier inference providers — Ollama → Nvidia NIM → Cloudflare → OpenRouter → Google AI Studio → Groq — until one succeeds.
+
+Rate-limited or failing providers are automatically cooled down and skipped, and each provider's exact model IDs are mapped for you (`llama-3.1-8b`, `gpt-oss-120b`, `kimi-k2.6`, `glm-5.2`, `deepseek-v4-pro`, …). Point any OpenAI SDK at `http://localhost:3000/api/ai/v1` and get inference at $0 — no code changes needed.
+
 ---
 
 ## Bring Your Own Keys
@@ -62,6 +67,7 @@ Bricks doesn't mark up API costs. You connect directly:
 - **Groq Cloud** — fast, cheap inference on Llama models
 - **OpenAI / Google Gemini** — plug in your own key, pay provider prices directly
 - **Local Ollama** — run models like DeepSeek R1 or Qwen locally, no API cost, data stays on your machine
+- **Free-tier gateway providers** — Nvidia NIM, OpenRouter, Cloudflare AI Workers, and Google AI Studio all have usable free tiers; the backend's AI waterfall chains them together so one exhausted quota never stops a run
 
 ---
 
@@ -82,7 +88,8 @@ cd bricks
 cd api/bricks-api
 npm install
 
-# Create a .env.local file — see the backend README for all variables
+# Create your env file (full template with comments):
+cp .env.example .env.local
 # Minimum needed: SERPER_API_KEY or TAVILY_API_KEY for web search
 # If neither is set, falls back to free DuckDuckGo scraping automatically
 
