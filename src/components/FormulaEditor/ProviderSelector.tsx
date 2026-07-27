@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PROVIDERS, type AIProvider, CustomProvider } from '@/lib/constants/aiModels';
 import { SelectSeparator } from '@/components/ui/select';
-import { Globe } from 'lucide-react';
+import { Globe } from 'iconoir-react';
 
 interface ProviderSelectorProps {
   provider: AIProvider;

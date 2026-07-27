@@ -1,9 +1,7 @@
 import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import Papa from 'papaparse';
-import { Upload, FileSpreadsheet } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Upload, Table } from 'iconoir-react';
 import { useDataStore } from '@/stores/useDataStore';
 import { toast } from '@/hooks/use-toast';
 
@@ -42,10 +40,10 @@ export const CSVUploader = ({ onDataLoaded }: CSVUploaderProps) => {
 
         // Clear existing data first
         clearData();
-        
+
         // Set new data
         setData(headers, rows);
-        
+
         toast({
           title: "CSV Loaded Successfully",
           description: `Loaded ${rows.length} rows with ${headers.length} columns.`,
@@ -81,48 +79,52 @@ export const CSVUploader = ({ onDataLoaded }: CSVUploaderProps) => {
   });
 
   return (
-    <Card 
-      {...getRootProps()} 
+    <div
+      {...getRootProps()}
       className={`
-        p-8 border-2 border-dashed cursor-pointer transition-all duration-200
-        ${isDragActive 
-          ? 'border-primary bg-primary/5 shadow-glow' 
-          : 'border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50'
+        group relative cursor-pointer rounded-xl border border-dashed bg-card/60 p-12 text-center
+        transition-all duration-300
+        ${isDragActive
+          ? 'border-primary bg-primary/[0.06] shadow-glow'
+          : 'border-border hover:border-primary/70 hover:bg-primary/[0.04]'
         }
       `}
     >
       <input {...getInputProps()} />
-      <div className="flex flex-col items-center gap-4 text-center">
-        <div className={`
-          p-4 rounded-full transition-colors duration-200
-          ${isDragActive ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}
-        `}>
-          {isDragActive ? (
-            <FileSpreadsheet className="h-8 w-8" />
-          ) : (
-            <Upload className="h-8 w-8" />
-          )}
-        </div>
-        
-        <div className="space-y-2">
-          <h3 className="text-lg font-semibold">
-            {isDragActive ? 'Drop your CSV file here' : 'Upload CSV Data'}
-          </h3>
-          <p className="text-sm text-muted-foreground">
-            {isDragActive 
-              ? 'Release to load your data' 
-              : 'Drag & drop a CSV file here, or click to select'
-            }
-          </p>
-        </div>
-        
-        {!isDragActive && (
-          <Button variant="outline" className="mt-2">
-            <Upload className="h-4 w-4 mr-2" />
-            Choose File
-          </Button>
+      <div
+        className={`
+          mx-auto flex h-14 w-14 items-center justify-center rounded-xl border transition-all duration-300
+          ${isDragActive
+            ? 'border-primary bg-primary text-primary-foreground scale-110'
+            : 'border-primary/30 bg-primary/10 text-primary group-hover:-translate-y-1'
+          }
+        `}
+      >
+        {isDragActive ? (
+          <Table className="text-[24px]" />
+        ) : (
+          <Upload className="text-[24px]" />
         )}
       </div>
-    </Card>
+
+      <h3 className="mt-6 font-display text-xl font-bold uppercase tracking-tight">
+        {isDragActive ? 'Drop it. Build the grid.' : 'Drop your CSV'}
+      </h3>
+      <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+        {isDragActive
+          ? 'release to load your data'
+          : 'or click to browse — parsed locally, never uploaded'
+        }
+      </p>
+
+      {!isDragActive && (
+        <div className="mt-8 flex items-center justify-center">
+          <span className="inline-flex h-10 items-center gap-2 rounded-md border border-primary bg-primary px-6 font-mono text-[10px] uppercase tracking-[0.16em] text-primary-foreground transition-colors group-hover:bg-primary-glow group-hover:border-primary-glow">
+            <Upload className="text-[14px]" />
+            Browse files
+          </span>
+        </div>
+      )}
+    </div>
   );
 };

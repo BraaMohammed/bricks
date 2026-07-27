@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Settings, KeyRound, Save } from 'lucide-react';
+import { Settings, Key, FloppyDisk } from 'iconoir-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Card } from '@/components/ui/card';
@@ -96,10 +96,10 @@ export const AIConfiguration = () => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="flex items-center gap-2">
-          <KeyRound className="h-4 w-4" />
-          API Keys
-          {(settings.hasApiKey || settings.hasGeminiKey || settings.hasGroqKey || settings.customProviders.some(p => !!p.apiKey)) && <div className="w-2 h-2 bg-green-500 rounded-full" />}
+        <Button variant="outline" size="sm" className="flex h-9 items-center gap-2 rounded-md border-border font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground hover:border-primary/60 hover:bg-transparent hover:text-foreground">
+          <Key className="text-[14px]" />
+          AI Config
+          {(settings.hasApiKey || settings.hasGeminiKey || settings.hasGroqKey || settings.customProviders.some(p => !!p.apiKey)) && <div className="w-1.5 h-1.5 bg-primary rounded-full brick-pulse-dot" />}
         </Button>
       </DialogTrigger>
 
@@ -207,7 +207,7 @@ export const AIConfiguration = () => {
               Cancel
             </Button>
             <Button onClick={handleSave} className="flex items-center gap-2">
-              <Save className="h-4 w-4" />
+              <FloppyDisk className="h-4 w-4" />
               Save Configuration
             </Button>
           </div>

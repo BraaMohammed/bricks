@@ -1,4 +1,4 @@
-import { Eye, Settings, Play } from 'lucide-react';
+import { Eye, Settings, Play } from 'iconoir-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';

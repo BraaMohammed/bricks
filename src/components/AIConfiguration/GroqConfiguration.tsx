@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'react';
-import { Zap, CheckCircle, XCircle, ExternalLink, Loader2, Zap as ZapIcon } from 'lucide-react';
+import { Flash, CheckCircle, XmarkCircle, OpenNewWindow, Refresh, Flash as FlashIcon } from 'iconoir-react';
 import { Button } from '@/components/ui/button';
 import { CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -46,7 +46,7 @@ export const GroqConfiguration = ({ hasApiKey, onTestConnection }: GroqConfigura
   return (
     <CardContent className="space-y-4">
       <div className="flex items-start gap-3">
-        <Zap className="h-5 w-5 text-purple-500 mt-0.5" />
+        <Flash className="h-5 w-5 text-purple-500 mt-0.5" />
         <div className="flex-1 space-y-2">
           <h3 className="font-medium">Groq Ultra-Fast Inference</h3>
           <p className="text-sm text-muted-foreground">
@@ -64,12 +64,12 @@ export const GroqConfiguration = ({ hasApiKey, onTestConnection }: GroqConfigura
             >
               {testing ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Refresh className="h-4 w-4 mr-2 animate-spin" />
                   Testing Connection...
                 </>
               ) : (
                 <>
-                  <ZapIcon className="h-4 w-4 mr-2" />
+                  <FlashIcon className="h-4 w-4 mr-2" />
                   Test Connection
                 </>
               )}
@@ -90,7 +90,7 @@ export const GroqConfiguration = ({ hasApiKey, onTestConnection }: GroqConfigura
                 {testResult.success ? (
                   <CheckCircle className="h-4 w-4 mt-0.5" />
                 ) : (
-                  <XCircle className="h-4 w-4 mt-0.5" />
+                  <XmarkCircle className="h-4 w-4 mt-0.5" />
                 )}
                 <div className="flex-1">
                   <AlertDescription className="text-sm">
@@ -118,7 +118,7 @@ export const GroqConfiguration = ({ hasApiKey, onTestConnection }: GroqConfigura
               rel="noopener noreferrer"
               className="text-xs text-blue-500 hover:underline flex items-center gap-1"
             >
-              Quickstart Guide <ExternalLink className="h-3 w-3" />
+              Quickstart Guide <OpenNewWindow className="h-3 w-3" />
             </a>
             <span className="text-xs text-muted-foreground">•</span>
             <a
@@ -127,7 +127,7 @@ export const GroqConfiguration = ({ hasApiKey, onTestConnection }: GroqConfigura
               rel="noopener noreferrer"
               className="text-xs text-blue-500 hover:underline flex items-center gap-1"
             >
-              Available Models <ExternalLink className="h-3 w-3" />
+              Available Models <OpenNewWindow className="h-3 w-3" />
             </a>
           </div>
         </div>

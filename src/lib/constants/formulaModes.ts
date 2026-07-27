@@ -12,7 +12,7 @@
  * 4. Add TabsContent in FormulaEditor.tsx
  */
 
-import { Code, Brain, Wand2, Users, Bot, Search, Mail } from 'lucide-react';
+import { Code, Brain, MagicWand, Group, Binocular, Search, Mail } from 'iconoir-react';
 
 /**
  * Formula editor modes configuration
@@ -35,21 +35,21 @@ export const MODES = [
   {
     id: 'firecrawl',
     name: 'Firecrawl Mode',
-    icon: Wand2,
+    icon: MagicWand,
     description: 'Scrape websites and convert to LLM-ready markdown',
     requiresApiKey: true,
   },
   {
     id: 'ai-agents',
     name: 'AI Copy Agents',
-    icon: Users,
+    icon: Group,
     description: 'Dual-agent system for creating and validating personalized messages',
     requiresApiKey: true,
   },
   {
     id: 'puppeteer',
     name: 'Puppeteer Mode',
-    icon: Bot,
+    icon: Binocular,
     description: 'Browser automation for complex web scraping and interactions',
     requiresApiKey: false,
   },

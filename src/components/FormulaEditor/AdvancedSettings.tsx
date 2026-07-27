@@ -1,4 +1,4 @@
-import { Settings, ChevronDown, Zap, FileSpreadsheet, Sparkles } from 'lucide-react';
+import { Settings, NavArrowDown, Flash, Table, Sparks } from 'iconoir-react';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -33,7 +33,7 @@ export const AdvancedSettings = ({
       {/* Temperature Control - Always visible */}
       <div>
         <Label className="text-base font-semibold flex items-center gap-2 mb-3">
-          <Zap className="h-4 w-4" />
+          <Flash className="h-4 w-4" />
           Temperature ({temperature})
         </Label>
         <div className="space-y-2">
@@ -65,14 +65,14 @@ export const AdvancedSettings = ({
                 <Settings className="h-4 w-4" />
                 Advanced Settings
               </Label>
-              <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+              <NavArrowDown className={`h-4 w-4 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-4 mt-3">
             {/* Max Tokens Control */}
             <div>
               <Label className="text-sm font-medium flex items-center gap-2 mb-2">
-                <FileSpreadsheet className="h-3 w-3" />
+                <Table className="h-3 w-3" />
                 Max Tokens ({maxTokens})
               </Label>
               <div className="space-y-2">
@@ -98,7 +98,7 @@ export const AdvancedSettings = ({
             {/* Top-K Control */}
             <div>
               <Label className="text-sm font-medium flex items-center gap-2 mb-2">
-                <Sparkles className="h-3 w-3" />
+                <Sparks className="h-3 w-3" />
                 Top-K Sampling ({topK})
               </Label>
               <div className="space-y-2">

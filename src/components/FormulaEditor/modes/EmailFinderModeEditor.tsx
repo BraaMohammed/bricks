@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Mail, Zap, Settings2, ChevronDown, Info } from 'lucide-react';
+import { Mail, Flash, Tools, NavArrowDown, InfoCircle } from 'iconoir-react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
@@ -98,7 +98,7 @@ export const EmailFinderModeEditor = () => {
 
       <Card className="p-3 bg-muted/10 border">
         <div className="flex items-center gap-1.5 mb-2">
-          <Info className="h-3.5 w-3.5 text-muted-foreground" />
+          <InfoCircle className="h-3.5 w-3.5 text-muted-foreground" />
           <p className="text-xs font-medium text-muted-foreground">What the agent returns</p>
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1">
@@ -142,7 +142,7 @@ export const EmailFinderModeEditor = () => {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label className="text-sm font-medium flex items-center gap-1.5">
-            <Zap className="h-4 w-4" />
+            <Flash className="h-4 w-4" />
             Max Tool Steps
           </Label>
           <Badge variant="secondary" className="tabular-nums">
@@ -166,10 +166,10 @@ export const EmailFinderModeEditor = () => {
       <Collapsible className="border rounded-md p-3 bg-muted/10">
         <CollapsibleTrigger className="flex items-center justify-between w-full text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
           <div className="flex items-center gap-2">
-            <Settings2 className="h-4 w-4" />
+            <Tools className="h-4 w-4" />
             Agent Settings
           </div>
-          <ChevronDown className="h-4 w-4" />
+          <NavArrowDown className="h-4 w-4" />
         </CollapsibleTrigger>
         <CollapsibleContent className="pt-4 space-y-5">
           <div className="space-y-2">

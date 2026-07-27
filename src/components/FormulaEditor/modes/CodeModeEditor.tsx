@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Sparkles } from 'lucide-react';
+import { Sparks } from 'iconoir-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { FormulaValidator } from '@/components/FormulaValidator';

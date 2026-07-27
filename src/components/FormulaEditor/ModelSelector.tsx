@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Wand2, Brain, RefreshCw } from 'lucide-react';
+import { MagicWand, Brain, Refresh } from 'iconoir-react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -83,7 +83,7 @@ export const ModelSelector = ({
     <div>
       {!compact && (
         <Label htmlFor="ai-model" className="text-base font-semibold flex items-center gap-2 mb-3">
-          <Wand2 className="h-4 w-4" />
+          <MagicWand className="h-4 w-4" />
           AI Model
         </Label>
       )}
@@ -109,7 +109,7 @@ export const ModelSelector = ({
               disabled={fetchingModels}
               className="flex-shrink-0"
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${fetchingModels ? 'animate-spin' : ''}`} />
+              <Refresh className={`h-4 w-4 mr-2 ${fetchingModels ? 'animate-spin' : ''}`} />
               Fetch
             </Button>
           </div>

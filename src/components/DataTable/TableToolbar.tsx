@@ -1,6 +1,4 @@
-import { Upload, Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
+import { Upload, Plus } from 'iconoir-react';
 
 interface TableToolbarProps {
   onUploadCSV: () => void;
@@ -14,43 +12,46 @@ interface TableToolbarProps {
  */
 export const TableToolbar = ({ onUploadCSV, onAddColumn, executionProgress }: TableToolbarProps) => {
   return (
-    <div className="flex items-center justify-between p-4 border-b border-border">
-      <div className="flex items-center gap-4">
-        <h3 className="font-semibold">Data Table</h3>
-        
+    <div className="flex h-14 items-center justify-between border-b border-border px-4">
+      <div className="flex items-center gap-3">
+        <h3 className="font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-foreground">
+          Data table
+        </h3>
+
         {/* Progress Indicator - shown when formulas are executing */}
         {executionProgress && (
           <div className="flex items-center gap-3">
-            <Progress 
-              value={(executionProgress.completed / executionProgress.total) * 100} 
-              className="w-32 h-2"
-            />
-            <span className="text-sm text-muted-foreground whitespace-nowrap">
-              Processing {executionProgress.completed}/{executionProgress.total} rows
+            <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+              Enriching
+            </span>
+            <div className="h-1.5 w-32 rounded-full bg-muted">
+              <div
+                className="brick-progress-fill h-full rounded-full"
+                style={{ width: `${(executionProgress.completed / executionProgress.total) * 100}%` }}
+              />
+            </div>
+            <span className="font-mono text-[10px] tracking-[0.14em] text-muted-foreground whitespace-nowrap">
+              {executionProgress.completed}/{executionProgress.total}
             </span>
           </div>
         )}
       </div>
-      
+
       <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
+        <button
           onClick={onUploadCSV}
-          className="flex items-center gap-2"
+          className="flex h-8 items-center gap-2 rounded-md border border-border px-3 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
         >
-          <Upload className="h-4 w-4" />
-          Upload New CSV
-        </Button>
-        <Button 
-          size="sm" 
-          variant="outline" 
-          className="flex items-center gap-2"
+          <Upload className="text-[13px]" />
+          <span className="hidden sm:inline">Upload</span>
+        </button>
+        <button
           onClick={onAddColumn}
+          className="flex h-8 items-center gap-2 rounded-md border border-primary bg-primary px-3 font-mono text-[10px] uppercase tracking-[0.14em] text-primary-foreground transition-colors hover:bg-primary-glow hover:border-primary-glow"
         >
-          <Plus className="h-4 w-4" />
-          Add Column
-        </Button>
+          <Plus className="text-[13px]" />
+          <span className="hidden sm:inline">Add column</span>
+        </button>
       </div>
     </div>
   );

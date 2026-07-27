@@ -14,7 +14,7 @@
  * 5. Update icon imports if needed
  */
 
-import { Key, Sparkles, Server, Zap } from 'lucide-react';
+import { Key, Sparks, Server, Flash } from 'iconoir-react';
 
 /**
  * Model definition interface
@@ -53,14 +53,14 @@ export const PROVIDERS = [
   {
     id: 'gemini',
     name: 'Google Gemini (Cloud)',
-    icon: Sparkles,
+    icon: Sparks,
     requiresApiKey: true,
     supportsLocalModels: false,
   },
   {
     id: 'groq',
     name: 'Groq (Cloud)',
-    icon: Zap,
+    icon: Flash,
     requiresApiKey: true,
     supportsLocalModels: false,
   },

@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'react';
-import { Sparkles, CheckCircle2, XCircle, ExternalLink, Loader2 } from 'lucide-react';
+import { Sparks, CheckCircle, XmarkCircle, OpenNewWindow, Refresh } from 'iconoir-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -44,7 +44,7 @@ export const GeminiConfiguration = ({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
-          <Sparkles className="h-4 w-4" />
+          <Sparks className="h-4 w-4" />
           Google Gemini Configuration
         </CardTitle>
         <CardDescription>
@@ -58,12 +58,12 @@ export const GeminiConfiguration = ({
             <span className="text-sm font-medium">API Key Status:</span>
             {hasApiKey ? (
               <Badge variant="default" className="gap-1">
-                <CheckCircle2 className="h-3 w-3" />
+                <CheckCircle className="h-3 w-3" />
                 Configured
               </Badge>
             ) : (
               <Badge variant="secondary" className="gap-1">
-                <XCircle className="h-3 w-3" />
+                <XmarkCircle className="h-3 w-3" />
                 Not Set
               </Badge>
             )}
@@ -77,7 +77,7 @@ export const GeminiConfiguration = ({
           >
             {testing ? (
               <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Refresh className="h-4 w-4 mr-2 animate-spin" />
                 Testing...
               </>
             ) : (
@@ -92,7 +92,7 @@ export const GeminiConfiguration = ({
             <AlertDescription className="flex items-center gap-2">
               {testResult.success ? (
                 <>
-                  <CheckCircle2 className="h-4 w-4" />
+                  <CheckCircle className="h-4 w-4" />
                   <div>
                     <span className="font-medium">{testResult.message}</span>
                     {testResult.model && (
@@ -104,7 +104,7 @@ export const GeminiConfiguration = ({
                 </>
               ) : (
                 <>
-                  <XCircle className="h-4 w-4" />
+                  <XmarkCircle className="h-4 w-4" />
                   <span>{testResult.message}</span>
                 </>
               )}
@@ -126,7 +126,7 @@ export const GeminiConfiguration = ({
                   className="text-primary hover:underline inline-flex items-center gap-1"
                 >
                   Google AI Studio
-                  <ExternalLink className="h-3 w-3" />
+                  <OpenNewWindow className="h-3 w-3" />
                 </a>
                 {' '}to get your API key
               </li>
@@ -175,7 +175,7 @@ export const GeminiConfiguration = ({
 
         {/* Free Tier Info */}
         <Alert>
-          <Sparkles className="h-4 w-4" />
+          <Sparks className="h-4 w-4" />
           <AlertDescription className="text-xs">
             <strong>Free Tier:</strong> Get 20-100 requests/day for testing. 
             Large context windows (1M-2M tokens) available on all models.

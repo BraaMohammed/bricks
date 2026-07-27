@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Database, Save, FolderOpen, Trash2, Download } from 'lucide-react';
+import { Database, FloppyDisk, Folder, Trash, Download } from 'iconoir-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -182,13 +182,13 @@ export const TablesManager = () => {
     <>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button variant="outline" size="sm" className="flex items-center gap-2">
-            <Database className="h-4 w-4" />
+          <Button variant="outline" size="sm" className="flex h-9 items-center gap-2 rounded-md border-border font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground hover:border-primary/60 hover:bg-transparent hover:text-foreground">
+            <Database className="text-[14px]" />
             Tables
             {savedTables.length > 0 && (
-              <Badge variant="secondary" className="text-xs">
+              <span className="rounded border border-primary/40 bg-primary/10 px-1 py-px font-mono text-[9px] text-primary">
                 {savedTables.length}
-              </Badge>
+              </span>
             )}
           </Button>
         </DialogTrigger>
@@ -259,7 +259,7 @@ export const TablesManager = () => {
                             size="sm"
                             onClick={() => loadTable(table)}
                           >
-                            <FolderOpen className="h-3 w-3 mr-1" />
+                            <Folder className="h-3 w-3 mr-1" />
                             Load
                           </Button>
                           <Button
@@ -268,7 +268,7 @@ export const TablesManager = () => {
                             onClick={() => deleteTable(table.id)}
                             className="text-destructive hover:text-destructive-foreground hover:bg-destructive"
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Trash className="h-3 w-3" />
                           </Button>
                         </div>
                       </div>
@@ -285,8 +285,8 @@ export const TablesManager = () => {
       {headers.length > 0 && (
         <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
           <DialogTrigger asChild>
-            <Button variant="outline" size="sm" className="flex items-center gap-2">
-              <Save className="h-4 w-4" />
+            <Button variant="outline" size="sm" className="flex h-9 items-center gap-2 rounded-md border-border font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground hover:border-primary/60 hover:bg-transparent hover:text-foreground">
+              <FloppyDisk className="text-[14px]" />
               Save Table
             </Button>
           </DialogTrigger>

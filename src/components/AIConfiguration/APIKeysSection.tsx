@@ -5,7 +5,7 @@
  * Provides input fields with clear buttons and help links.
  */
 
-import { Key, Sparkles, Zap, X, ExternalLink } from 'lucide-react';
+import { Key, Sparks, Flash, OpenNewWindow } from 'iconoir-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -96,7 +96,7 @@ export const APIKeysSection = ({
         {/* Google Gemini API Key */}
         <div className="space-y-2">
           <Label htmlFor="gemini-key" className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4" />
+            <Sparks className="h-4 w-4" />
             Google Gemini API Key
           </Label>
           <div className="flex gap-2">
@@ -131,9 +131,9 @@ export const APIKeysSection = ({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label htmlFor="groq-key" className="flex items-center gap-2">
-              <Zap className="h-4 w-4" />
+              <Flash className="h-4 w-4" />
               Groq API Key
-              {hasGroqKey && <div className="w-2 h-2 bg-green-500 rounded-full" />}
+              {hasGroqKey && <div className="w-2 h-2 bg-success rounded-full" />}
             </Label>
             <a
               href="https://console.groq.com/keys"
@@ -141,7 +141,7 @@ export const APIKeysSection = ({
               rel="noopener noreferrer"
               className="text-xs text-blue-500 hover:underline flex items-center gap-1"
             >
-              Get API Key <ExternalLink className="h-3 w-3" />
+              Get API Key <OpenNewWindow className="h-3 w-3" />
             </a>
           </div>
           <div className="flex gap-2">

@@ -1,4 +1,4 @@
-import { Trash2 } from 'lucide-react';
+import { Trash } from 'iconoir-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -89,7 +89,7 @@ export const SavedFormulas = ({
                     size="sm"
                     onClick={() => onDelete(savedFormula.name)}
                   >
-                    <Trash2 className="h-3 w-3" />
+                    <Trash className="h-3 w-3" />
                   </Button>
                 </div>
               </div>

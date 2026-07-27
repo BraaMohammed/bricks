@@ -1,4 +1,4 @@
-import { Trash2, X, Save, Upload } from 'lucide-react';
+import { Trash, Xmark, FloppyDisk, Upload } from 'iconoir-react';
 import { Button } from '@/components/ui/button';
 import { SheetFooter } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -52,7 +52,7 @@ export const EditorFooter = ({
         <AlertDialog open={showRemoveDialog} onOpenChange={onRemoveDialogChange}>
           <AlertDialogTrigger asChild>
             <Button variant="destructive" size="sm">
-              <Trash2 className="h-4 w-4 mr-2" />
+              <Trash className="h-4 w-4 mr-2" />
               Remove Column
             </Button>
           </AlertDialogTrigger>
@@ -89,14 +89,14 @@ export const EditorFooter = ({
             variant="outline"
             onClick={onCancel}
           >
-            <X className="h-4 w-4 mr-2" />
+            <Xmark className="h-4 w-4 mr-2" />
             Cancel
           </Button>
           <Button
             onClick={onSave}
             disabled={!hasChanges || !isValid}
           >
-            <Save className="h-4 w-4 mr-2" />
+            <FloppyDisk className="h-4 w-4 mr-2" />
             {getSaveButtonText()}
           </Button>
         </div>

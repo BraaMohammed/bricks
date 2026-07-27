@@ -1,4 +1,4 @@
-import { Code2 } from 'lucide-react';
+import { CodeBrackets } from 'iconoir-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -59,7 +59,7 @@ export const PuppeteerTemplatesDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
-          <Code2 className="h-4 w-4 mr-2" />
+          <CodeBrackets className="h-4 w-4 mr-2" />
           Templates
         </Button>
       </DialogTrigger>

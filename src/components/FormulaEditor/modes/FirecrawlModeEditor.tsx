@@ -1,4 +1,4 @@
-import { Wand2 } from 'lucide-react';
+import { MagicWand } from 'iconoir-react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -31,7 +31,7 @@ export const FirecrawlModeEditor = () => {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
-          <Wand2 className="h-4 w-4" />
+          <MagicWand className="h-4 w-4" />
           Firecrawl Website Scraper
         </CardTitle>
         <CardDescription>

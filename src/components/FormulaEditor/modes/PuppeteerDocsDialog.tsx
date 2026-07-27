@@ -1,4 +1,4 @@
-import { Bot, BookOpen } from 'lucide-react';
+import { Binocular, OpenBook } from 'iconoir-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -19,7 +19,7 @@ export const PuppeteerDocsDialog = ({ open, onOpenChange }: PuppeteerDocsDialogP
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
-          <BookOpen className="h-4 w-4 mr-2" />
+          <OpenBook className="h-4 w-4 mr-2" />
           Documentation
         </Button>
       </DialogTrigger>
@@ -34,7 +34,7 @@ export const PuppeteerDocsDialog = ({ open, onOpenChange }: PuppeteerDocsDialogP
           {/* System Status */}
           <div>
             <h4 className="font-semibold mb-2 flex items-center gap-2">
-              <Bot className="h-4 w-4" />
+              <Binocular className="h-4 w-4" />
               System Status
             </h4>
             <div className="grid grid-cols-2 gap-3 text-sm">

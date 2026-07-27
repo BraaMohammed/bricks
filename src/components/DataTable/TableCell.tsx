@@ -1,4 +1,4 @@
-import { Play, Eye, Loader2 } from 'lucide-react';
+import { Play, Eye, Refresh } from 'iconoir-react';
 import { Button } from '@/components/ui/button';
 
 interface TableCellProps {
@@ -29,38 +29,40 @@ export const TableCell = ({
   };
 
   return (
-    <td className="table-cell relative group">
+    <td className="group/cell relative border-r border-border/60 px-4 py-3 last:border-r-0">
       <div className="flex items-center justify-between">
-        <div 
-          className="truncate max-w-[150px] cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5" 
-          title={value}
-          onClick={handleCellClick}
-        >
-          {value || ''}
-        </div>
+        {isExecuting ? (
+          <span className="flex items-center gap-2 font-mono text-[11px] text-primary">
+            <Refresh className="animate-spin text-[12px]" />
+            running…
+          </span>
+        ) : (
+          <div
+            className="max-w-[180px] cursor-pointer truncate rounded px-1 py-0.5 text-sm hover:bg-muted/50"
+            title={value}
+            onClick={handleCellClick}
+          >
+            {value || <span className="font-mono text-[11px] text-muted-foreground/40">—</span>}
+          </div>
+        )}
         <div className="flex items-center gap-1">
-          {hasFormula && (
+          {hasFormula && !isExecuting && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => onExecuteCell(rowIndex, columnName)}
-              disabled={isExecuting}
-              className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity ml-1"
+              className="ml-1 h-5 w-5 p-0 text-muted-foreground opacity-0 transition-opacity hover:text-primary group-hover/cell:opacity-100"
             >
-              {isExecuting ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <Play className="h-3 w-3" />
-              )}
+              <Play className="text-[11px]" />
             </Button>
           )}
           <Button
             variant="ghost"
             size="sm"
             onClick={handleCellClick}
-            className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity ml-1"
+            className="ml-1 h-5 w-5 p-0 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover/cell:opacity-100"
           >
-            <Eye className="h-3 w-3" />
+            <Eye className="text-[11px]" />
           </Button>
         </div>
       </div>

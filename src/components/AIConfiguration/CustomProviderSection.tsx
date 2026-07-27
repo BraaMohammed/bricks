@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Globe, Plus, Trash2, Link } from 'lucide-react';
+import { Globe, Plus, Trash, Link } from 'iconoir-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -85,7 +85,7 @@ export const CustomProviderSection = ({
                   onClick={() => removeCustomProvider(provider.id)}
                   className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 px-2"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash className="h-4 w-4" />
                 </Button>
               </div>
             ))}

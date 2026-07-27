@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { Settings, Play, ChevronUp, ChevronDown, Trash2, Loader2 } from 'lucide-react';
+import { Settings, Play, NavArrowUp, NavArrowDown, Trash, Refresh } from 'iconoir-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,34 +59,36 @@ export const TableHeader = ({
   };
 
   return (
-    <th className="table-header relative group">
+    <th className="group relative border-r border-border/60 px-4 py-3 text-left last:border-r-0">
       <div className="flex items-center justify-between gap-2">
         <button
           onClick={() => onSort(header)}
-          className="flex items-center gap-1 text-left hover:text-foreground transition-colors"
+          className="flex items-center gap-1.5 text-left transition-colors hover:text-foreground"
         >
-          <span className="truncate max-w-[120px]">{header}</span>
+          <span className="max-w-[160px] truncate font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground transition-colors group-hover:text-foreground/80">
+            {header}
+          </span>
           {isSorted && (
             sortDirection === 'asc' ?
-              <ChevronUp className="h-3 w-3" /> :
-              <ChevronDown className="h-3 w-3" />
+              <NavArrowUp className="text-[12px] text-primary" /> :
+              <NavArrowDown className="text-[12px] text-primary" />
           )}
         </button>
 
         <div className="flex items-center gap-1">
           {hasFormula && (
-            <Badge variant="secondary" className="text-xs py-0 px-1">
+            <span className="rounded border border-primary/40 bg-primary/10 px-1 py-px font-mono text-[9px] text-primary">
               f(x)
-            </Badge>
+            </span>
           )}
 
           <Button
             variant="ghost"
             size="sm"
             onClick={() => onEditFormula(header)}
-            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="h-6 w-6 p-0 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
           >
-            <Settings className="h-3 w-3" />
+            <Settings className="text-[12px]" />
           </Button>
 
           {/* ▶ Execute button — opens options dialog */}
@@ -96,12 +97,12 @@ export const TableHeader = ({
             size="sm"
             onClick={() => setShowExecutionDialog(true)}
             disabled={!hasFormula || isExecuting}
-            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
+            className="h-6 w-6 p-0 text-muted-foreground opacity-0 transition-opacity hover:text-primary group-hover:opacity-100 disabled:opacity-50"
           >
             {isExecuting ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
+              <Refresh className="animate-spin text-[12px] text-primary" />
             ) : (
-              <Play className="h-3 w-3" />
+              <Play className="text-[12px]" />
             )}
           </Button>
 
@@ -111,9 +112,9 @@ export const TableHeader = ({
                 variant="ghost"
                 size="sm"
                 onClick={() => onSetColumnToRemove(header)}
-                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700"
+                className="h-6 w-6 p-0 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
               >
-                <Trash2 className="h-3 w-3" />
+                <Trash className="text-[12px]" />
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -127,7 +128,7 @@ export const TableHeader = ({
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={() => onRemoveColumn(header)}
-                  className="bg-red-600 hover:bg-red-700"
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
                   Remove Column
                 </AlertDialogAction>
@@ -136,6 +137,11 @@ export const TableHeader = ({
           </AlertDialog>
         </div>
       </div>
+
+      {/* Executing underline */}
+      {isExecuting && (
+        <span className="absolute inset-x-0 bottom-0 h-0.5 brick-progress-fill" />
+      )}
 
       {/* Execution Options Dialog */}
       <ExecutionOptionsDialog

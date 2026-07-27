@@ -5,7 +5,7 @@
  * Displays appropriate icons and descriptions for each provider.
  */
 
-import { Key, Server, Sparkles, Zap, Globe } from 'lucide-react';
+import { Key, Server, Sparks, Flash, Globe } from 'iconoir-react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -53,13 +53,13 @@ export const ProviderSelector = ({
               </SelectItem>
               <SelectItem value="gemini">
                 <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4" />
+                  <Sparks className="h-4 w-4" />
                   Google Gemini (Cloud)
                 </div>
               </SelectItem>
               <SelectItem value="groq">
                 <div className="flex items-center gap-2">
-                  <Zap className="h-4 w-4" />
+                  <Flash className="h-4 w-4" />
                   Groq (Cloud - Ultra Fast)
                 </div>
               </SelectItem>

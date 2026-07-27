@@ -15,8 +15,12 @@ export default {
 			center: true,
 			padding: '1.5rem'
 		},
-		extend: {
-			colors: {
+	extend: {
+		fontFamily: {
+			display: ['"Archivo"', 'system-ui', 'sans-serif'],
+			mono: ['"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+		},
+		colors: {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',
@@ -70,11 +74,15 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				}
 			},
-			borderRadius: {
-				lg: 'var(--radius)',
-				md: 'calc(var(--radius) - 2px)',
-				sm: 'calc(var(--radius) - 4px)'
-			},
+		borderRadius: {
+			lg: 'var(--radius)',
+			md: 'calc(var(--radius) - 2px)',
+			sm: 'calc(var(--radius) - 4px)'
+		},
+		boxShadow: {
+			elegant: 'var(--shadow-elegant)',
+			glow: 'var(--shadow-glow)'
+		},
 			keyframes: {
 				'accordion-down': {
 					from: {

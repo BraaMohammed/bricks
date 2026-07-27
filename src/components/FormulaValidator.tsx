@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle, Info } from 'lucide-react';
+import { WarningTriangle, CheckCircle, InfoCircle } from 'iconoir-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface ValidationResult {
@@ -98,14 +98,14 @@ export const FormulaValidator = ({ formula, availableColumns }: FormulaValidator
 
       {validation.errors.map((error, index) => (
         <Alert key={`error-${index}`} variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
+          <WarningTriangle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ))}
 
       {validation.warnings.map((warning, index) => (
         <Alert key={`warning-${index}`} className="border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950">
-          <Info className="h-4 w-4 text-amber-600" />
+          <InfoCircle className="h-4 w-4 text-amber-600" />
           <AlertDescription className="text-amber-800 dark:text-amber-200">
             {warning}
           </AlertDescription>

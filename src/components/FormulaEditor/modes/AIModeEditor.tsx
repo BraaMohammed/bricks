@@ -1,4 +1,4 @@
-import { Brain } from 'lucide-react';
+import { Brain } from 'iconoir-react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';

@@ -5,7 +5,7 @@
  * Shows loading, connected, or disconnected states with model count.
  */
 
-import { Wifi, WifiOff } from 'lucide-react';
+import { Wifi, WifiOff } from 'iconoir-react';
 
 export interface OllamaStatusIndicatorProps {
   connected: boolean;

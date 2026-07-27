@@ -1,4 +1,4 @@
-import { Bot, Info, Sparkles, X } from 'lucide-react';
+import { Binocular, InfoCircle, Sparks, Xmark } from 'iconoir-react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -54,7 +54,7 @@ export const PuppeteerModeEditor = () => {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Bot className="h-5 w-5 text-primary" />
+            <Binocular className="h-5 w-5 text-primary" />
             <h3 className="text-lg font-semibold">Puppeteer Browser Automation</h3>
           </div>
           <div className="flex items-center gap-2">
@@ -138,7 +138,7 @@ export const PuppeteerModeEditor = () => {
             <h4 className="font-semibold">Puppeteer Code</h4>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="flex items-center gap-1 text-xs">
-                <Bot className="h-3 w-3" />
+                <Binocular className="h-3 w-3" />
                 Server-side execution
               </Badge>
             </div>
@@ -174,12 +174,12 @@ return await page.title();
             <h4 className="font-semibold mb-2 flex items-center gap-2">
               {lastResult.type === 'success' ? (
                 <>
-                  <Sparkles className="h-4 w-4 text-primary" />
+                  <Sparks className="h-4 w-4 text-primary" />
                   <span>Last Execution Result</span>
                 </>
               ) : (
                 <>
-                  <X className="h-4 w-4 text-destructive" />
+                  <Xmark className="h-4 w-4 text-destructive" />
                   <span className="text-destructive">Execution Error</span>
                 </>
               )}
@@ -196,7 +196,7 @@ return await page.title();
         {executionLog.length > 0 && (
           <Card className="p-4 bg-muted/50 border-border">
             <h4 className="font-semibold mb-2 flex items-center gap-2">
-              <Info className="h-4 w-4" />
+              <InfoCircle className="h-4 w-4" />
               <span>Execution Log</span>
               <Button 
                 variant="outline" 
@@ -221,7 +221,7 @@ return await page.title();
         {code && firstRow && (
           <Card className="p-4 bg-muted/50">
             <h4 className="font-semibold mb-2 flex items-center gap-2">
-              <Sparkles className="h-4 w-4" />
+              <Sparks className="h-4 w-4" />
               Execution Configuration
             </h4>
             <div className="space-y-3">

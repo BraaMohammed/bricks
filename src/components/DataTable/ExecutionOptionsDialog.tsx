@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Play, X, AlertTriangle, Hash, ArrowRight, Filter } from 'lucide-react';
+import { Play, Xmark, WarningTriangle, Hashtag, ArrowRight, Filter } from 'iconoir-react';
 import { DEFAULT_ERROR_KEYWORDS } from '@/lib/utils/errorDetector';
 import type { ExecutionOptions } from '@/hooks/useFormulaExecution';
 
@@ -45,9 +45,9 @@ const MODE_LABELS: Record<RunMode, string> = {
 
 const MODE_ICONS: Record<RunMode, React.ReactNode> = {
   all: <Play className="h-4 w-4" />,
-  'first-x': <Hash className="h-4 w-4" />,
+  'first-x': <Hashtag className="h-4 w-4" />,
   range: <ArrowRight className="h-4 w-4" />,
-  'errors-only': <AlertTriangle className="h-4 w-4" />,
+  'errors-only': <WarningTriangle className="h-4 w-4" />,
   'column-filter': <Filter className="h-4 w-4" />,
 };
 
@@ -241,7 +241,7 @@ export const ExecutionOptionsDialog = ({
                     className="ml-0.5 rounded hover:text-destructive transition-colors"
                     aria-label={`Remove "${kw}"`}
                   >
-                    <X className="h-3 w-3" />
+                    <Xmark className="h-3 w-3" />
                   </button>
                 </Badge>
               ))}

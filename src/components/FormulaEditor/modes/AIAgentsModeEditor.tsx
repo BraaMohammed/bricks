@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Users, PenTool, UserCheck, Sparkles, Brain, Key, Server } from 'lucide-react';
+import { Group, EditPencil, UserBadgeCheck, Sparks, Brain, Key, Server } from 'iconoir-react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -103,7 +103,7 @@ export const AIAgentsModeEditor = () => {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Users className="h-5 w-5" />
+          <Group className="h-5 w-5" />
           AI Copy Agents Configuration
         </CardTitle>
         <CardDescription>
@@ -125,7 +125,7 @@ export const AIAgentsModeEditor = () => {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
-                <PenTool className="h-4 w-4" />
+                <EditPencil className="h-4 w-4" />
                 Message Creator Agent
               </CardTitle>
               <CardDescription>
@@ -194,7 +194,7 @@ export const AIAgentsModeEditor = () => {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
-                <UserCheck className="h-4 w-4" />
+                <UserBadgeCheck className="h-4 w-4" />
                 Lead Roleplay Agent
               </CardTitle>
               <CardDescription>
@@ -293,7 +293,7 @@ export const AIAgentsModeEditor = () => {
         {(messageCreatorInstructions || leadRoleplayInstructions) && firstRow && (
           <Card className="p-4 bg-muted/50">
             <h4 className="font-semibold mb-3 flex items-center gap-2">
-              <Sparkles className="h-4 w-4" />
+              <Sparks className="h-4 w-4" />
               Instructions Preview (Row 1 Data)
             </h4>
             <div className="space-y-4">

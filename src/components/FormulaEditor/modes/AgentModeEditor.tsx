@@ -1,4 +1,4 @@
-import { Search, Zap } from 'lucide-react';
+import { Search, Flash } from 'iconoir-react';
 import { useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, Settings2 } from 'lucide-react';
+import { NavArrowDown, Tools } from 'iconoir-react';
 import { ColumnBadges } from '@/components/FormulaEditor/ColumnBadges';
 import { ThinkingModeToggle } from '../ThinkingModeToggle';
 import { ProviderSelector } from '../ProviderSelector';
@@ -116,7 +116,7 @@ export const AgentModeEditor = () => {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label className="text-sm font-medium flex items-center gap-1.5">
-            <Zap className="h-4 w-4" />
+            <Flash className="h-4 w-4" />
             Max Tool Steps
           </Label>
           <Badge variant="secondary" className="tabular-nums">
@@ -139,10 +139,10 @@ export const AgentModeEditor = () => {
       <Collapsible className="border rounded-md p-3 bg-muted/10">
         <CollapsibleTrigger className="flex items-center justify-between w-full text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
           <div className="flex items-center gap-2">
-            <Settings2 className="h-4 w-4" />
+            <Tools className="h-4 w-4" />
             Agent Settings
           </div>
-          <ChevronDown className="h-4 w-4" />
+          <NavArrowDown className="h-4 w-4" />
         </CollapsibleTrigger>
         <CollapsibleContent className="pt-4 space-y-5">
           <div className="space-y-2">

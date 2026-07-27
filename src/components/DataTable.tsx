@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Card } from '@/components/ui/card';
 import { useDataStore } from '@/stores/useDataStore';
 
 // Custom Hooks
@@ -21,34 +20,31 @@ interface DataTableProps {
 
 /**
  * DataTable Component - Main orchestrator for table display and interaction
- * 
+ *
  * Responsibilities:
  * - Coordinate custom hooks for sorting, formula execution, CSV upload, and column management
  * - Render table structure with headers and cells
  * - Manage cell details viewing
- * 
- * Note: This component has been refactored from 628 lines to 158 lines by extracting
- * logic into custom hooks and UI into sub-components
  */
 export const DataTable = ({ onEditFormula }: DataTableProps) => {
   // Store data access
   const { headers, rows, getFormula } = useDataStore();
-  
+
   // Custom Hooks - Business Logic
   const { sortColumn, sortDirection, sortedRows, handleSort } = useTableSort(rows);
   const { executingColumn, executingCells, executeFormula, executeCellFormula, executionProgress } = useFormulaExecution();
   const { handleCSVUpload } = useCSVUpload();
-  const { 
-    showAddColumnDialog, 
+  const {
+    showAddColumnDialog,
     setShowAddColumnDialog,
     newColumnName,
     setNewColumnName,
     columnToRemove,
     setColumnToRemove,
     handleAddColumn,
-    handleRemoveColumn 
+    handleRemoveColumn
   } = useColumnManagement(headers, onEditFormula);
-  
+
   // Local UI state for cell details viewer
   const [selectedCell, setSelectedCell] = useState<{row: number, column: string, content: string} | null>(null);
 
@@ -63,18 +59,18 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
   }
 
   return (
-    <Card className="overflow-hidden">
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
       {/* Toolbar with CSV upload and Add Column actions */}
-      <TableToolbar 
+      <TableToolbar
         onUploadCSV={handleCSVUpload}
         onAddColumn={() => setShowAddColumnDialog(true)}
         executionProgress={executionProgress}
       />
-      
+
       {/* Horizontal scroll container with mirrored scroll bars */}
       <div className="relative">
         {/* Top scroll bar - mirrored to main table */}
-        <div 
+        <div
           className="overflow-x-auto pb-2 border-b border-border/30"
           onScroll={(e) => {
             const tableContainer = e.currentTarget.parentElement?.querySelector('.table-scroll-container') as HTMLElement;
@@ -83,11 +79,11 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
             }
           }}
         >
-          <div style={{ width: `${headers.length * 200}px`, height: '1px' }} />
+          <div style={{ width: `${(headers.length + 1) * 220}px`, height: '1px' }} />
         </div>
-        
+
         {/* Main table container */}
-        <div 
+        <div
           className="overflow-x-auto table-scroll-container"
           onScroll={(e) => {
             const topScroll = e.currentTarget.parentElement?.querySelector('div') as HTMLElement;
@@ -99,7 +95,11 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
           <table className="w-full border-collapse">
           {/* Table Headers with sorting and actions */}
           <thead>
-            <tr className="border-b border-border">
+            <tr className="border-b border-border bg-muted/40">
+              {/* Row number column */}
+              <th className="w-12 border-r border-border/60 px-3 py-3 text-left font-mono text-[10px] font-medium tracking-[0.14em] text-muted-foreground/60">
+                #
+              </th>
               {headers.map((header) => (
                 <TableHeader
                   key={header}
@@ -123,13 +123,16 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
           {/* Table Body with data cells */}
           <tbody>
             {sortedRows.map((row, index) => (
-              <tr key={index} className="border-b border-border hover:bg-muted/30 transition-colors">
+              <tr key={index} className="group border-b border-border/60 last:border-b-0 hover:bg-accent/30 transition-colors">
+                <td className="border-r border-border/60 px-3 py-3 font-mono text-[10px] text-muted-foreground/50">
+                  {String(index + 1).padStart(3, '0')}
+                </td>
                 {headers.map((header) => {
                   const cellKey = `${index}-${header}`;
                   const isCellExecuting = executingCells.has(cellKey);
                   const isColumnExecuting = executingColumn === header;
                   const isAnyExecuting = isCellExecuting || isColumnExecuting;
-                  
+
                   return (
                     <TableCell
                       key={header}
@@ -149,11 +152,23 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
         </table>
         </div>
       </div>
-      
+
       {/* Empty state message */}
       {rows.length === 0 && (
-        <div className="p-8 text-center text-muted-foreground">
+        <div className="p-8 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
           <p>No data to display</p>
+        </div>
+      )}
+
+      {/* Table footer */}
+      {rows.length > 0 && (
+        <div className="flex items-center justify-between border-t border-border px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+          <span>
+            {rows.length} rows · {headers.length} columns
+          </span>
+          <span className="hidden sm:inline">
+            {headers.filter(h => !!getFormula(h)).length} columns programmed
+          </span>
         </div>
       )}
 
@@ -173,6 +188,6 @@ export const DataTable = ({ onEditFormula }: DataTableProps) => {
         onColumnNameChange={setNewColumnName}
         onAddColumn={handleAddColumn}
       />
-    </Card>
+    </div>
   );
 };

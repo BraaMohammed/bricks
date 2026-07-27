@@ -1,4 +1,4 @@
-import { Info } from 'lucide-react';
+import { InfoCircle } from 'iconoir-react';
 import { Badge } from '@/components/ui/badge';
 
 interface ColumnBadgesProps {
@@ -11,7 +11,7 @@ export const ColumnBadges = ({ headers, onColumnClick, helpText }: ColumnBadgesP
   return (
     <div>
       <h4 className="font-semibold mb-3 flex items-center gap-2">
-        <Info className="h-4 w-4" />
+        <InfoCircle className="h-4 w-4" />
         Available Columns
       </h4>
       <p className="text-sm text-muted-foreground mb-2">

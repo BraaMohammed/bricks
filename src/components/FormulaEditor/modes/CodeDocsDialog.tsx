@@ -1,4 +1,4 @@
-import { Code2, BookOpen } from 'lucide-react';
+import { CodeBrackets, OpenBook } from 'iconoir-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -19,7 +19,7 @@ export const CodeDocsDialog = ({ open, onOpenChange }: CodeDocsDialogProps) => {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
-          <BookOpen className="h-4 w-4 mr-2" />
+          <OpenBook className="h-4 w-4 mr-2" />
           Documentation
         </Button>
       </DialogTrigger>
@@ -34,7 +34,7 @@ export const CodeDocsDialog = ({ open, onOpenChange }: CodeDocsDialogProps) => {
           {/* Quick Start */}
           <div className="bg-muted/50 p-4 rounded-lg border border-border">
             <h4 className="font-semibold mb-2 flex items-center gap-1">
-              <Code2 className="h-4 w-4 text-primary" />
+              <CodeBrackets className="h-4 w-4 text-primary" />
               Quick Start
             </h4>
             <p className="text-sm text-muted-foreground mb-2">

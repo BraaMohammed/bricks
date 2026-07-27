@@ -1,4 +1,4 @@
-import { Brain } from 'lucide-react';
+import { Brain } from 'iconoir-react';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
-import { Sparkles, MessageSquare, Brain, Zap } from 'lucide-react';
+import { Sparks, MessageText, Brain, Flash } from 'iconoir-react';
 import { useDataStore } from '@/stores/useDataStore';
 
 interface SlashMenuProps {
@@ -14,7 +14,7 @@ interface SlashMenuProps {
 const AI_TEMPLATES = [
   {
     id: 'personalized-message',
-    icon: MessageSquare,
+    icon: MessageText,
     title: 'Personalized Message',
     description: 'Generate a personalized message',
     template: `// Generate personalized message
@@ -38,7 +38,7 @@ return data.choices[0].message.content;`
   },
   {
     id: 'email-subject',
-    icon: Sparkles,
+    icon: Sparks,
     title: 'Email Subject Line',
     description: 'Generate compelling email subject',
     template: `// Generate email subject line
@@ -86,7 +86,7 @@ return data.choices[0].message.content.toLowerCase();`
   },
   {
     id: 'custom-prompt',
-    icon: Zap,
+    icon: Flash,
     title: 'Custom AI Prompt',
     description: 'Custom prompt template',
     template: `// Custom AI prompt
