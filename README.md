@@ -154,6 +154,21 @@ Once both steps are done, select **Ollama** in the Bricks settings and it will i
 
 ---
 
+## ⚠️ Disclaimer — Responsible Use
+
+Bricks is provided **as-is, for lawful and ethical purposes only**.
+
+You are solely responsible for how you use this software. The authors and contributors **accept no legal or ethical accountability** for your actions, and we **do not endorse or recommend** using Bricks for any activity that is unethical, unlawful, or in violation of agreements you have accepted — including, but not limited to:
+
+- **Breaking the Terms of Service** of websites, APIs, or data providers you agreed to
+- Scraping or collecting data you are not authorized to access
+- Sending unsolicited communications in violation of anti-spam laws (CAN-SPAM, GDPR, etc.)
+- Any form of harassment, deception, fraud, or privacy violation
+
+By using Bricks, you accept full responsibility for complying with all applicable laws, regulations, and contractual obligations in your jurisdiction. If you are unsure whether a use case is permitted, don't do it.
+
+---
+
 ## Contributing
 
 Open issues, pull requests, and forks are welcome. If you hit a site the Puppeteer engine can't handle, or find a case where the email finder breaks, open an issue with the details.
