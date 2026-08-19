@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { puppeteerQueue } from '../../queue';
+
+async function getPuppeteerQueue() {
+  try {
+    const { puppeteerQueue } = await import('../../queue');
+    return puppeteerQueue;
+  } catch {
+    return null;
+  }
+}
 
 // CORS headers for cross-origin requests
 const corsHeaders = {
@@ -33,6 +41,14 @@ export async function GET(
     }
 
     console.log(`🔍 Checking status for job: ${jobId}`);
+
+    const puppeteerQueue = await getPuppeteerQueue();
+    if (!puppeteerQueue) {
+      return NextResponse.json(
+        { error: 'Puppeteer is not available on this deployment.' },
+        { status: 503, headers: corsHeaders }
+      );
+    }
 
     const job = puppeteerQueue.getJob(jobId);
     

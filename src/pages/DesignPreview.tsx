@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import {
   IconoirProvider,
-  Cube,
   Database,
   Download,
   Trash,
@@ -139,14 +138,14 @@ const DesignPreview = () => {
         <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur-md">
           <div className="flex h-16 items-center justify-between px-6">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-[0_0_24px_hsl(var(--primary)/0.35)]">
-                <Cube className="text-[20px]" strokeWidth={1.8} />
-              </div>
-              <div className="leading-none">
-                <div className="font-display text-xl font-black uppercase tracking-tight">Bricks</div>
-                <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <img src="/logo-1.png" alt="Bricks logo" className="h-8 w-8 shrink-0 object-contain" />
+                <span className="font-display text-2xl font-black uppercase tracking-tight text-foreground">
+                  BRICKS
+                </span>
+                <span className="ml-2 hidden border-l border-border pl-3 font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground sm:inline-block">
                   Clay alternative · zero credits
-                </div>
+                </span>
               </div>
 
               {view === 'data' && (

@@ -1,8 +1,14 @@
-import puppeteer, { Browser, Page } from 'puppeteer';
+import type { Browser, Page } from 'puppeteer';
 
-// Note: Using regular puppeteer for now to avoid stealth plugin compatibility issues
+// Note: Using regular Puppeteer for now to avoid stealth plugin compatibility issues
 // Stealth features are implemented manually in browser configuration
 console.log('🔧 Using regular Puppeteer with manual stealth configuration');
+
+// Lazy-load puppeteer — on Cloudflare Workers this package is not available
+async function getPuppeteer() {
+  const puppeteer = await import('puppeteer');
+  return puppeteer.default ?? puppeteer;
+}
 
 interface BrowserInstance {
   id: string;
@@ -65,7 +71,7 @@ class BrowserPool {
       console.log(`🌐 Using custom browser binary: ${executablePath}`);
     }
     
-    const browser = await puppeteer.launch({
+    const browser = await (await getPuppeteer()).launch({
       headless: true, // Always headless — even when using a custom browser path
       ...(executablePath ? { executablePath } : {}),
       args: [

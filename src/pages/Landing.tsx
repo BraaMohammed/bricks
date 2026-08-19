@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import {
   IconoirProvider,
-  Cube,
   Search,
   Mail,
   Group,
@@ -64,15 +63,15 @@ const Nav = () => (
   <header className="sticky top-0 z-50 border-b border-border bg-background/85 backdrop-blur-md">
     <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between px-6">
       <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-[0_0_24px_hsl(var(--primary)/0.35)]">
-          <Cube className="text-[20px]" strokeWidth={1.8} />
-        </div>
-        <div className="leading-none">
-          <div className="font-display text-xl font-black uppercase tracking-tight">Bricks</div>
-          <div className="mt-1 hidden font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground sm:block">
+        <Link to="/" className="group flex items-center gap-1.5">
+          <img src="/logo-1.png" alt="Bricks logo" className="h-8 w-8 shrink-0 object-contain transition-transform group-hover:scale-105" />
+          <span className="font-display text-2xl font-black uppercase tracking-tight text-foreground">
+            BRICKS
+          </span>
+          <span className="ml-2 hidden border-l border-border pl-3 font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground sm:inline-block">
             Clay alternative · zero credits
-          </div>
-        </div>
+          </span>
+        </Link>
       </div>
 
       <nav className="hidden items-center gap-7 font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground md:flex">
@@ -520,11 +519,12 @@ const Cta = () => (
 const Footer = () => (
   <footer className="border-t border-border">
     <div className="mx-auto flex max-w-[1440px] flex-col items-center justify-between gap-4 px-6 py-8 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground md:flex-row">
-      <div className="flex items-center gap-3">
-        <div className="flex h-6 w-6 items-center justify-center rounded bg-primary text-primary-foreground">
-          <Cube className="text-[13px]" />
-        </div>
-        <span>Bricks — free lite-weight clay alternative</span>
+      <div className="flex items-center gap-2.5">
+        <img src="/logo-1.png" alt="Bricks logo" className="h-6 w-6 shrink-0 object-contain" />
+        <span className="font-display text-base font-black uppercase tracking-tight text-foreground">BRICKS</span>
+        <span className="border-l border-border pl-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+          free lite-weight clay alternative
+        </span>
       </div>
       <div className="flex items-center gap-6">
         <a href="https://github.com/BraaMohammed/bricks" target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-foreground">GitHub</a>
