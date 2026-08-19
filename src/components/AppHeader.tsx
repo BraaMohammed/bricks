@@ -1,4 +1,4 @@
-import { Flash, Github, Download, Trash, Xmark, ArrowUpRight, Cube } from 'iconoir-react';
+import { Flash, Github, Download, Trash, Xmark, ArrowUpRight } from 'iconoir-react';
 import { Button } from '@/components/ui/button';
 import { useDataStore } from '@/stores/useDataStore';
 import { AIConfiguration } from '@/components/AIConfiguration';
@@ -15,7 +15,7 @@ export const AppHeader = () => {
   // Show promo occasionally (30% chance when component mounts)
   useEffect(() => {
     const shouldShow = Math.random() < 0.3;
-    const hasSeenRecently = localStorage.getItem('brospect-promo-dismissed');
+    const hasSeenRecently = localStorage.getItem('builder-promo-dismissed');
     const oneDayInMs = 24 * 60 * 60 * 1000;
 
     if (shouldShow && (!hasSeenRecently || Date.now() - parseInt(hasSeenRecently) > oneDayInMs)) {
@@ -25,7 +25,7 @@ export const AppHeader = () => {
 
   const dismissPromo = () => {
     setShowPromo(false);
-    localStorage.setItem('brospect-promo-dismissed', Date.now().toString());
+    localStorage.setItem('builder-promo-dismissed', Date.now().toString());
   };
 
   const exportCSV = () => {
@@ -83,16 +83,14 @@ export const AppHeader = () => {
         <div className="mx-auto px-6">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center gap-3">
-              <Link to="/" className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-[0_0_24px_hsl(var(--primary)/0.35)]">
-                  <Cube className="text-[20px]" strokeWidth={1.8} />
-                </div>
-                <div className="leading-none">
-                  <div className="font-display text-xl font-black uppercase tracking-tight">Bricks</div>
-                  <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
-                    Clay alternative · zero credits
-                  </p>
-                </div>
+              <Link to="/" className="group flex items-center gap-1.5">
+                <img src="/logo-1.png" alt="Bricks logo" className="h-8 w-8 shrink-0 object-contain transition-transform group-hover:scale-105" />
+                <span className="font-display text-2xl font-black uppercase tracking-tight text-foreground">
+                  BRICKS
+                </span>
+                <span className="ml-2 hidden border-l border-border pl-3 font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground sm:inline-block">
+                  Clay alternative · zero credits
+                </span>
               </Link>
 
               {headers.length > 0 && (
@@ -152,13 +150,13 @@ export const AppHeader = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
-                  <Flash className="text-[14px] text-primary" />
+                  <Github className="text-[14px] text-primary" />
                   <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-foreground">
-                    Need more meetings?
+                    Liked this tool?
                   </span>
                 </div>
                 <div className="hidden text-sm text-muted-foreground sm:block">
-                  Flood your calendar on autopilot with LinkedIn video outreach that is impossible to ignore
+                  Explore more open-source projects and connect with the builder on GitHub
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -167,9 +165,10 @@ export const AppHeader = () => {
                   asChild
                   className="h-7 gap-1.5 rounded-md border border-primary bg-primary font-mono text-[10px] uppercase tracking-[0.12em] text-primary-foreground hover:bg-primary-glow"
                 >
-                  <a href="https://try.brospect.xyz" target="_blank" rel="noopener noreferrer">
+                  <a href="https://github.com/BraaMohammed" target="_blank" rel="noopener noreferrer">
+                    <Github className="text-[12px]" />
+                    See Builder
                     <ArrowUpRight className="text-[12px]" />
-                    Try Brospect
                   </a>
                 </Button>
                 <Button
@@ -177,6 +176,7 @@ export const AppHeader = () => {
                   size="sm"
                   onClick={dismissPromo}
                   className="h-7 w-7 p-0 text-muted-foreground hover:bg-primary/10 hover:text-foreground"
+                  aria-label="Dismiss banner"
                 >
                   <Xmark className="text-[13px]" />
                 </Button>

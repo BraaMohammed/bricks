@@ -1,5 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { puppeteerQueue } from './queue';
+
+async function getPuppeteerQueue() {
+  try {
+    const { puppeteerQueue } = await import('./queue');
+    return puppeteerQueue;
+  } catch {
+    return null;
+  }
+}
+
+const PUPPETEER_UNAVAILABLE = {
+  success: false,
+  error: 'Puppeteer is not available on this deployment. The /api/puppeteer route requires a Node.js runtime with Chromium installed.',
+};
 
 // Configure runtime for larger payloads
 export const runtime = 'nodejs';
@@ -83,6 +96,11 @@ export async function POST(request: NextRequest) {
     console.log('⚙️ Config:', sanitizedConfig);
     console.log('📊 Row data keys:', Object.keys(rowData || {}));
 
+    const puppeteerQueue = await getPuppeteerQueue();
+    if (!puppeteerQueue) {
+      return NextResponse.json(PUPPETEER_UNAVAILABLE, { status: 503, headers: corsHeaders });
+    }
+
     // Fix #2: Queue size cap — prevent unbounded growth (OOM protection)
     const currentStats = puppeteerQueue.getQueueStats();
     if (currentStats.pending >= 1000) {
@@ -149,6 +167,10 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
+  const puppeteerQueue = await getPuppeteerQueue();
+  if (!puppeteerQueue) {
+    return NextResponse.json(PUPPETEER_UNAVAILABLE, { status: 503, headers: corsHeaders });
+  }
   // Return queue statistics
   const stats = puppeteerQueue.getQueueStats();
   const recentJobs = puppeteerQueue.getRecentJobs(5);

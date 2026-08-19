@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Readability } from '@mozilla/readability';
 import { JSDOM } from 'jsdom';
 import TurndownService from 'turndown';
-import { browserPool } from '../puppeteer/browser-pool';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -205,6 +204,7 @@ async function readWithScraperAPI(url: string, apiKey: string): Promise<{ conten
 // Slowest but handles anything a real browser can.
 
 async function readWithPuppeteer(url: string): Promise<{ content: string; title: string; release: () => Promise<void>; browserRelease: () => void }> {
+    const { browserPool } = await import('../puppeteer/browser-pool');
     const browserInfo = await browserPool.getBrowser();
     const pageInfo = await browserPool.getPage(browserInfo.browserId);
     const page = pageInfo.page;

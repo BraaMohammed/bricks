@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { puppeteerQueue } from '../queue';
-import { browserPool } from '../browser-pool';
 
 export async function GET() {
   try {
+    const { puppeteerQueue } = await import('../queue');
+    const { browserPool } = await import('../browser-pool');
     const queueStats = puppeteerQueue.getQueueStats();
     const browserStats = browserPool.getStats();
     const recentJobs = puppeteerQueue.getRecentJobs(10);
