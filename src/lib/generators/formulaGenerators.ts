@@ -89,6 +89,7 @@ export const generateAIFormulaCode = (params: AIFormulaParams): string => {
   const fullPrompt = message ? `${processedPrompt}. Additional context: ${message}` : processedPrompt;
 
   // Determine provider type
+  const isWaterfallProvider = provider === 'waterfall';
   const isOllamaProvider = provider === 'ollama';
   const isGeminiModel = provider === 'gemini';
   const isGroqProvider = provider === 'groq';
@@ -96,7 +97,10 @@ export const generateAIFormulaCode = (params: AIFormulaParams): string => {
 
   // API endpoint
   let apiEndpoint = '';
-  if (isOllamaProvider) {
+  if (isWaterfallProvider) {
+    const backendBase = (typeof localStorage !== 'undefined' ? localStorage.getItem('backend_api_url') : null) || 'http://localhost:3000';
+    apiEndpoint = `${backendBase.replace(/\/+$/, '')}/api/ai/v1/chat/completions`;
+  } else if (isOllamaProvider) {
     apiEndpoint = `${ollamaBaseUrl}/v1/chat/completions`;
   } else if (isGeminiModel) {
     apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
@@ -108,7 +112,9 @@ export const generateAIFormulaCode = (params: AIFormulaParams): string => {
 
   // API key handling
   let apiKeyCheck = '';
-  if (isOllamaProvider) {
+  if (isWaterfallProvider) {
+    apiKeyCheck = '// Bricks Waterfall Gateway cascades through free-tier providers via backend\nconst apiKey = null;';
+  } else if (isOllamaProvider) {
     apiKeyCheck = '// Ollama runs locally without API key\nconst apiKey = null;';
   } else if (isGeminiModel) {
     apiKeyCheck = `const apiKey = localStorage.getItem('gemini_api_key');\n\nif (!apiKey) {\n  return 'Please set your Gemini API key in AI Settings';\n}`;
@@ -138,7 +144,7 @@ if (!apiKey) {
 
   // Authorization header
   let authHeader = '';
-  if (isOllamaProvider) {
+  if (isWaterfallProvider || isOllamaProvider) {
     authHeader = `      'Content-Type': 'application/json',`;
   } else if (isGeminiModel) {
     authHeader = `      'x-goog-api-key': apiKey,\n      'Content-Type': 'application/json',`;
@@ -155,7 +161,7 @@ if (!apiKey) {
   const useMaxCompletionTokens = model.startsWith('gpt-5') || model.startsWith('o');
 
   // Generate provider name
-  const providerName = isGeminiModel ? 'Gemini' : isGroqProvider ? 'Groq' : isOllamaProvider ? 'Ollama' : isCustomProvider ? provider : 'OpenAI';
+  const providerName = isWaterfallProvider ? 'Bricks Waterfall' : isGeminiModel ? 'Gemini' : isGroqProvider ? 'Groq' : isOllamaProvider ? 'Ollama' : isCustomProvider ? provider : 'OpenAI';
 
   const endpointStr = isCustomProvider 
     ? '`${customBaseUrl.replace(/\\/$/, \'\')}/chat/completions`' 

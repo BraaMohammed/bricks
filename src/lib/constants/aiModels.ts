@@ -44,6 +44,13 @@ export interface CustomProvider {
 
 export const PROVIDERS = [
   {
+    id: 'waterfall',
+    name: 'Bricks Gateway (Free Tier Waterfall)',
+    icon: Flash,
+    requiresApiKey: false,
+    supportsLocalModels: true,
+  },
+  {
     id: 'openai',
     name: 'OpenAI (Cloud)',
     icon: Key,
@@ -150,12 +157,87 @@ export const groqModels: ModelDefinition[] = [
   },
 ];
 
+export const waterfallModels: ModelDefinition[] = [
+  {
+    id: 'deepseek-v4-flash',
+    name: 'DeepSeek V4 Flash (Fast & Cheap)',
+    supportsThinking: true,
+    cost: 'Free Tier Cascade',
+  },
+  {
+    id: 'deepseek-v4-pro',
+    name: 'DeepSeek V4 Pro (Frontier Reasoner)',
+    supportsThinking: true,
+    cost: 'Free Tier Cascade',
+  },
+  {
+    id: 'kimi-k2.6',
+    name: 'Kimi K2.6 (Moonshot Long Horizon)',
+    supportsThinking: false,
+    cost: 'Free Tier Cascade',
+  },
+  {
+    id: 'glm-5.2',
+    name: 'GLM 5.2 (Z.ai)',
+    supportsThinking: false,
+    cost: 'Free Tier Cascade',
+  },
+  {
+    id: 'glm-5.1',
+    name: 'GLM 5.1 (Z.ai)',
+    supportsThinking: false,
+    cost: 'Free Tier Cascade',
+  },
+  {
+    id: 'qwen-3.7-plus',
+    name: 'Qwen 3.7 Plus (Multimodal 1M ctx)',
+    supportsThinking: true,
+    cost: 'Free Tier Cascade',
+  },
+  {
+    id: 'qwen-3.6-35b',
+    name: 'Qwen 3.6 35B (Tool Use)',
+    supportsThinking: true,
+    cost: 'Free Tier Cascade',
+  },
+  {
+    id: 'gemini-3.5-flash',
+    name: 'Gemini 3.5 Flash (Google)',
+    supportsThinking: false,
+    cost: 'Free Tier Cascade',
+  },
+  {
+    id: 'gemini-3.1-flash-lite',
+    name: 'Gemini 3.1 Flash Lite',
+    supportsThinking: false,
+    cost: 'Free Tier Cascade',
+  },
+  {
+    id: 'nemotron-3-ultra',
+    name: 'Nvidia Nemotron 3 Ultra (550B)',
+    supportsThinking: true,
+    cost: 'Free Tier Cascade',
+  },
+  {
+    id: 'llama-3.3-70b-instruct',
+    name: 'Llama 3.3 70B (Meta)',
+    supportsThinking: false,
+    cost: 'Free Tier Cascade',
+  },
+];
+
 /**
  * Helper function to get models for a specific provider
- * Ollama models are fetched dynamically from the server
+ * Ollama models and Waterfall models can be passed dynamically
  */
-export function getProviderModels(provider: AIProvider, ollamaModels: string[] = []): ModelDefinition[] {
+export function getProviderModels(
+  provider: AIProvider,
+  ollamaModels: string[] = [],
+  dynamicWaterfallModels: ModelDefinition[] = []
+): ModelDefinition[] {
   switch (provider) {
+    case 'waterfall':
+      return dynamicWaterfallModels.length > 0 ? dynamicWaterfallModels : waterfallModels;
     case 'openai':
       return openAIModels;
     case 'gemini':
@@ -305,6 +387,7 @@ export const STORAGE_KEYS = {
 
   // Custom Providers
   CUSTOM_PROVIDERS: 'custom_ai_providers',
+  BACKEND_API_URL: 'backend_api_url',
 
   // Add new storage keys here as needed
 } as const;

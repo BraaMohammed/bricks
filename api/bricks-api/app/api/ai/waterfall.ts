@@ -210,10 +210,12 @@ export async function runWaterfall(
     ? eligibleProviders
     : SORTED_PROVIDERS.filter(isProviderConfigured);
 
+  // Check if at least one provider is not cooling down
+  const hasAvailableProvider = providerList.some((p) => health.isAvailable(p.id));
+
   for (const provider of providerList) {
-    // Skip if this provider went into cooldown between the eligibility check
-    // and now (rare but possible under concurrency)
-    if (!health.isAvailable(provider.id)) {
+    // If all providers are in cooldown, don't skip the first one — give it a chance to recover
+    if (!health.isAvailable(provider.id) && hasAvailableProvider) {
       console.log(
         `  ↳ [waterfall] ${provider.displayName} cooling down — skipping`,
       );

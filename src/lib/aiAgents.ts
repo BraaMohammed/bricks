@@ -43,8 +43,17 @@ function getModelProvider(modelName: string): AIProvider {
 
 // Helper function to get API endpoint and headers
 function getApiConfig(modelName: string, provider: AIProvider) {
-  
-  if (provider === 'gemini') {
+  if (provider === 'waterfall') {
+    const backendBase = localStorage.getItem('backend_api_url') || 'http://localhost:3000';
+    return {
+      endpoint: `${backendBase.replace(/\/+$/, '')}/api/ai/v1/chat/completions`,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      requiresApiKey: false,
+      provider: 'waterfall' as const,
+    };
+  } else if (provider === 'gemini') {
     const apiKey = localStorage.getItem('gemini_api_key');
     return {
       endpoint: '', // Gemini uses custom API calls

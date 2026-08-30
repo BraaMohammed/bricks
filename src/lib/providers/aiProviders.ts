@@ -48,6 +48,10 @@ export const getAPIEndpoint = (
   baseUrl?: string
 ): string => {
   switch (provider) {
+    case 'waterfall': {
+      const backendBase = baseUrl || (typeof localStorage !== 'undefined' ? localStorage.getItem('backend_api_url') : null) || 'http://localhost:3000';
+      return `${backendBase.replace(/\/+$/, '')}/api/ai/v1/chat/completions`;
+    }
     case 'groq':
       return 'https://api.groq.com/openai/v1/chat/completions';
     case 'ollama':
@@ -209,8 +213,9 @@ export const getAuthHeader = (
   };
 
   switch (provider) {
+    case 'waterfall':
     case 'ollama':
-      // Ollama runs locally without API key
+      // Waterfall and Ollama do not require client API keys
       return baseHeaders;
     
     case 'gemini':

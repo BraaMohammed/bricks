@@ -68,7 +68,7 @@ export const WATERFALL_PROVIDERS: ProviderConfig[] = [
     displayName: 'Nvidia NIM',
     baseURL: 'https://integrate.api.nvidia.com/v1',
     apiKeyEnvVar: 'NVIDIA_NIM_API_KEY',
-    timeoutMs: 30_000,
+    timeoutMs: 18_000,           // Fast failover if NIM queue is overloaded
     cooldownOnRateLimitMs: 60_000,
     cooldownOnErrorMs: 20_000,
     priority: 2,
@@ -92,7 +92,7 @@ export const WATERFALL_PROVIDERS: ProviderConfig[] = [
     displayName: 'OpenRouter',
     baseURL: 'https://openrouter.ai/api/v1',
     apiKeyEnvVar: 'OPENROUTER_API_KEY',
-    timeoutMs: 30_000,
+    timeoutMs: 35_000,           // Allow enough time for free-tier queues
     cooldownOnRateLimitMs: 60_000,
     cooldownOnErrorMs: 20_000,
     priority: 4,
@@ -148,18 +148,18 @@ export const MODEL_MAP: Record<string, ModelProviderMap> = {
   // ═══════════════════════════════════════════════════════════════════════════
 
   // ── DeepSeek V4 Pro (1.6T MoE, 49B active, 1M ctx) ──────────────────────
-  // Released April 2026. Best open-weight coder/reasoner with tool use.
+  // Released April 2026 / Updated August 2026 build on Nvidia NIM.
   'deepseek-v4-pro': {
     'ollama':     'deepseek-v4-pro',
-    'nvidia-nim': 'deepseek-ai/deepseek-v4-pro',
+    'nvidia-nim': 'deepseek-ai/deepseek-v4-pro-0813',
     'openrouter': 'deepseek/deepseek-v4-pro',
   },
 
   // ── DeepSeek V4 Flash (284B MoE, 13B active, 1M ctx) ────────────────────
-  // Released April 2026. Fast, cheap sibling of V4 Pro.
+  // Fast sibling of V4 Pro. Updated to 0731 build on Nvidia NIM.
   'deepseek-v4-flash': {
     'ollama':     'deepseek-v4-flash',
-    'nvidia-nim': 'deepseek-ai/deepseek-v4-flash',
+    'nvidia-nim': 'deepseek-ai/deepseek-v4-flash-0731',
     'openrouter': 'deepseek/deepseek-v4-flash',
   },
 
