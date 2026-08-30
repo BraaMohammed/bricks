@@ -13,6 +13,7 @@ import { useDataStore } from '@/stores/useDataStore';
 import { useAIAgentsStore } from '@/stores/editor/useAIAgentsStore';
 import { useUIStore } from '@/stores/editor/useUIStore';
 import { useOllamaConnection } from '@/hooks/useOllamaConnection';
+import { useBackendStatus } from '@/hooks/useBackendStatus';
 import { getAvailableModels, useAISettingsStore } from '@/stores/useAISettingsStore';
 import type { AIProvider } from '@/lib/constants/aiModels';
 import { ProviderSelector } from '../ProviderSelector';
@@ -43,8 +44,9 @@ export const AIAgentsModeEditor = () => {
     setMaxIterations: onMaxIterationsChange
   } = useAIAgentsStore();
 
-  const { setHasChanges } = useUIStore();
   const { models: ollamaModelsRaw, connected: ollamaConnected } = useOllamaConnection();
+  const backend = useBackendStatus();
+  const { setHasChanges } = useUIStore();
   const ollamaModels = ollamaModelsRaw || [];
   const { customProviders } = useAISettingsStore();
 
@@ -63,14 +65,14 @@ export const AIAgentsModeEditor = () => {
   const handleColumnClick = (columnName: string) => {
     const insertion = `{${columnName}}`;
     navigator.clipboard.writeText(insertion).then(() => {
-      toast.success(`Copied \${insertion} to clipboard!`);
+      toast.success(`Copied ${insertion} to clipboard!`);
     }).catch(() => {
       toast.error('Failed to copy to clipboard');
     });
   };
 
-  const availableCreatorModels = getAvailableModels(creatorProvider, ollamaModels);
-  const availableRoleplayModels = getAvailableModels(roleplayProvider, ollamaModels);
+  const availableCreatorModels = getAvailableModels(creatorProvider, ollamaModels, backend.models);
+  const availableRoleplayModels = getAvailableModels(roleplayProvider, ollamaModels, backend.models);
 
   // Auto-select first model if current isn't in list
   useEffect(() => {

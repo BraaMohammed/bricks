@@ -12,8 +12,11 @@ interface ProviderSelectorProps {
   ollamaConnected?: boolean;
   ollamaModels?: string[];
   ollamaBaseUrl?: string;
+  backendConnected?: boolean;
+  backendModelsCount?: number;
   onProviderChange: (provider: AIProvider) => void;
   onRefreshConnection?: () => void;
+  onRefreshBackend?: () => void;
   onBaseUrlChange?: (url: string) => void;
   compact?: boolean;
 }
@@ -24,8 +27,11 @@ export const ProviderSelector = ({
   ollamaConnected = false,
   ollamaModels = [],
   ollamaBaseUrl = 'http://localhost:11434',
+  backendConnected = false,
+  backendModelsCount = 0,
   onProviderChange,
   onRefreshConnection,
+  onRefreshBackend,
   onBaseUrlChange,
   compact = false
 }: ProviderSelectorProps) => {
@@ -77,6 +83,29 @@ export const ProviderSelector = ({
             )}
           </SelectContent>
         </Select>
+        {!compact && provider === 'waterfall' && onRefreshBackend && (
+          <div className="mt-2 flex items-center gap-2 text-sm font-mono text-xs">
+            {backendConnected ? (
+              <div className="flex items-center gap-2 text-primary font-semibold">
+                <div className="w-2 h-2 bg-primary rounded-full brick-pulse-dot" />
+                Backend Gateway Online ({backendModelsCount} models)
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-amber-500">
+                <div className="w-2 h-2 bg-amber-500 rounded-full" />
+                Backend Offline (using fallback models)
+              </div>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRefreshBackend}
+              className="ml-auto h-6 px-2 text-xs font-mono"
+            >
+              Refresh
+            </Button>
+          </div>
+        )}
         {!compact && provider === 'ollama' && onRefreshConnection && (
           <div className="mt-2 flex items-center gap-2 text-sm">
             {ollamaConnected ? (

@@ -2,10 +2,7 @@
  * AIConfiguration Component
  * 
  * Main dialog for configuring AI settings including API keys,
- * provider selection, and model configuration.
- * 
- * Refactored to use custom hooks and sub-components for better
- * maintainability and testability.
+ * provider selection, model configuration, and backend waterfall gateway status.
  */
 
 import { useState, useEffect } from 'react';
@@ -18,10 +15,12 @@ import { toast } from '@/hooks/use-toast';
 // Custom Hooks
 import { useAISettings } from '@/hooks/useAISettings';
 import { useOllamaConnection } from '@/hooks/useOllamaConnection';
+import { useBackendStatus } from '@/hooks/useBackendStatus';
 
 // Sub-components
 import { APIKeysSection } from '@/components/AIConfiguration/APIKeysSection';
 import { ProviderSelector } from '@/components/AIConfiguration/ProviderSelector';
+import { WaterfallConfiguration } from '@/components/AIConfiguration/WaterfallConfiguration';
 import { OllamaConfiguration } from '@/components/AIConfiguration/OllamaConfiguration';
 import { GeminiConfiguration } from '@/components/AIConfiguration/GeminiConfiguration';
 import { GroqConfiguration } from '@/components/AIConfiguration/GroqConfiguration';
@@ -33,31 +32,45 @@ import { CustomProviderSection } from '@/components/AIConfiguration/CustomProvid
 import { testGeminiConnection } from '@/lib/gemini';
 import { testGroqConnection } from '@/lib/groq';
 
-// Constants
-import { OPENAI_MODELS } from '@/lib/constants/aiModels';
-
 export const AIConfiguration = () => {
   const [open, setOpen] = useState(false);
 
-  // Custom hooks handle all state management
-  const settings = useAISettings();
+  // Connection hooks
   const ollama = useOllamaConnection();
+  const backend = useBackendStatus();
 
-  // Check Ollama connection when provider switches to Ollama
+  // Custom hooks handle all state management with live models
+  const settings = useAISettings(ollama.models, backend.models);
+
+  // Poll connections when modal opens or provider changes
   useEffect(() => {
-    if (settings.aiProvider === 'ollama' && open) {
-      // Delay to avoid blocking UI
-      setTimeout(() => {
+    if (open) {
+      if (settings.aiProvider === 'waterfall') {
+        backend.checkConnection();
+      } else if (settings.aiProvider === 'ollama') {
         ollama.checkConnection();
-      }, 100);
+      }
     }
   }, [settings.aiProvider, open]);
 
+  // Auto-select first Waterfall model when models are loaded
+  useEffect(() => {
+    if (
+      settings.aiProvider === 'waterfall' &&
+      backend.models.length > 0 &&
+      (!settings.model || !backend.models.some((m) => m.id === settings.model))
+    ) {
+      settings.setModel(backend.models[0].id);
+    }
+  }, [settings.aiProvider, backend.models, settings.model]);
+
   // Auto-select first Ollama model when models are loaded
   useEffect(() => {
-    if (settings.aiProvider === 'ollama' &&
+    if (
+      settings.aiProvider === 'ollama' &&
       ollama.models.length > 0 &&
-      !settings.model) {
+      !settings.model
+    ) {
       settings.setModel(ollama.models[0]);
     }
   }, [settings.aiProvider, ollama.models, settings.model]);
@@ -82,14 +95,16 @@ export const AIConfiguration = () => {
   };
 
   const handleProviderChange = (provider: string) => {
-    // Need to cast to any to handle custom provider strings
     settings.setAiProvider(provider as any);
 
-    // Trigger Ollama connection check if switching to Ollama
-    if (provider === 'ollama') {
+    if (provider === 'waterfall') {
+      setTimeout(() => {
+        backend.checkConnection();
+      }, 50);
+    } else if (provider === 'ollama') {
       setTimeout(() => {
         ollama.checkConnection();
-      }, 100);
+      }, 50);
     }
   };
 
@@ -99,7 +114,9 @@ export const AIConfiguration = () => {
         <Button variant="outline" size="sm" className="flex h-9 items-center gap-2 rounded-md border-border font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground hover:border-primary/60 hover:bg-transparent hover:text-foreground">
           <Key className="text-[14px]" />
           AI Config
-          {(settings.hasApiKey || settings.hasGeminiKey || settings.hasGroqKey || settings.customProviders.some(p => !!p.apiKey)) && <div className="w-1.5 h-1.5 bg-primary rounded-full brick-pulse-dot" />}
+          {(settings.aiProvider === 'waterfall' || settings.hasApiKey || settings.hasGeminiKey || settings.hasGroqKey || settings.customProviders.some(p => !!p.apiKey)) && (
+            <div className="w-1.5 h-1.5 bg-primary rounded-full brick-pulse-dot" />
+          )}
         </Button>
       </DialogTrigger>
 
@@ -138,6 +155,20 @@ export const AIConfiguration = () => {
             customProviders={settings.customProviders}
             onProviderChange={handleProviderChange}
           />
+
+          {/* Waterfall Configuration - only shown when Waterfall is selected */}
+          {settings.aiProvider === 'waterfall' && (
+            <WaterfallConfiguration
+              connected={backend.connected}
+              checking={backend.checking}
+              backendUrl={backend.backendUrl}
+              setBackendUrl={backend.setBackendUrl}
+              latency={backend.latency}
+              configuredProviders={backend.configuredProviders}
+              modelsCount={backend.models.length}
+              onRefresh={backend.checkConnection}
+            />
+          )}
 
           {/* Ollama Configuration - only shown when Ollama is selected */}
           {settings.aiProvider === 'ollama' && (
@@ -184,14 +215,10 @@ export const AIConfiguration = () => {
             customProvider={settings.customProviders.find(p => p.id === settings.aiProvider)}
             model={settings.model}
             setModel={settings.setModel}
-            availableModels={
-              settings.aiProvider === 'openai'
-                ? [...OPENAI_MODELS]
-                : ollama.models
-            }
+            availableModels={settings.availableModels}
             ollamaStatus={{
-              connected: ollama.connected,
-              checking: ollama.checking,
+              connected: settings.aiProvider === 'waterfall' ? backend.connected : ollama.connected,
+              checking: settings.aiProvider === 'waterfall' ? backend.checking : ollama.checking,
             }}
           />
 

@@ -30,6 +30,15 @@ export function getAgentModel(config: AgentProviderConfig): LanguageModel {
   const { provider, model } = config;
 
   switch (provider) {
+    case 'waterfall': {
+      const backendBase = config.customBaseUrl || (typeof localStorage !== 'undefined' ? localStorage.getItem('backend_api_url') : null) || 'http://localhost:3000';
+      const client = createOpenAI({
+        apiKey: 'not-needed',
+        baseURL: `${backendBase.replace(/\/+$/, '')}/api/ai/v1`,
+      });
+      return client(model || 'deepseek-v4-flash');
+    }
+
     case 'openai': {
       if (!config.openaiKey) {
         throw new Error('OpenAI API key is required. Add it in AI Configuration.');

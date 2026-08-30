@@ -8,6 +8,7 @@ import {
   openAIModels,
   geminiModels,
   groqModels,
+  waterfallModels,
   CustomProvider
 } from '@/lib/constants/aiModels';
 
@@ -55,6 +56,8 @@ export const useAISettingsStore = create<AISettingsState>((set, get) => ({
     set({ aiProvider: provider });
     if (provider === 'openai') {
       set({ model: DEFAULT_OPENAI_MODEL });
+    } else if (provider === 'waterfall') {
+      set({ model: 'deepseek-v4-flash' });
     } else {
       set({ model: '' });
     }
@@ -146,14 +149,20 @@ export const useAISettingsStore = create<AISettingsState>((set, get) => ({
   }
 }));
 
-export const getAvailableModels = (aiProvider: AIProvider, ollamaModels: string[]): ModelDefinition[] => {
-  if (aiProvider === 'openai') {
+export const getAvailableModels = (
+  aiProvider: AIProvider,
+  ollamaModels: string[] = [],
+  dynamicWaterfallModels: ModelDefinition[] = []
+): ModelDefinition[] => {
+  if (aiProvider === 'waterfall') {
+    return dynamicWaterfallModels.length > 0 ? dynamicWaterfallModels : waterfallModels;
+  } else if (aiProvider === 'openai') {
     return openAIModels;
   } else if (aiProvider === 'gemini') {
     return geminiModels;
   } else if (aiProvider === 'groq') {
     return groqModels;
-  } else {
+  } else if (aiProvider === 'ollama') {
     return ollamaModels.map(modelName => ({
       id: modelName,
       name: modelName,
@@ -161,4 +170,5 @@ export const getAvailableModels = (aiProvider: AIProvider, ollamaModels: string[
       cost: 'Free (Local)'
     }));
   }
+  return [];
 };

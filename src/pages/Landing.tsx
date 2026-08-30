@@ -78,6 +78,7 @@ const Nav = () => (
         <a href="#features" className="transition-colors hover:text-foreground">Features</a>
         <a href="#how" className="transition-colors hover:text-foreground">How it works</a>
         <a href="#compare" className="transition-colors hover:text-foreground">Compare</a>
+        <Link to="/blog" className="transition-colors text-primary hover:text-primary-glow font-semibold">Blog</Link>
       </nav>
 
       <div className="flex items-center gap-2">
@@ -529,6 +530,7 @@ const Footer = () => (
       <div className="flex items-center gap-6">
         <a href="https://github.com/BraaMohammed/bricks" target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-foreground">GitHub</a>
         <a href="#features" className="transition-colors hover:text-foreground">Features</a>
+        <Link to="/blog" className="transition-colors hover:text-foreground">Blog</Link>
         <Link to="/app" className="transition-colors hover:text-foreground">App</Link>
       </div>
       <span>

@@ -140,6 +140,15 @@ export function getRateLimitConfig(provider: string, model?: string): {
       return config;
     }
 
+    case 'waterfall': {
+      const config = {
+        maxConcurrent: 5,
+        delayMs: 300,
+        description: 'Bricks Gateway Waterfall (multi-provider cascade)'
+      };
+      return config;
+    }
+
     case 'openai': {
       const config = {
         maxConcurrent: 50,

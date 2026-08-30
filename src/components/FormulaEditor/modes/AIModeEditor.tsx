@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Brain } from 'iconoir-react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,6 +14,7 @@ import { useDataStore } from '@/stores/useDataStore';
 import { useAIModeStore } from '@/stores/editor/useAIModeStore';
 import { useAISettingsStore, getAvailableModels } from '@/stores/useAISettingsStore';
 import { useOllamaConnection } from '@/hooks/useOllamaConnection';
+import { useBackendStatus } from '@/hooks/useBackendStatus';
 import { useUIStore } from '@/stores/editor/useUIStore';
 
 export const AIModeEditor = () => {
@@ -45,11 +47,19 @@ export const AIModeEditor = () => {
     : undefined;
 
   const { connected: ollamaConnected, models: ollamaModels, checkConnection: onRefreshConnection } = useOllamaConnection();
+  const backend = useBackendStatus();
   const { showAdvancedSettings, setShowAdvancedSettings: onAdvancedSettingsChange, setHasChanges } = useUIStore();
 
-  const availableModels = getAvailableModels(provider, ollamaModels);
+  const availableModels = getAvailableModels(provider, ollamaModels, backend.models);
   const selectedModelInfo = availableModels.find(m => m.id === selectedModel);
   const supportsThinking = selectedModelInfo?.supportsThinking || false;
+
+  // Auto-select first model if not set or invalid
+  useEffect(() => {
+    if (availableModels.length > 0 && (!selectedModel || !availableModels.some(m => m.id === selectedModel))) {
+      onModelChange(availableModels[0].id);
+    }
+  }, [availableModels, selectedModel, onModelChange]);
 
   const handleInputChange = () => {
     setHasChanges(true);
@@ -71,6 +81,9 @@ export const AIModeEditor = () => {
         ollamaConnected={ollamaConnected}
         ollamaModels={ollamaModels}
         ollamaBaseUrl={ollamaBaseUrl}
+        backendConnected={backend.connected}
+        backendModelsCount={backend.models.length}
+        onRefreshBackend={backend.checkConnection}
         onProviderChange={(value) => {
           onProviderChange(value);
           handleInputChange();

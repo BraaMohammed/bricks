@@ -24,6 +24,7 @@ import {
   openAIModels,
   geminiModels,
   groqModels,
+  waterfallModels,
   ModelDefinition,
   CustomProvider
 } from '@/lib/constants/aiModels';
@@ -96,9 +97,13 @@ export interface AISettings {
  * Hook for managing all AI configuration settings
  * 
  * @param ollamaModels - Optional array of available Ollama models (from useOllamaConnection)
+ * @param dynamicWaterfallModels - Optional array of live backend models (from useBackendStatus)
  * @returns Complete AI settings interface with state and actions
  */
-export const useAISettings = (ollamaModels: string[] = []): AISettings => {
+export const useAISettings = (
+  ollamaModels: string[] = [],
+  dynamicWaterfallModels: ModelDefinition[] = []
+): AISettings => {
   // Load initial values from localStorage
   const initialConfig = aiConfigStorage.loadAll();
 
@@ -153,7 +158,9 @@ export const useAISettings = (ollamaModels: string[] = []): AISettings => {
 
   // Compute available models based on current provider
   const availableModels = useMemo<ModelDefinition[]>(() => {
-    if (aiProvider === 'openai') {
+    if (aiProvider === 'waterfall') {
+      return dynamicWaterfallModels.length > 0 ? dynamicWaterfallModels : waterfallModels;
+    } else if (aiProvider === 'openai') {
       return openAIModels;
     } else if (aiProvider === 'gemini') {
       return geminiModels;
@@ -168,7 +175,7 @@ export const useAISettings = (ollamaModels: string[] = []): AISettings => {
         cost: 'Free (Local)'
       }));
     }
-  }, [aiProvider, ollamaModels]);
+  }, [aiProvider, ollamaModels, dynamicWaterfallModels]);
 
   const loadSettings = useCallback(() => {
     const config = aiConfigStorage.loadAll();

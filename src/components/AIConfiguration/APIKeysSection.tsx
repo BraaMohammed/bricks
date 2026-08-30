@@ -59,7 +59,7 @@ export const APIKeysSection = ({
           API Keys
         </CardTitle>
         <CardDescription>
-          Your API keys are stored locally and never sent to our servers.
+          Your API keys are stored locally and never sent to our servers. (Not required if using Bricks Free Gateway or Ollama).
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

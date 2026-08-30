@@ -45,6 +45,17 @@ export const ProviderSelector = ({
               <SelectValue placeholder="Select AI provider" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="waterfall">
+                <div className="flex items-center justify-between w-full gap-2">
+                  <div className="flex items-center gap-2">
+                    <Flash className="h-4 w-4 text-primary" />
+                    <span className="font-semibold text-foreground">Bricks Gateway (Free Tier Waterfall)</span>
+                  </div>
+                  <span className="rounded bg-primary/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-primary border border-primary/20">
+                    Free / Zero Key
+                  </span>
+                </div>
+              </SelectItem>
               <SelectItem value="openai">
                 <div className="flex items-center gap-2">
                   <Key className="h-4 w-4" />

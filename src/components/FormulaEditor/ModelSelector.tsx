@@ -173,6 +173,12 @@ export const ModelSelector = ({
               : 'Install models with: ollama pull llama2'
             }
           </>
+        ) : availableModels.length > 0 && provider === 'waterfall' ? (
+          <>
+            💡 Cost: {selectedModelInfo?.cost || 'Free Gateway Tier'}
+            <br />
+            Routed via Bricks Waterfall Gateway across free tiers with auto-failover (zero client API keys).
+          </>
         ) : availableModels.length > 0 && provider === 'gemini' ? (
           <>
             💡 Cost: {selectedModelInfo?.cost || 'Select a model to see pricing'}

@@ -1,19 +1,17 @@
 /**
  * ModelSelector Component
  * 
- * Provides model selection dropdown for both OpenAI and Ollama.
- * Handles different states (loading, no models, etc.) and provides
- * appropriate descriptions based on the selected provider.
+ * Provides model selection dropdown for Waterfall Gateway, OpenAI, Gemini, Groq, Ollama, and Custom providers.
  */
 
 import { useState } from 'react';
-import { Sparks, Globe, Refresh, Search } from 'iconoir-react';
+import { Sparks, Globe, Refresh, Flash } from 'iconoir-react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AIProvider, GEMINI_MODELS, GEMINI_MODEL_INFO, groqModels, CustomProvider } from '@/lib/constants/aiModels';
+import { AIProvider, GEMINI_MODELS, GEMINI_MODEL_INFO, groqModels, CustomProvider, ModelDefinition } from '@/lib/constants/aiModels';
 import { toast } from '@/hooks/use-toast';
 
 export interface ModelSelectorProps {
@@ -21,7 +19,7 @@ export interface ModelSelectorProps {
   customProvider?: CustomProvider;
   model: string;
   setModel: (model: string) => void;
-  availableModels: string[];
+  availableModels: ModelDefinition[] | string[] | any[];
   ollamaStatus?: {
     connected: boolean;
     checking: boolean;
@@ -39,33 +37,44 @@ export const ModelSelector = ({
   const [fetchingModels, setFetchingModels] = useState(false);
   const [customModels, setCustomModels] = useState<string[]>([]);
   const isCustomProvider = provider.startsWith('custom:') && !!customProvider;
+
   // Get description text based on provider and state
   const getDescriptionText = () => {
+    if (provider === 'waterfall') {
+      return ollamaStatus?.connected
+        ? `Connected to backend gateway. ${availableModels.length} models available across configured free providers.`
+        : 'Connect backend dev server to discover live active models and provider fallbacks.';
+    }
+
     if (isCustomProvider) {
       return `Enter the model ID manually, or fetch available models from ${customProvider?.name}.`;
     }
     
     if (provider === 'openai') {
-      return 'GPT-4 models are more powerful but cost more. GPT-3.5-turbo is faster and cheaper.';
+      return 'GPT-4 / GPT-5 models are more powerful. Mini models are faster and cheaper.';
     }
     
     if (provider === 'gemini') {
-      return 'Gemini 3 series are latest models. Gemini 2.5 Flash Lite offers best value at $0.10/M tokens.';
+      return 'Gemini 3 series are latest models. Gemini 2.5 Flash Lite offers best value.';
     }
     
     if (provider === 'groq') {
-      return 'Groq provides ultra-fast inference. Llama 3.3 70B recommended for best quality. Free tier: 30-60 req/min.';
+      return 'Groq provides ultra-fast inference. Llama 3.3 70B recommended for best quality.';
     }
     
     // Ollama provider
     if (ollamaStatus?.connected) {
       return `${availableModels.length} local models available. No API costs.`;
     }
-    return 'Install models with: ollama pull llama2';
+    return 'Install models with: ollama pull llama3.3';
   };
 
   // Get placeholder text for empty state
   const getPlaceholderText = () => {
+    if (provider === 'waterfall') {
+      return ollamaStatus?.connected ? 'Select a waterfall model' : 'Backend offline (using defaults)';
+    }
+
     if (isCustomProvider) {
       return 'Enter model ID (e.g. meta-llama/llama-3-8b-instruct)';
     }
@@ -134,7 +143,9 @@ export const ModelSelector = ({
       <CardHeader>
         <CardTitle className="text-lg">Model Selection</CardTitle>
         <CardDescription>
-          {isCustomProvider
+          {provider === 'waterfall'
+            ? 'Choose which model to route through the free-tier backend waterfall gateway.'
+            : isCustomProvider
             ? `Choose which model to use from ${customProvider?.name}.`
             : provider === 'openai' 
             ? 'Choose which OpenAI model to use for AI operations.'
@@ -192,15 +203,36 @@ export const ModelSelector = ({
                 <SelectValue placeholder={getPlaceholderText()} />
               </SelectTrigger>
               <SelectContent>
-                {provider === 'openai' ? (
-                  // OpenAI models
-                  availableModels.map((modelOption) => (
-                    <SelectItem key={modelOption} value={modelOption}>
-                      {modelOption}
-                    </SelectItem>
-                  ))
+                {provider === 'waterfall' ? (
+                  availableModels.map((modelDef: any) => {
+                    const id = typeof modelDef === 'string' ? modelDef : modelDef.id;
+                    const name = typeof modelDef === 'string' ? modelDef : modelDef.name;
+                    const cost = typeof modelDef === 'object' ? modelDef.cost : 'Free';
+                    return (
+                      <SelectItem key={id} value={id}>
+                        <div className="flex items-center justify-between w-full gap-3">
+                          <div className="flex items-center gap-1.5 truncate">
+                            <Flash className="h-3.5 w-3.5 text-primary shrink-0" />
+                            <span className="truncate">{name}</span>
+                          </div>
+                          <span className="text-[10px] font-mono text-muted-foreground shrink-0">
+                            {cost}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })
+                ) : provider === 'openai' ? (
+                  availableModels.map((modelOption: any) => {
+                    const id = typeof modelOption === 'string' ? modelOption : modelOption.id;
+                    const name = typeof modelOption === 'string' ? modelOption : modelOption.name;
+                    return (
+                      <SelectItem key={id} value={id}>
+                        {name}
+                      </SelectItem>
+                    );
+                  })
                 ) : provider === 'gemini' ? (
-                  // Gemini models
                   GEMINI_MODELS.map((modelOption) => {
                     const modelInfo = GEMINI_MODEL_INFO[modelOption];
                     return (
@@ -218,7 +250,6 @@ export const ModelSelector = ({
                     );
                   })
                 ) : provider === 'groq' ? (
-                  // Groq models
                   groqModels.map((modelDef) => (
                     <SelectItem key={modelDef.id} value={modelDef.id}>
                       <div className="flex items-center justify-between w-full">
@@ -230,13 +261,15 @@ export const ModelSelector = ({
                     </SelectItem>
                   ))
                 ) : (
-                  // Ollama models
                   availableModels && availableModels.length > 0 ? (
-                    availableModels.map((modelOption) => (
-                      <SelectItem key={modelOption} value={modelOption}>
-                        {modelOption}
-                      </SelectItem>
-                    ))
+                    availableModels.map((modelOption: any) => {
+                      const id = typeof modelOption === 'string' ? modelOption : modelOption.id;
+                      return (
+                        <SelectItem key={id} value={id}>
+                          {id}
+                        </SelectItem>
+                      );
+                    })
                   ) : (
                     <SelectItem value="__placeholder__" disabled>
                       {getPlaceholderText()}

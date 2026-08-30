@@ -17,6 +17,7 @@ import { useDataStore } from '@/stores/useDataStore';
 import { useAgentStore } from '@/stores/editor/useAgentStore';
 import { useAISettingsStore, getAvailableModels } from '@/stores/useAISettingsStore';
 import { useOllamaConnection } from '@/hooks/useOllamaConnection';
+import { useBackendStatus } from '@/hooks/useBackendStatus';
 import { useUIStore } from '@/stores/editor/useUIStore';
 import type { AIProvider } from '@/lib/constants/aiModels';
 
@@ -40,6 +41,7 @@ export const AgentModeEditor = () => {
   } = useAgentStore();
 
   const { models: ollamaModels } = useOllamaConnection();
+  const backend = useBackendStatus();
   const { setHasChanges } = useUIStore();
   const { customProviders } = useAISettingsStore();
 
@@ -51,12 +53,12 @@ export const AgentModeEditor = () => {
     setHasChanges(true);
   };
 
-  const availableModels = getAvailableModels(provider, ollamaModels || []);
+  const availableModels = getAvailableModels(provider, ollamaModels || [], backend.models);
 
   const handleProviderChange = (newProvider: string) => {
     const providerId = newProvider as AIProvider;
     onProviderChange(providerId);
-    const firstModel = getAvailableModels(providerId, ollamaModels || [])?.[0]?.id ?? '';
+    const firstModel = getAvailableModels(providerId, ollamaModels || [], backend.models)?.[0]?.id ?? '';
     onModelChange(firstModel);
     handleInputChange();
   };
