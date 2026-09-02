@@ -113,6 +113,47 @@ async function searchWithExa(query: string, apiKey: string): Promise<SearchResul
     }));
 }
 
+// ── Provider: TinyFish ────────────────────────────────────────────────────────
+//
+// GET https://api.search.tinyfish.ai?query=...
+// Returns structured, ranked web search results optimized for LLM agents.
+//
+// Limits: 30 requests/min (Free), 60 req/min (Starter), 120 req/min (Pro)
+// Docs: https://docs.tinyfish.ai
+// Requires: TINYFISH_API_KEY in env
+//
+
+async function searchWithTinyFish(query: string, apiKey: string): Promise<SearchResult[]> {
+    const url = `https://api.search.tinyfish.ai?query=${encodeURIComponent(query)}`;
+    const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+            'X-API-Key': apiKey,
+        },
+        signal: AbortSignal.timeout(15000),
+    });
+
+    if (res.status === 401) {
+        throw new Error('TinyFish Search: 401 — API key invalid or expired');
+    }
+    if (res.status === 429) {
+        throw new Error('TinyFish Search: 429 Too Many Requests (rate limit exceeded: 30 req/min on free tier)');
+    }
+    if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`TinyFish error: ${res.status} ${res.statusText} - ${errorText}`);
+    }
+
+    const data = await res.json();
+    const items: Array<Record<string, any>> = data?.results ?? [];
+
+    return items.slice(0, 5).map((r) => ({
+        title: r.title ?? '',
+        url: r.url ?? '',
+        snippet: r.snippet ? String(r.snippet).slice(0, 300) : '',
+    }));
+}
+
 // ── Provider: DuckDuckGo (HTML scrape, no key) ────────────────────────────────
 
 async function searchWithDuckDuckGo(query: string): Promise<SearchResult[]> {
@@ -182,14 +223,18 @@ export async function POST(request: NextRequest) {
         console.log(`🔍 Search request: "${query}"`);
 
         const serperKey = process.env.SERPER_API_KEY;
-        const tavilyKey = process.env.TAVILY_API_KEY;
+        const tinyfishKey = process.env.TINYFISH_API_KEY;
         const exaKey = process.env.EXA_API_KEY;
+        const tavilyKey = process.env.TAVILY_API_KEY;
 
         // Try each provider in order
         const providers: Array<{ name: string; fn: () => Promise<SearchResult[]> }> = [];
 
         if (serperKey) {
             providers.push({ name: 'serper', fn: () => searchWithSerper(query, serperKey) });
+        }
+        if (tinyfishKey) {
+            providers.push({ name: 'tinyfish', fn: () => searchWithTinyFish(query, tinyfishKey) });
         }
         if (exaKey) {
             providers.push({ name: 'exa', fn: () => searchWithExa(query, exaKey) });

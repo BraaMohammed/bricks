@@ -58,7 +58,49 @@ async function readWithFetch(url: string): Promise<{ content: string; title: str
     }
 }
 
-// ── Provider 2: Firecrawl ─────────────────────────────────────────────────────
+// ── Provider 2: TinyFish ──────────────────────────────────────────────────────
+//
+// POST https://api.fetch.tinyfish.ai
+// Returns Markdown natively via format:"markdown".
+// Real browser rendering, JS/SPA support, stealth handling.
+//
+// Limits: 150 requests/min (Free), 300 req/min (Starter), 600 req/min (Pro)
+// Docs: https://docs.tinyfish.ai
+// Requires: TINYFISH_API_KEY in env
+//
+
+async function readWithTinyFish(url: string, apiKey: string): Promise<{ content: string; title: string }> {
+    const res = await fetch('https://api.fetch.tinyfish.ai', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': apiKey,
+        },
+        body: JSON.stringify({
+            urls: [url],
+            format: 'markdown',
+        }),
+        signal: AbortSignal.timeout(35000),
+    });
+
+    if (res.status === 401) throw new Error('TinyFish: 401 — API key invalid or expired');
+    if (res.status === 429) throw new Error('TinyFish: 429 — rate limit exceeded');
+    if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`TinyFish failed: ${res.status} ${res.statusText} - ${errorText}`);
+    }
+
+    const data = await res.json();
+    const result = data?.results?.[0];
+    if (!result || !result.text?.trim()) {
+        const errorMsg = data?.errors?.[0] ? JSON.stringify(data.errors[0]) : 'empty markdown response';
+        throw new Error(`TinyFish: ${errorMsg}`);
+    }
+
+    return { content: result.text.trim(), title: result.title ?? '' };
+}
+
+// ── Provider 3: Firecrawl ─────────────────────────────────────────────────────
 //
 // POST https://api.firecrawl.dev/v1/scrape
 // Returns native Markdown — no Readability/DOM processing needed.
@@ -338,6 +380,7 @@ export async function POST(request: NextRequest) {
         const services: ServiceDef[] = [];
 
         const firecrawlKey  = process.env.FIRECRAWL_KEY;
+        const tinyfishKey   = process.env.TINYFISH_API_KEY;
         const scrapeDoKey   = process.env.SCRAPE_DO_KEY;
         const scraperApiKey = process.env.SCRAPER_API_KEY;
         const diffbotKey    = process.env.DIFFBOT_TOKEN;
@@ -345,6 +388,7 @@ export async function POST(request: NextRequest) {
         const scrapflyKey   = process.env.SCRAPFLY_KEY;
 
         if (firecrawlKey)  services.push({ name: 'firecrawl',  credits: '500 total',    fn: () => readWithFirecrawl(url, firecrawlKey) });
+        if (tinyfishKey)   services.push({ name: 'tinyfish',   credits: 'free tier',    fn: () => readWithTinyFish(url, tinyfishKey) });
         if (scrapeDoKey)   services.push({ name: 'scrape.do',  credits: '1000/month',   fn: () => readWithScrapeDo(url, scrapeDoKey) });
         if (scraperApiKey) services.push({ name: 'scraperapi', credits: '1000/month',   fn: () => readWithScraperAPI(url, scraperApiKey) });
         if (diffbotKey)    services.push({ name: 'diffbot',    credits: '10000/month',  fn: () => readWithDiffbot(url, diffbotKey) });
