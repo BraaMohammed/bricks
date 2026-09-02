@@ -200,7 +200,51 @@ async function readWithScraperAPI(url: string, apiKey: string): Promise<{ conten
     return extractReadableContent(html, url);
 }
 
-// ── Provider 3: Puppeteer pool (full browser, most reliable) ─────────────────
+// ── Provider 3: TinyFish (renders JS, extracts clean markdown) ───────────────
+//
+// POST https://api.fetch.tinyfish.ai
+// Renders pages with stealth browser and returns clean markdown.
+//
+// Limits: 150 requests/min (Free), 300 req/min (Starter), 600 req/min (Pro)
+// Docs: https://docs.tinyfish.ai
+// Requires: TINYFISH_API_KEY in env
+//
+
+async function readWithTinyFish(url: string, apiKey: string): Promise<{ content: string; title: string }> {
+    const res = await fetch('https://api.fetch.tinyfish.ai', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': apiKey,
+        },
+        body: JSON.stringify({
+            urls: [url],
+            format: 'markdown',
+        }),
+        signal: AbortSignal.timeout(35000),
+    });
+
+    if (res.status === 401) throw new Error('TinyFish: 401 — API key invalid or expired');
+    if (res.status === 429) throw new Error('TinyFish Fetch: 429 Too Many Requests (rate limit exceeded: 150 req/min on free tier)');
+    if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`TinyFish Fetch error: ${res.status} ${res.statusText} - ${errorText}`);
+    }
+
+    const data = await res.json();
+    const result = data?.results?.[0];
+    if (!result || !result.text?.trim()) {
+        const errorMsg = data?.errors?.[0] ? JSON.stringify(data.errors[0]) : 'empty result';
+        throw new Error(`TinyFish Fetch returned no content: ${errorMsg}`);
+    }
+
+    return {
+        content: result.text.trim(),
+        title: result.title ?? '',
+    };
+}
+
+// ── Provider 4: Puppeteer pool (full browser, most reliable) ─────────────────
 // Slowest but handles anything a real browser can.
 
 async function readWithPuppeteer(url: string): Promise<{ content: string; title: string; release: () => Promise<void>; browserRelease: () => void }> {
@@ -233,8 +277,8 @@ async function readWithPuppeteer(url: string): Promise<{ content: string; title:
 export async function POST(request: NextRequest) {
     // ── Env flag: forward to /fetch-page (no-Puppeteer stack) ────────────────
     // Set READER_USE_FETCH_PAGE=true in .env.local to route all /reader traffic
-    // through the puppeteer-free waterfall (fetch → ScraperAPI → scrape.do →
-    // Tavily → Scrapfly → Firecrawl).
+    // through the puppeteer-free waterfall (fetch → Firecrawl → TinyFish →
+    // ScraperAPI → scrape.do → Diffbot → Tavily → Scrapfly).
     if (process.env.READER_USE_FETCH_PAGE === 'true') {
         const baseUrl = process.env.VERCEL_URL
             ? `https://${process.env.VERCEL_URL}`
@@ -287,12 +331,13 @@ export async function POST(request: NextRequest) {
         //   1. fetch      — free, instant, works for static/SSR pages
         //   2. Puppeteer  — full browser with tracker blocking + networkidle2,
         //                   handles JS SPAs reliably without spending API credits
-        //   3. ScraperAPI — paid last resort for pages Puppeteer can't crack
+        //   3. TinyFish   — fast cloud scraper with native markdown & stealth handling
+        //   4. ScraperAPI — paid last resort for pages Puppeteer/TinyFish can't crack
         //                   (heavy Cloudflare bot management, etc.)
 
         // 1️⃣ Plain fetch (free, instant)
         try {
-            console.log(`  ↳ [1/3] Trying plain fetch...`);
+            console.log(`  ↳ [1/4] Trying plain fetch...`);
             const { content, title } = await readWithFetch(url);
             if (content.length >= MIN_USEFUL_CHARS) {
                 const truncated = content.slice(0, MAX_CONTENT_LENGTH);
@@ -309,7 +354,7 @@ export async function POST(request: NextRequest) {
 
         // 2️⃣ Puppeteer pool (full browser, tracker-blocked, networkidle2)
         try {
-            console.log(`  ↳ [2/3] Trying Puppeteer...`);
+            console.log(`  ↳ [2/4] Trying Puppeteer...`);
             const puppeteerResult = await readWithPuppeteer(url);
             puppeteerRelease = puppeteerResult.release;
             puppeteerBrowserRelease = puppeteerResult.browserRelease;
@@ -329,11 +374,33 @@ export async function POST(request: NextRequest) {
             console.warn(`  ⚠️ Puppeteer failed: ${err} — falling through`);
         }
 
-        // 3️⃣ ScraperAPI (paid, last resort — only spent when Puppeteer itself fails)
+        // 3️⃣ TinyFish (cloud scraper / JS renderer — tried before ScraperAPI)
+        const tinyfishApiKey = process.env.TINYFISH_API_KEY;
+        if (tinyfishApiKey) {
+            try {
+                console.log(`  ↳ [3/4] Trying TinyFish...`);
+                const { content, title } = await readWithTinyFish(url, tinyfishApiKey);
+                if (content.length >= MIN_USEFUL_CHARS) {
+                    const truncated = content.slice(0, MAX_CONTENT_LENGTH);
+                    console.log(`  ✅ TinyFish extracted ${truncated.length} chars from ${url}`);
+                    return NextResponse.json(
+                        { url, content: truncated, title, provider: 'tinyfish', error: null } satisfies ReaderResponse,
+                        { headers: corsHeaders }
+                    );
+                }
+                console.warn(`  ⚠️ TinyFish returned only ${content.length} chars — falling through`);
+            } catch (err) {
+                console.warn(`  ⚠️ TinyFish failed: ${err} — falling through`);
+            }
+        } else {
+            console.log(`  ↳ [3/4] TinyFish skipped (no TINYFISH_API_KEY)`);
+        }
+
+        // 4️⃣ ScraperAPI (paid, last resort — only spent when prior providers fail)
         const scraperApiKey = process.env.SCRAPER_API_KEY;
         if (scraperApiKey) {
             try {
-                console.log(`  ↳ [3/3] Trying ScraperAPI...`);
+                console.log(`  ↳ [4/4] Trying ScraperAPI...`);
                 const { content, title } = await readWithScraperAPI(url, scraperApiKey);
                 if (content.length >= MIN_USEFUL_CHARS) {
                     const truncated = content.slice(0, MAX_CONTENT_LENGTH);
@@ -348,7 +415,7 @@ export async function POST(request: NextRequest) {
                 console.warn(`  ⚠️ ScraperAPI failed: ${err} — all providers exhausted`);
             }
         } else {
-            console.log(`  ↳ [3/3] ScraperAPI skipped (no SCRAPER_API_KEY) — all providers exhausted`);
+            console.log(`  ↳ [4/4] ScraperAPI skipped (no SCRAPER_API_KEY) — all providers exhausted`);
         }
 
         return NextResponse.json(

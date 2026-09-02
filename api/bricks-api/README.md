@@ -10,9 +10,9 @@ Runs separately from the Vite frontend. Handles anything that can't run client-s
 
 - **AI Waterfall Gateway (`/api/ai/v1`)** — OpenAI-compatible chat completions across 6 free-tier providers (Ollama → Nvidia NIM → Cloudflare → OpenRouter → Google AI Studio → Groq) with automatic failover, per-provider cooldowns, and model aliasing. Point any OpenAI SDK at it and never pay for inference again.
 - **Puppeteer Stealth Engine (`/api/puppeteer`)** — Queue-based browser pool. Handles JS-heavy pages, bot-detection bypass, screenshot tasks, and bulk automations with memory management.
-- **Autonomous Web Search (`/api/search`)** — Routes queries through Serper → Exa → Tavily → DuckDuckGo (free fallback). Used as the search layer for web research agents.
-- **Web Content Reader (`/api/reader`)** — 3-layer fallback chain that converts any URL into clean, AI-ready markdown, including JS-rendered SPAs.
-- **Serverless Page Fetcher (`/api/fetch-page`)** — Puppeteer-free URL reading waterfall: Fetch → ScraperAPI → Diffbot → scrape.do → Tavily → Scrapfly → Firecrawl.
+- **Autonomous Web Search (`/api/search`)** — Routes queries through Serper → TinyFish → Exa → Tavily → DuckDuckGo (free fallback). Used as the search layer for web research agents.
+- **Web Content Reader (`/api/reader`)** — 4-layer fallback chain (Fetch → Puppeteer → TinyFish → ScraperAPI) that converts any URL into clean, AI-ready markdown, including JS-rendered SPAs.
+- **Serverless Page Fetcher (`/api/fetch-page`)** — Puppeteer-free URL reading waterfall: Fetch → Firecrawl → TinyFish → scrape.do → ScraperAPI → Diffbot → Tavily → Scrapfly.
 - **Email Validation Cascade (`/api/validate-email`)** — Routes email validation through Hunter → MillionVerifier → QuickEmailVerification in sequence to maximize accuracy and stay within free tiers.
 
 ---
@@ -31,15 +31,15 @@ AI provider keys used **by the frontend agents** (OpenAI, Gemini, Groq) are stil
 
 ```env
 # ── Web Search Providers ─────────────────────────────────────────────────────
-# Falls back to free DuckDuckGo scraping if neither is set.
+# Falls back to free DuckDuckGo scraping if none are set.
 SERPER_API_KEY=your_serper_key_here
+TINYFISH_API_KEY=your_tinyfish_key_here
 EXA_API_KEY=your_exa_key_here
 TAVILY_API_KEY=your_tavily_key_here
 
-# ── Web Reader — ScraperAPI (Optional) ───────────────────────────────────────
-# Last-resort fallback in /api/reader when Puppeteer fails.
-# Free tier available at https://www.scraperapi.com
-# Leave blank to skip — Puppeteer handles the vast majority of cases.
+# ── Web Reader & Scrapers (Optional) ─────────────────────────────────────────
+# TinyFish — Free tier search & fetch (uses TINYFISH_API_KEY above)
+# ScraperAPI — last-resort fallback in /api/reader when Puppeteer/TinyFish fail
 SCRAPER_API_KEY=your_scraperapi_key_here
 
 # ── Serverless Page Fetcher (/api/fetch-page) ─────────────────────────────────
