@@ -13,6 +13,9 @@
 # testing
 /coverage
 
+# local PGlite data directory
+/.pglite-data
+
 # next.js
 /.next/
 /out/

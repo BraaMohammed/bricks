@@ -1,0 +1,3 @@
+# Local storage is embedded Postgres (PGlite) with Drizzle
+
+Local persistence uses PGlite — a WASM build of Postgres shipped as an npm package, with no install and no Docker — so the local engine matches production Supabase exactly. Drizzle is the ORM: one Postgres schema and one migration set run unchanged against PGlite locally and Supabase in production; only the driver changes (`drizzle-orm/pglite` to `drizzle-orm/postgres-js`). Switching to Supabase is therefore a connection string, not a rewrite. Considered and rejected: SQLite (its migrations would not run on Supabase); Prisma (heavier, bundles a query engine, own migration format); local Supabase CLI (Docker setup burden).

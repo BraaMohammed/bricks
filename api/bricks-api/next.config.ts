@@ -1,20 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  
-  // Increase API payload limits for Puppeteer code
-  experimental: {
-    serverComponentsExternalPackages: ['puppeteer-core']
-  },
-  
-  // API routes configuration
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb', // Increase from default 1mb to 10mb
-    },
-    responseLimit: '10mb'
-  }
+  // Keep browser-automation packages out of the server bundle; they are
+  // required lazily by the Puppeteer pool.
+  serverExternalPackages: [
+    'puppeteer',
+    'puppeteer-extra',
+    'puppeteer-extra-plugin-stealth',
+  ],
 };
 
 export default nextConfig;
