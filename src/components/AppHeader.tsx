@@ -1,4 +1,4 @@
-import { Flash, Github, Download, Trash, Xmark, ArrowUpRight } from 'iconoir-react';
+import { Flash, Github, Download, Trash, Xmark, ArrowUpRight, Sparks } from 'iconoir-react';
 import { Button } from '@/components/ui/button';
 import { useDataStore } from '@/stores/useDataStore';
 import { AIConfiguration } from '@/components/AIConfiguration';
@@ -106,6 +106,14 @@ export const AppHeader = () => {
             </div>
 
             <div className="flex items-center gap-2">
+              <Link
+                to="/deep-research"
+                aria-label="AI Deep Researcher"
+                className="flex h-9 items-center gap-2 rounded-md border border-border px-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground lg:px-3"
+              >
+                <Sparks className="text-[14px] text-primary" />
+                <span className="hidden lg:inline">AI Deep Researcher</span>
+              </Link>
               <TablesManager />
               <AIConfiguration />
               {headers.length > 0 && (

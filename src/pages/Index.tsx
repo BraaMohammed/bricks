@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AppHeader } from '@/components/AppHeader';
 import { CSVUploader } from '@/components/CSVUploader';
 import { DataTable } from '@/components/DataTable';
 import { FormulaEditor } from '@/components/FormulaEditor';
+import { Button } from '@/components/ui/button';
 import { useDataStore } from '@/stores/useDataStore';
-import { IconoirProvider, Database, Terminal, Flash } from 'iconoir-react';
+import { IconoirProvider, Database, Terminal, Flash, Sparks } from 'iconoir-react';
 
 const steps = [
   { n: '01', icon: Database, title: 'Upload CSV', desc: 'Drag in your lead list. Headers become programmable columns instantly.' },
@@ -67,6 +69,37 @@ const Index = () => {
 
                 <div className="brick-animate-in mt-12" style={{ animationDelay: '280ms' }}>
                   <CSVUploader />
+                </div>
+
+                <div
+                  className="brick-animate-in mt-5 flex flex-col items-center gap-3"
+                  style={{ animationDelay: '320ms' }}
+                >
+                  <div className="flex w-full max-w-xl items-center gap-4">
+                    <span className="h-px flex-1 bg-border" />
+                    <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                      or
+                    </span>
+                    <span className="h-px flex-1 bg-border" />
+                  </div>
+
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="lg"
+                    className="h-11 gap-2 rounded-md border-border font-mono text-[10px] uppercase tracking-[0.16em] text-foreground hover:border-primary/60 hover:bg-primary/[0.04]"
+                  >
+                    <Link to="/deep-research">
+                      <Sparks className="text-[15px] text-primary" />
+                      AI Deep Researcher
+                    </Link>
+                  </Button>
+
+                  <p className="max-w-xl text-center text-sm leading-relaxed text-muted-foreground">
+                    No list yet? Describe what you're looking for — it can find companies,
+                    people, job posts, whatever you describe — and the AI Deep Researcher builds
+                    the table for you.
+                  </p>
                 </div>
 
                 {/* Steps */}
