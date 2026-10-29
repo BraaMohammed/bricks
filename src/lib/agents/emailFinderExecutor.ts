@@ -21,7 +21,7 @@ export interface EmailFinderRunOptions {
   /** Lead context — may contain {ColumnName} placeholders already interpolated */
   context: string;
   /** AI provider to use */
-  provider: 'openai' | 'gemini' | 'groq' | 'ollama';
+  provider: 'openai' | 'gemini' | 'groq' | 'ollama' | 'opencode-go';
   /** Model ID */
   model: string;
   /** Maximum agentic tool-call steps. Default: 15 */

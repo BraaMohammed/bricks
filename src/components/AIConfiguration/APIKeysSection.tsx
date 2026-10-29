@@ -192,6 +192,15 @@ export const APIKeysSection = ({
             </a>
           </p>
         </div>
+
+        {/* OpenCode Go backend key note */}
+        <div className="rounded-md border border-border bg-muted/30 p-3">
+          <p className="text-xs text-muted-foreground">
+            OpenCode Go uses the backend environment key{' '}
+            <code className="font-mono text-foreground">OPENCODE_GO_API_KEY</code> from{' '}
+            <code className="font-mono text-foreground">api/bricks-api/.env.local</code>. There is no key field here.
+          </p>
+        </div>
       </CardContent>
     </Card>
   );

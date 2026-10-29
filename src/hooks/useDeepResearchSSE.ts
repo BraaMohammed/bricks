@@ -60,7 +60,7 @@ export function useDeepResearchSSE() {
     if (abortRef.current) return;
 
     const store = useDeepResearchStore.getState();
-    const { runId, outputSchema } = store;
+    const { runId, outputSchema, model } = store;
     if (!runId || !outputSchema) return;
     if (!store.startRun()) return;
 
@@ -73,7 +73,7 @@ export function useDeepResearchSSE() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
-        body: JSON.stringify({ runId, outputSchema }),
+        body: JSON.stringify({ runId, outputSchema, model }),
       });
 
       if (!response.ok) {

@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { Settings, Key, FloppyDisk } from 'iconoir-react';
+import type { AIProvider } from '@/lib/constants/aiModels';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Card } from '@/components/ui/card';
@@ -24,6 +25,7 @@ import { WaterfallConfiguration } from '@/components/AIConfiguration/WaterfallCo
 import { OllamaConfiguration } from '@/components/AIConfiguration/OllamaConfiguration';
 import { GeminiConfiguration } from '@/components/AIConfiguration/GeminiConfiguration';
 import { GroqConfiguration } from '@/components/AIConfiguration/GroqConfiguration';
+import { OpenCodeGoConfiguration } from '@/components/AIConfiguration/OpenCodeGoConfiguration';
 import { ModelSelector } from '@/components/AIConfiguration/ModelSelector';
 import { CustomPromptSection } from '@/components/AIConfiguration/CustomPromptSection';
 import { CustomProviderSection } from '@/components/AIConfiguration/CustomProviderSection';
@@ -95,7 +97,7 @@ export const AIConfiguration = () => {
   };
 
   const handleProviderChange = (provider: string) => {
-    settings.setAiProvider(provider as any);
+    settings.setAiProvider(provider as AIProvider);
 
     if (provider === 'waterfall') {
       setTimeout(() => {
@@ -168,6 +170,11 @@ export const AIConfiguration = () => {
               modelsCount={backend.models.length}
               onRefresh={backend.checkConnection}
             />
+          )}
+
+          {/* OpenCode Go Configuration - only shown when OpenCode Go is selected */}
+          {settings.aiProvider === 'opencode-go' && (
+            <OpenCodeGoConfiguration />
           )}
 
           {/* Ollama Configuration - only shown when Ollama is selected */}

@@ -16,6 +16,17 @@ import {
   getSelfBaseUrl,
 } from './env';
 
+const OPENCODE_GO_MODEL_PREFIX = 'opencode-go/';
+const OPENCODE_GO_SESSION_ID = `deep-research-${process.pid}`;
+
+function isOpenCodeGoModel(model: string): boolean {
+  return model.startsWith(OPENCODE_GO_MODEL_PREFIX);
+}
+
+function openCodeGoChatUrl(): string {
+  return `${getSelfBaseUrl()}/api/ai/opencode-go/v1/chat/completions`;
+}
+
 // ── Streaming client (self-hosted OpenAI-format SSE route) ───────────────────
 //
 // The installed @ai-sdk/openai-compatible package implements provider
@@ -63,6 +74,7 @@ export interface StreamChatOptions {
   temperature?: number;
   maxTokens?: number;
   model?: string;
+  sessionId?: string;
 }
 
 export interface StreamChatResult {
@@ -86,8 +98,10 @@ export async function streamChat(
   options: StreamChatOptions,
 ): Promise<StreamChatResult> {
   const baseUrl = getSelfBaseUrl();
+  const model = options.model ?? getDeepResearchModel();
+  const isOpenCodeGo = isOpenCodeGoModel(model);
   const body = {
-    model: options.model ?? getDeepResearchModel(),
+    model,
     messages: options.messages,
     ...(options.tools?.length ? { tools: options.tools } : {}),
     temperature: options.temperature ?? 0.2,
@@ -95,12 +109,22 @@ export async function streamChat(
     stream: true,
   };
 
-  const res = await fetch(`${baseUrl}/api/ai/v1/chat/completions/stream`, {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'text/event-stream',
+  };
+  if (isOpenCodeGo) {
+    headers['x-bricks-session'] =
+      options.sessionId?.trim() || OPENCODE_GO_SESSION_ID;
+  }
+
+  const url = isOpenCodeGo
+    ? openCodeGoChatUrl()
+    : `${baseUrl}/api/ai/v1/chat/completions/stream`;
+
+  const res = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
-    },
+    headers,
     body: JSON.stringify(body),
     signal: options.abortSignal,
   });
@@ -241,6 +265,7 @@ export interface StreamCompletionOptions {
   abortSignal?: AbortSignal;
   maxOutputTokens?: number;
   temperature?: number;
+  model?: string;
 }
 
 /**
@@ -260,6 +285,7 @@ export async function streamCompletion(
     abortSignal: options.abortSignal,
     maxTokens: options.maxOutputTokens ?? 900,
     temperature: options.temperature ?? 0.2,
+    model: options.model,
   });
   return result.text;
 }
@@ -322,8 +348,69 @@ export interface WaterfallJsonOptions {
   system: string;
   prompt: string;
   models?: string[];
+  model?: string;
   temperature?: number;
   maxTokens?: number;
+}
+
+/**
+ * Non-streaming JSON completion through the OpenCode Go proxy. This is a paid
+ * direct provider, so it never falls back to free models.
+ */
+async function openCodeGoJson(
+  model: string,
+  options: WaterfallJsonOptions,
+): Promise<unknown | null> {
+  try {
+    const res = await fetch(openCodeGoChatUrl(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'x-bricks-session': OPENCODE_GO_SESSION_ID,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: options.system },
+          { role: 'user', content: options.prompt },
+        ],
+        temperature: options.temperature ?? 0.2,
+        max_tokens: options.maxTokens ?? 2_000,
+        stream: false,
+      }),
+    });
+
+    if (!res.ok) {
+      const snippet = await res.text().catch(() => '');
+      console.warn(
+        `  ⚠️ [deep-research] ${model} failed: HTTP ${res.status}: ${snippet.slice(0, 300)}`,
+      );
+      return null;
+    }
+
+    const payload = (await res.json()) as {
+      error?: { message?: unknown };
+      choices?: Array<{ message?: { content?: string | null } }>;
+    };
+
+    if (payload.error) {
+      console.warn(
+        `  ⚠️ [deep-research] ${model} failed: ${
+          typeof payload.error.message === 'string'
+            ? payload.error.message
+            : JSON.stringify(payload.error)
+        }`,
+      );
+      return null;
+    }
+
+    const text = payload.choices?.[0]?.message?.content ?? '';
+    return extractJsonValue(text) ?? null;
+  } catch (err) {
+    console.warn(`  ⚠️ [deep-research] ${model} failed: ${String(err)}`);
+    return null;
+  }
 }
 
 /**
@@ -333,7 +420,15 @@ export interface WaterfallJsonOptions {
 export async function waterfallJson(
   options: WaterfallJsonOptions,
 ): Promise<unknown | null> {
-  const models = options.models ?? getDeepResearchModelCandidates();
+  const resolvedModel =
+    options.model ?? options.models?.[0] ?? getDeepResearchModel();
+
+  if (isOpenCodeGoModel(resolvedModel)) {
+    return openCodeGoJson(resolvedModel, options);
+  }
+
+  const models =
+    options.models ?? getDeepResearchModelCandidates(options.model);
 
   for (const model of models) {
     const result = await runWaterfall({

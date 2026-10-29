@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
+import { useOpenCodeGoModels } from '@/hooks/useOpenCodeGoModels';
 import type { ModelDefinition, AIProvider, CustomProvider } from '@/lib/constants/aiModels';
 
 interface ModelSelectorProps {
@@ -18,6 +19,29 @@ interface ModelSelectorProps {
   compact?: boolean;
 }
 
+const OPENCODE_GO_LABELS: Record<string, string> = {
+  contributor: 'Trains on data',
+  free: 'Free',
+  'region-limited': 'Region-limited',
+  preview: 'Preview',
+};
+
+const GoModelLabels = ({ labels }: { labels?: string[] }) => {
+  if (!labels || labels.length === 0) return null;
+  return (
+    <>
+      {labels.map((label) => (
+        <span
+          key={label}
+          className="rounded-full border border-border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground"
+        >
+          {OPENCODE_GO_LABELS[label] ?? label}
+        </span>
+      ))}
+    </>
+  );
+};
+
 export const ModelSelector = ({
   provider,
   customProvider,
@@ -28,7 +52,9 @@ export const ModelSelector = ({
   ollamaModelsCount,
   compact = false
 }: ModelSelectorProps) => {
-  const selectedModelInfo = availableModels.find(m => m.id === selectedModel);
+  const openCodeGo = useOpenCodeGoModels();
+  const models = provider === 'opencode-go' ? openCodeGo.models : availableModels;
+  const selectedModelInfo = models.find(m => m.id === selectedModel);
   const isCustomProvider = provider.startsWith('custom:') && !!customProvider;
   
   const [fetchingModels, setFetchingModels] = useState(false);
@@ -131,27 +157,37 @@ export const ModelSelector = ({
         </div>
       ) : (
         <Select 
-          value={availableModels.length > 0 ? selectedModel : undefined} 
+          value={models.length > 0 ? selectedModel : undefined}
           onValueChange={onModelChange}
-          disabled={availableModels.length === 0}
+          disabled={models.length === 0}
         >
           <SelectTrigger>
             <SelectValue placeholder="Select AI model" />
           </SelectTrigger>
           <SelectContent>
-            {availableModels.map((model) => (
-              <SelectItem key={model.id} value={model.id}>
-                <div className="flex items-center gap-2">
-                  {model.name}
-                  {model.supportsThinking && <Brain className="h-3 w-3" />}
-                </div>
-              </SelectItem>
-            ))}
+            {models.map((model) =>
+              provider === 'opencode-go' || model.id.startsWith('opencode-go/') ? (
+                <SelectItem key={model.id} value={model.id}>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {model.name}
+                    {model.supportsThinking && <Brain className="h-3 w-3" />}
+                    <GoModelLabels labels={model.labels} />
+                  </div>
+                </SelectItem>
+              ) : (
+                <SelectItem key={model.id} value={model.id}>
+                  <div className="flex items-center gap-2">
+                    {model.name}
+                    {model.supportsThinking && <Brain className="h-3 w-3" />}
+                  </div>
+                </SelectItem>
+              )
+            )}
           </SelectContent>
         </Select>
       )}
 
-      {!isCustomProvider && availableModels.length === 0 && (
+      {!isCustomProvider && models.length === 0 && (
         <p className="text-sm text-orange-600 mt-2 p-2 bg-orange-50 rounded border border-orange-200">
           {provider === 'ollama' 
             ? (ollamaConnected ? 'No models installed. Run: ollama pull llama2' : 'Connect to Ollama first')
@@ -160,30 +196,36 @@ export const ModelSelector = ({
         </p>
       )}
       <p className="text-xs text-muted-foreground mt-2">
-        {availableModels.length > 0 && provider === 'openai' ? (
+        {models.length > 0 && provider === 'openai' ? (
           <>
             💡 Cost: {selectedModelInfo?.cost || 'Select a model to see pricing'}
             <br />
             Choose based on your needs: GPT-4o Mini for cost efficiency, GPT-4o for multimodal tasks, o1/o3 for complex reasoning, GPT-5 for cutting-edge performance.
           </>
-        ) : availableModels.length > 0 && provider === 'ollama' ? (
+        ) : models.length > 0 && provider === 'ollama' ? (
           <>
             💡 {ollamaConnected 
               ? `${ollamaModelsCount || 0} local models available. No API costs.`
               : 'Install models with: ollama pull llama2'
             }
           </>
-        ) : availableModels.length > 0 && provider === 'waterfall' ? (
+        ) : models.length > 0 && provider === 'waterfall' ? (
           <>
             💡 Cost: {selectedModelInfo?.cost || 'Free Gateway Tier'}
             <br />
             Routed via Bricks Waterfall Gateway across free tiers with auto-failover (zero client API keys).
           </>
-        ) : availableModels.length > 0 && provider === 'gemini' ? (
+        ) : models.length > 0 && provider === 'gemini' ? (
           <>
             💡 Cost: {selectedModelInfo?.cost || 'Select a model to see pricing'}
             <br />
             Gemini models offer strong performance with competitive pricing.
+          </>
+        ) : models.length > 0 && provider === 'opencode-go' ? (
+          <>
+            💡 Cost: {selectedModelInfo?.cost || 'Go plan'}
+            <br />
+            Paid models via your OpenCode Go plan. Models marked "Trains on data" may use prompts for training.
           </>
         ) : null}
       </p>

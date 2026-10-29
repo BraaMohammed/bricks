@@ -8,6 +8,10 @@
  * (docs/adr/0001-agent-orchestration-server-side-mastra.md).
  */
 
+import { AsyncLocalStorage } from 'node:async_hooks';
+
+const runModelStorage = new AsyncLocalStorage<string>();
+
 function positiveInt(name: string, fallback: number): number {
   const raw = process.env[name]?.trim();
   if (!raw) return fallback;
@@ -54,30 +58,59 @@ export function getSelfBaseUrl(): string {
   return raw.replace(/\/+$/, '');
 }
 
+export const DEFAULT_DEEP_RESEARCH_MODEL = 'deepseek-v4.1-flash';
+
+const FREE_DEEP_RESEARCH_MODELS = [
+  DEFAULT_DEEP_RESEARCH_MODEL,
+  'gemini-3.1-flash-lite',
+  'gemini-3.5-flash',
+  'qwen-3.6-35b',
+  'deepseek-v4-flash',
+];
+
+/**
+ * Runs `fn` with a per-Deep-Research-Run model override. The override is
+ * carried through async calls (including the Mastra workflow) so every agent
+ * step uses the model the user selected without threading it through each
+ * workflow schema.
+ */
+export function runWithDeepResearchModel<T>(
+  model: string | undefined,
+  fn: () => T,
+): T {
+  const trimmed = model?.trim();
+  if (!trimmed) return fn();
+  return runModelStorage.run(trimmed, fn);
+}
+
 /**
  * Canonical model ID for the Orchestrator, Coverage Reviewer and Search
- * Sub-Agents. Must exist in app/api/ai/providers.config.ts MODEL_MAP.
+ * Sub-Agents. Models prefixed "opencode-go/" are paid direct OpenCode Go
+ * models; free models must exist in app/api/ai/providers.config.ts MODEL_MAP.
  */
-export function getDeepResearchModel(): string {
-  // Gemini 3.x requires thought signatures when replaying function calls;
-  // gemini-3.1-flash-lite accepts tool results without them, so it is the
-  // safe default for the tool-using Search Sub-Agents.
-  return process.env.DEEP_RESEARCH_MODEL?.trim() || 'gemini-3.1-flash-lite';
+export function getDeepResearchModel(override?: string): string {
+  const explicit = override?.trim();
+  if (explicit) return explicit;
+
+  const scoped = runModelStorage.getStore()?.trim();
+  if (scoped) return scoped;
+
+  return (
+    process.env.DEEP_RESEARCH_MODEL?.trim() || DEFAULT_DEEP_RESEARCH_MODEL
+  );
 }
 
 /**
  * Ordered fallbacks for non-streaming LLM calls. The waterfall already
  * fail-overs between providers; this adds model-level resilience when the
- * preferred model is unavailable on every configured provider.
+ * preferred model is unavailable on every configured provider. OpenCode Go
+ * models are paid and never fall back to free models.
  */
-export function getDeepResearchModelCandidates(): string[] {
-  const candidates = [
-    getDeepResearchModel(),
-    'gemini-3.1-flash-lite',
-    'gemini-3.5-flash',
-    'qwen-3.6-35b',
-    'deepseek-v4-flash',
-  ];
+export function getDeepResearchModelCandidates(override?: string): string[] {
+  const resolved = getDeepResearchModel(override);
+  if (resolved.startsWith('opencode-go/')) return [resolved];
+
+  const candidates = [resolved, ...FREE_DEEP_RESEARCH_MODELS];
   return [...new Set(candidates.filter(Boolean))];
 }
 

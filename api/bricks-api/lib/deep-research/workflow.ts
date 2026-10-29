@@ -42,6 +42,7 @@ const runInputSchema = z.object({
   goal: z.string(),
   outputSchema: outputSchemaZ,
   targetCount: z.number().int().positive(),
+  model: z.string().min(1).max(200).optional(),
 });
 
 const sourceAssignmentZ = z.object({
@@ -62,6 +63,7 @@ const planOutputSchema = z.object({
   sources: z.array(sourceAssignmentZ),
   startedAt: z.number(),
   deadline: z.number(),
+  model: z.string().optional(),
 });
 
 const sourceDigestZ = z.object({
@@ -88,6 +90,7 @@ const researchOutputSchema = z.object({
   records: z.array(z.record(z.string(), z.string())),
   sourceDigests: z.array(sourceDigestZ),
   coverage: coverageSchema,
+  model: z.string().optional(),
 });
 
 const tableOutputSchema = z.object({
@@ -111,6 +114,7 @@ const planSourcesStep = createStep({
     const sources = await planResearchSources({
       goal: inputData.goal,
       outputSchema,
+      model: inputData.model,
     });
 
     emitRunEvent(inputData.runId, {
@@ -126,6 +130,7 @@ const planSourcesStep = createStep({
       goal: inputData.goal,
       outputSchema,
       sources,
+      model: inputData.model,
       onTextDelta: (text) =>
         emitRunEvent(inputData.runId, {
           event: 'orchestrator_token_delta',
@@ -141,6 +146,7 @@ const planSourcesStep = createStep({
       sources,
       startedAt,
       deadline,
+      model: inputData.model,
     };
   },
 });
@@ -190,6 +196,7 @@ const researchRoundsStep = createStep({
             coverateFeedback:
               round === 0 ? undefined : coverage.reason,
             deadline: inputData.deadline,
+            model: inputData.model,
           }),
         ),
       );
@@ -220,6 +227,7 @@ const researchRoundsStep = createStep({
         sourceDigests: [...digestsBySource.values()],
         reSpinNumber: round,
         maxRespins: caps.maxRespins,
+        model: inputData.model,
       });
       reviewCompleted = true;
 
@@ -255,6 +263,7 @@ const researchRoundsStep = createStep({
       records: collected as ResearchRecord[],
       sourceDigests: [...digestsBySource.values()],
       coverage,
+      model: inputData.model,
     };
   },
 });

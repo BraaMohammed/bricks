@@ -7,6 +7,7 @@
 
 import { getDeepResearchMastra } from './mastra';
 import { emitRunEvent } from './event-bus';
+import { runWithDeepResearchModel } from './env';
 import { updateRun } from './repository';
 import type { OutputSchema } from './types';
 
@@ -15,6 +16,7 @@ export interface ExecuteDeepResearchRunInput {
   goal: string;
   outputSchema: OutputSchema;
   targetCount: number;
+  model?: string;
 }
 
 function errorMessage(value: unknown): string {
@@ -46,14 +48,17 @@ export async function executeDeepResearchRun(
     }
 
     const run = await workflow.createRun();
-    const result = await run.start({
-      inputData: {
-        runId: input.runId,
-        goal: input.goal,
-        outputSchema: input.outputSchema,
-        targetCount: input.targetCount,
-      },
-    });
+    const inputData = {
+      runId: input.runId,
+      goal: input.goal,
+      outputSchema: input.outputSchema,
+      targetCount: input.targetCount,
+      ...(input.model ? { model: input.model } : {}),
+    };
+
+    const result = await runWithDeepResearchModel(input.model, () =>
+      run.start({ inputData }),
+    );
 
     if (result.status === 'success') {
       const totalRecords =

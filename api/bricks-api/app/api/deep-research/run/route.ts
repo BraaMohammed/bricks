@@ -35,6 +35,7 @@ const runBodySchema = z.object({
   runId: z.string().uuid(),
   outputSchema: z.unknown(),
   targetCount: z.number().int().positive().optional(),
+  model: z.string().min(1).max(200).optional(),
 });
 
 export async function POST(request: NextRequest): Promise<Response> {
@@ -104,6 +105,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         goal: run.goal,
         outputSchema,
         targetCount,
+        model: parsed.data.model,
       }).finally(() => {
         unregisterRunListener(runId);
         try {

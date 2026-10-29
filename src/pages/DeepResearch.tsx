@@ -11,6 +11,7 @@ import {
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
 import { ClarifyChat } from '@/components/deepResearch/ClarifyChat';
+import { ResearchModelSelector } from '@/components/deepResearch/ResearchModelSelector';
 import { AgentTranscript } from '@/components/deepResearch/AgentTranscript';
 import { SourceStatusCards } from '@/components/deepResearch/SourceStatusCards';
 import { RecordsTable } from '@/components/deepResearch/RecordsTable';
@@ -125,6 +126,10 @@ const DeepResearch = () => {
                       </Button>
                     </div>
                   )}
+
+                  <div className="mt-8">
+                    <ResearchModelSelector />
+                  </div>
                 </div>
 
                 <ClarifyChat />

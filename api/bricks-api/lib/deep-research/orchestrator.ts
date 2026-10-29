@@ -114,15 +114,17 @@ export interface ProposeOrClarifyResult {
  */
 export async function proposeOrClarify(
   messages: ChatTurn[],
+  model?: string,
 ): Promise<ProposeOrClarifyResult> {
   const history = conversationText(messages);
   const prompt = `Conversation so far:\n\n${history}\n\nReturn the next Orchestrator turn as JSON.`;
 
-  let parsed = await waterfallJson({
+  const parsed = await waterfallJson({
     system: ORCHESTRATOR_SYSTEM,
     prompt,
     temperature: 0.2,
     maxTokens: 1_600,
+    model,
   });
 
   let reply = normalizeReply(parsed);
@@ -133,6 +135,7 @@ export async function proposeOrClarify(
       prompt: `The previous answer was invalid for this schema. Re-emit a valid JSON reply in the required shape.\n\nPrevious answer:\n${JSON.stringify(parsed)}`,
       temperature: 0,
       maxTokens: 1_600,
+      model,
     });
     reply = normalizeReply(repaired);
   }
@@ -160,6 +163,7 @@ export interface PlanSourcesInput {
   outputSchema: OutputSchema;
   onTextDelta?: (text: string) => void;
   abortSignal?: AbortSignal;
+  model?: string;
 }
 
 /**
@@ -206,6 +210,7 @@ Return ONLY valid JSON:
       abortSignal: input.abortSignal,
       maxOutputTokens: 500,
       temperature: 0.1,
+      model: input.model,
     });
   } catch (err) {
     console.warn(
@@ -220,6 +225,7 @@ Return ONLY valid JSON:
       prompt: 'Select the Research Sources for this run. Return JSON only.',
       temperature: 0.1,
       maxTokens: 500,
+      model: input.model,
     });
   }
 
@@ -251,6 +257,7 @@ export interface OpeningBriefInput {
   sources: ResearchSourceAssignment[];
   onTextDelta?: (text: string) => void;
   abortSignal?: AbortSignal;
+  model?: string;
 }
 
 /**
@@ -272,6 +279,7 @@ export async function streamOpeningBrief(
     abortSignal: input.abortSignal,
     maxOutputTokens: 300,
     temperature: 0.3,
+    model: input.model,
   }).catch(() => '');
 }
 

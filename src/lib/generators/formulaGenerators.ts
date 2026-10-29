@@ -7,6 +7,7 @@
 
 import { detectThinkingSupport, isOllamaModel } from '../providers/aiProviders';
 import { isGroqModel } from '../groq';
+import { stripOpenCodeGoPrefix } from '../providers/opencodeGo';
 
 /**
  * AI Formula generation parameters
@@ -93,6 +94,7 @@ export const generateAIFormulaCode = (params: AIFormulaParams): string => {
   const isOllamaProvider = provider === 'ollama';
   const isGeminiModel = provider === 'gemini';
   const isGroqProvider = provider === 'groq';
+  const isOpenCodeGoProvider = provider === 'opencode-go';
   const isCustomProvider = provider.startsWith('custom:');
 
   // API endpoint
@@ -106,13 +108,17 @@ export const generateAIFormulaCode = (params: AIFormulaParams): string => {
     apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
   } else if (isGroqProvider) {
     apiEndpoint = 'https://api.groq.com/openai/v1/chat/completions';
-  } else if (!isCustomProvider) {
+  } else if (!isCustomProvider && !isOpenCodeGoProvider) {
     apiEndpoint = 'https://api.openai.com/v1/chat/completions';
   }
 
   // API key handling
   let apiKeyCheck = '';
-  if (isWaterfallProvider) {
+  if (isOpenCodeGoProvider) {
+    apiKeyCheck = `const backendBase = localStorage.getItem('backend_api_url') || 'http://localhost:3000';
+const apiEndpoint = \`\${backendBase}/api/ai/opencode-go/v1/chat/completions\`;
+const apiKey = null;`;
+  } else if (isWaterfallProvider) {
     apiKeyCheck = '// Bricks Waterfall Gateway cascades through free-tier providers via backend\nconst apiKey = null;';
   } else if (isOllamaProvider) {
     apiKeyCheck = '// Ollama runs locally without API key\nconst apiKey = null;';
@@ -144,7 +150,9 @@ if (!apiKey) {
 
   // Authorization header
   let authHeader = '';
-  if (isWaterfallProvider || isOllamaProvider) {
+  if (isOpenCodeGoProvider) {
+    authHeader = `      'x-bricks-session': localStorage.getItem('opencode_go_session_id') || crypto.randomUUID(),\n      'Content-Type': 'application/json',`;
+  } else if (isWaterfallProvider || isOllamaProvider) {
     authHeader = `      'Content-Type': 'application/json',`;
   } else if (isGeminiModel) {
     authHeader = `      'x-goog-api-key': apiKey,\n      'Content-Type': 'application/json',`;
@@ -155,16 +163,19 @@ if (!apiKey) {
   }
 
   // Check if this is a reasoning model
-  const isReasoningModel = detectThinkingSupport(model);
+  const capabilityModel = isOpenCodeGoProvider ? stripOpenCodeGoPrefix(model) : model;
+  const isReasoningModel = detectThinkingSupport(capabilityModel);
 
   // Newer models (GPT-5, o-series) use 'max_completion_tokens'
-  const useMaxCompletionTokens = model.startsWith('gpt-5') || model.startsWith('o');
+  const useMaxCompletionTokens = capabilityModel.startsWith('gpt-5') || capabilityModel.startsWith('o');
 
   // Generate provider name
-  const providerName = isWaterfallProvider ? 'Bricks Waterfall' : isGeminiModel ? 'Gemini' : isGroqProvider ? 'Groq' : isOllamaProvider ? 'Ollama' : isCustomProvider ? provider : 'OpenAI';
+  const providerName = isWaterfallProvider ? 'Bricks Waterfall' : isOpenCodeGoProvider ? 'OpenCode Go' : isGeminiModel ? 'Gemini' : isGroqProvider ? 'Groq' : isOllamaProvider ? 'Ollama' : isCustomProvider ? provider : 'OpenAI';
 
-  const endpointStr = isCustomProvider 
-    ? '`${customBaseUrl.replace(/\\/$/, \'\')}/chat/completions`' 
+  const endpointStr = isOpenCodeGoProvider
+    ? 'apiEndpoint'
+    : isCustomProvider
+    ? '`${customBaseUrl.replace(/\\/$/, \'\')}/chat/completions`'
     : `'${apiEndpoint}'`;
 
   // Build request body based on provider
@@ -223,9 +234,9 @@ const requestBody = {
   options: ollamaOptions
 };`;
   } else {
-    // OpenAI and Groq use same request format
+    // OpenAI-compatible providers use the same request format
     requestBodyCode = `
-// Build ${isGroqProvider ? 'Groq' : 'OpenAI'} request body conditionally
+// Build ${isGroqProvider ? 'Groq' : isOpenCodeGoProvider ? 'OpenCode Go' : 'OpenAI'} request body conditionally
 const requestBody = {
   model: '${model}',
   messages: [{

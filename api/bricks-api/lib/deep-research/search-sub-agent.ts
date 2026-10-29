@@ -36,6 +36,7 @@ export interface SearchSubAgentContext {
   coverateFeedback?: string;
   deadline: number;
   abortSignal?: AbortSignal;
+  model?: string;
 }
 
 export interface SearchSubAgentResult {
@@ -323,6 +324,7 @@ When done, reply with a one-sentence summary of what this source yielded.`;
         abortSignal: signal,
         temperature: 0.2,
         maxTokens: 3_000,
+        model: context.model,
         onTextDelta: (delta) => {
           text += delta;
           emitRunEvent(context.runId, {

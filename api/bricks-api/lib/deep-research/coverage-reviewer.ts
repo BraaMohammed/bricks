@@ -9,6 +9,7 @@
  * catches that. The run's re-spin cap bounds cost.
  */
 
+import { getDeepResearchModelCandidates } from './env';
 import { waterfallJson } from './llm';
 import { outputSchemaForPrompt } from './output-schema';
 import type { OutputSchema, ResearchRecord } from './types';
@@ -28,6 +29,7 @@ export interface CoverageReviewInput {
   sourceDigests: SourceDigest[];
   reSpinNumber: number;
   maxRespins: number;
+  model?: string;
 }
 
 export interface CoverageReviewResult {
@@ -129,6 +131,7 @@ Review coverage and return JSON.`;
       prompt,
       temperature: 0.1,
       maxTokens: 700,
+      models: getDeepResearchModelCandidates(input.model),
     });
 
     const result = parseDecision(parsed, input);

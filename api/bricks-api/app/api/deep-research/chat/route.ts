@@ -40,6 +40,7 @@ const chatBodySchema = z.object({
       }),
     )
     .min(1),
+  model: z.string().min(1).max(200).optional(),
 });
 
 export async function POST(request: NextRequest): Promise<Response> {
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     );
   }
 
-  const { runId: requestedRunId, messages } = parsed.data;
+  const { runId: requestedRunId, messages, model } = parsed.data;
   const turns: ChatTurn[] = messages.map((message) => ({
     role: message.role,
     content: message.content,
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     await replaceRunMessages(run.id, turns);
 
-    const result = await proposeOrClarify(turns);
+    const result = await proposeOrClarify(turns, model);
 
     await updateRun(run.id, {
       status: result.proposed ? 'schema_proposed' : 'clarifying',

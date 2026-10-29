@@ -5,7 +5,7 @@
  * Displays appropriate icons and descriptions for each provider.
  */
 
-import { Key, Server, Sparks, Flash, Globe } from 'iconoir-react';
+import { Key, Server, Sparks, Flash, Globe, Code } from 'iconoir-react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -72,6 +72,12 @@ export const ProviderSelector = ({
                 <div className="flex items-center gap-2">
                   <Flash className="h-4 w-4" />
                   Groq (Cloud - Ultra Fast)
+                </div>
+              </SelectItem>
+              <SelectItem value="opencode-go">
+                <div className="flex items-center gap-2">
+                  <Code className="h-4 w-4" />
+                  OpenCode Go (Cloud)
                 </div>
               </SelectItem>
               <SelectItem value="ollama">

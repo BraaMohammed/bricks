@@ -164,7 +164,7 @@ export const aiConfigStorage = {
     if (!provider) return 'openai';
     
     // Built-in providers or custom providers
-    if (provider === 'openai' || provider === 'ollama' || provider === 'gemini' || provider === 'groq' || provider.startsWith('custom:')) {
+    if (provider === 'openai' || provider === 'ollama' || provider === 'gemini' || provider === 'groq' || provider === 'opencode-go' || provider.startsWith('custom:')) {
       return provider;
     }
     

@@ -24,6 +24,7 @@ import {
   openAIModels,
   geminiModels,
   groqModels,
+  openCodeGoModels,
   waterfallModels,
   ModelDefinition,
   CustomProvider
@@ -160,6 +161,8 @@ export const useAISettings = (
   const availableModels = useMemo<ModelDefinition[]>(() => {
     if (aiProvider === 'waterfall') {
       return dynamicWaterfallModels.length > 0 ? dynamicWaterfallModels : waterfallModels;
+    } else if (aiProvider === 'opencode-go') {
+      return openCodeGoModels;
     } else if (aiProvider === 'openai') {
       return openAIModels;
     } else if (aiProvider === 'gemini') {

@@ -10,9 +10,14 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createGroq } from '@ai-sdk/groq';
 import { ollama } from 'ai-sdk-ollama';
 import type { LanguageModel } from 'ai';
+import {
+  getOpenCodeGoBaseUrl,
+  getOpenCodeGoHeaders,
+  OPENCODE_GO_DEFAULT_MODEL,
+} from '../providers/opencodeGo';
 
 export interface AgentProviderConfig {
-  provider: 'openai' | 'gemini' | 'groq' | 'ollama' | string;
+  provider: 'openai' | 'gemini' | 'groq' | 'ollama' | 'opencode-go' | string;
   model: string;
   openaiKey?: string;
   geminiKey?: string;
@@ -37,6 +42,15 @@ export function getAgentModel(config: AgentProviderConfig): LanguageModel {
         baseURL: `${backendBase.replace(/\/+$/, '')}/api/ai/v1`,
       });
       return client(model || 'deepseek-v4-flash');
+    }
+
+    case 'opencode-go': {
+      const client = createOpenAI({
+        apiKey: 'not-needed',
+        baseURL: getOpenCodeGoBaseUrl(),
+        headers: getOpenCodeGoHeaders(),
+      });
+      return client(model || OPENCODE_GO_DEFAULT_MODEL);
     }
 
     case 'openai': {

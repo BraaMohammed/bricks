@@ -33,6 +33,18 @@ export type TranscriptItem =
 
 export const ORCHESTRATOR_AGENT_ID = 'orchestrator';
 
+export const DEEP_RESEARCH_MODEL_STORAGE_KEY = 'deep_research_model';
+export const DEFAULT_DEEP_RESEARCH_MODEL = 'deepseek-v4.1-flash';
+
+const readStoredModel = (): string => {
+  try {
+    const stored = localStorage.getItem(DEEP_RESEARCH_MODEL_STORAGE_KEY);
+    return stored && stored.trim() ? stored.trim() : DEFAULT_DEEP_RESEARCH_MODEL;
+  } catch {
+    return DEFAULT_DEEP_RESEARCH_MODEL;
+  }
+};
+
 export interface DeepResearchState {
   phase: DeepResearchPhase;
   runId: string | null;
@@ -45,9 +57,11 @@ export interface DeepResearchState {
   coverageReview: CoverageReviewState | null;
   error: string | null;
   isSendingChat: boolean;
+  model: string;
 }
 
 export interface DeepResearchActions {
+  setModel: (model: string) => void;
   sendClarificationMessage: (content: string) => Promise<void>;
   approveOutputSchema: () => boolean;
   editOutputSchema: (updater: (schema: OutputSchema) => OutputSchema) => void;
@@ -83,6 +97,7 @@ const initialState: DeepResearchState = {
   coverageReview: null,
   error: null,
   isSendingChat: false,
+  model: readStoredModel(),
 };
 
 const normalizeOutputSchema = (schema: OutputSchema | null | undefined): OutputSchema => {
@@ -209,10 +224,19 @@ export const useDeepResearchStore = create<DeepResearchState & DeepResearchActio
   (set, get) => ({
     ...initialState,
 
+    setModel: (model) => {
+      set({ model });
+      try {
+        localStorage.setItem(DEEP_RESEARCH_MODEL_STORAGE_KEY, model);
+      } catch {
+        return;
+      }
+    },
+
     sendClarificationMessage: async (content) => {
       const trimmed = content.trim();
       if (!trimmed) return;
-      const { isSendingChat, phase, runId, messages } = get();
+      const { isSendingChat, phase, runId, messages, model } = get();
       if (isSendingChat || phase === 'researching') return;
 
       const nextMessages: ChatMessage[] = [...messages, { role: 'user', content: trimmed }];
@@ -227,7 +251,7 @@ export const useDeepResearchStore = create<DeepResearchState & DeepResearchActio
         const response = await fetch(deepResearchUrl('/chat'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ runId, messages: nextMessages }),
+          body: JSON.stringify({ runId, messages: nextMessages, model }),
         });
         if (!response.ok) {
           throw new Error(`The Orchestrator chat request failed (${response.status}).`);
@@ -399,7 +423,7 @@ export const useDeepResearchStore = create<DeepResearchState & DeepResearchActio
       const controller = activeAbortController;
       activeAbortController = null;
       if (controller) controller.abort();
-      set(initialState);
+      set({ ...initialState, model: get().model });
     },
 
     continueChatting: () => {

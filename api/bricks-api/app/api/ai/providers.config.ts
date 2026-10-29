@@ -139,6 +139,13 @@ export type ModelProviderMap = Partial<Record<ProviderID, string>>;
 
 export const MODEL_MAP: Record<string, ModelProviderMap> = {
 
+  // ── DeepSeek V4.1 Flash — default free model ─────────────────────────────
+  // Listed first so it appears first in /api/ai/v1/models.
+  'deepseek-v4.1-flash': {
+    'nvidia-nim': 'deepseek-ai/deepseek-v4.1-flash',
+    'openrouter': 'deepseek/deepseek-v4.1-flash',
+  },
+
   // ═══════════════════════════════════════════════════════════════════════════
   // JUNE 2026 — CURRENT GENERATION
   // IDs re-verified 2026-07-26 against live provider /v1/models endpoints
