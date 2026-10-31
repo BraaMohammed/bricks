@@ -10,9 +10,9 @@ Runs separately from the Vite frontend. Handles anything that can't run client-s
 
 - **AI Waterfall Gateway (`/api/ai/v1`)** — OpenAI-compatible chat completions across 6 free-tier providers (Ollama → Nvidia NIM → Cloudflare → OpenRouter → Google AI Studio → Groq) with automatic failover, per-provider cooldowns, and model aliasing. Point any OpenAI SDK at it and never pay for inference again.
 - **Puppeteer Stealth Engine (`/api/puppeteer`)** — Queue-based browser pool. Handles JS-heavy pages, bot-detection bypass, screenshot tasks, and bulk automations with memory management.
-- **Autonomous Web Search (`/api/search`)** — Routes queries through Serper → TinyFish → Exa → Tavily → DuckDuckGo (free fallback). Used as the search layer for web research agents.
+- **Autonomous Web Search (`/api/search`)** — Routes queries through Serper → TinyFish → Exa → Tavily → Scavio → DuckDuckGo (free fallback). Used as the search layer for web research agents.
 - **Web Content Reader (`/api/reader`)** — 4-layer fallback chain (Fetch → Puppeteer → TinyFish → ScraperAPI) that converts any URL into clean, AI-ready markdown, including JS-rendered SPAs.
-- **Serverless Page Fetcher (`/api/fetch-page`)** — Puppeteer-free URL reading waterfall: Fetch → Firecrawl → TinyFish → scrape.do → ScraperAPI → Diffbot → Tavily → Scrapfly.
+- **Serverless Page Fetcher (`/api/fetch-page`)** — Puppeteer-free URL reading waterfall: Fetch → Firecrawl → TinyFish → scrape.do → ScraperAPI → Diffbot → Tavily → Scrapfly → Scavio.
 - **Email Validation Cascade (`/api/validate-email`)** — Routes email validation through Hunter → MillionVerifier → QuickEmailVerification in sequence to maximize accuracy and stay within free tiers.
 
 ---
@@ -36,6 +36,7 @@ SERPER_API_KEY=your_serper_key_here
 TINYFISH_API_KEY=your_tinyfish_key_here
 EXA_API_KEY=your_exa_key_here
 TAVILY_API_KEY=your_tavily_key_here
+SCAVIO_API_KEY=your_scavio_key_here   # Google results, 50 free credits: https://scavio.dev/google-api
 
 # ── Web Reader & Scrapers (Optional) ─────────────────────────────────────────
 # TinyFish — Free tier search & fetch (uses TINYFISH_API_KEY above)
@@ -93,7 +94,7 @@ npm run dev
 ## API Endpoints
 
 ### Web Reading and Search
-- **`POST /api/search`** — Takes `{ query }`, returns URL and snippet results. Tries Serper → Exa → Tavily → DuckDuckGo.
+- **`POST /api/search`** — Takes `{ query }`, returns URL and snippet results. Tries Serper → TinyFish → Exa → Tavily → Scavio → DuckDuckGo.
 - **`POST /api/reader`** — Takes `{ url }`, returns `{ content, title, provider, error }`. See fallback chain below.
 - **`POST /api/fetch-page`** — Puppeteer-free URL reader with multi-provider fallback stack.
 - **`POST /api/validate-email`** — Takes `{ email }`, cascades through validation providers, returns deliverability status.
