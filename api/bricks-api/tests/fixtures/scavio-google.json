@@ -1,0 +1,86 @@
+{
+  "search_parameters": {
+    "q": "Stripe latest funding round",
+    "hl": "en",
+    "gl": "us",
+    "device": "desktop",
+    "start": 0,
+    "google_domain": "google.com"
+  },
+  "organic_results": [
+    {
+      "position": 1,
+      "title": "Stripe Valuation Set to Hit $140 Billion in New Tender Offer",
+      "link": "https://www.bloomberg.com/news/articles/2026-02-09/stripe-valuation-set-to-hit-140-billion-in-new-tender-offer",
+      "displayed_link": "https://www.bloomberg.com › news › articles › stripe-val...",
+      "snippet": "Feb 9, 2026 — The company hasn't announced new funding since 2023, when it grabbed $6.5 billion in a Series I financing led by Thrive Capital. Stripe reached ...Read more",
+      "snippet_highlighted_words": [
+        "funding",
+        "Stripe"
+      ],
+      "date": "Feb 9, 2026",
+      "source": "Bloomberg.com"
+    },
+    {
+      "position": 2,
+      "title": "Financial Details - Stripe",
+      "link": "https://www.crunchbase.com/organization/stripe/financial_details",
+      "displayed_link": "https://www.crunchbase.com › organization › financial...",
+      "snippet": "Stripe is funded by 76 investors. Robinhood Ventures and Alto are the most recent investors. Stripe has made 15 diversity investments.Read more",
+      "snippet_highlighted_words": [
+        "by 76"
+      ],
+      "source": "Crunchbase"
+    },
+    {
+      "position": 3,
+      "title": "Stripe Funding History : r/PSTH",
+      "link": "https://www.reddit.com/r/PSTH/comments/le4snd/stripe_funding_history/",
+      "displayed_link": "20+ comments · 5 years ago",
+      "snippet": "The last funding round Stripe received was on April 2020 in the amount of $600 million at a $36 Billion dollar valuation.Read more",
+      "snippet_highlighted_words": [
+        "April 2020 in the amount of $600 million"
+      ],
+      "source": "Reddit · r/PSTH"
+    },
+    {
+      "position": 4,
+      "title": "Stripe IPO Timeline and Financing Details",
+      "link": "https://forgeglobal.com/stripe_ipo/",
+      "displayed_link": "https://forgeglobal.com › Explore Private Companies",
+      "snippet": "Per Forge data, Stripe has raised a total of $9.4 billion in funding over 19 rounds. Their latest funding was raised on February 20, 2024, leaving the ...Read more",
+      "snippet_highlighted_words": [
+        "Stripe has raised a total of $9.4 billion in funding"
+      ],
+      "source": "Forge Global"
+    },
+    {
+      "position": 5,
+      "title": "Stripe Raises $1 Billion in New Financing Round",
+      "link": "https://www.linkedin.com/pulse/stripe-raises-1-billion-new-financing-round-what-investors-mrnxe",
+      "displayed_link": "4 reactions · 1 month ago",
+      "snippet": "Stripe did not announce a traditional $1 billion primary funding round in 2026. Instead, the company completed a tender offer that valued Stripe ...Read more",
+      "snippet_highlighted_words": [
+        "Stripe did not announce a traditional $1 billion primary funding round in 2026"
+      ],
+      "source": "LinkedIn · Startup Editor"
+    },
+    {
+      "position": 6,
+      "title": "Stripe Revenue, Valuation, Funding & Investors",
+      "link": "https://multiples.vc/private-comps/stripe",
+      "displayed_link": "https://multiples.vc › Companies",
+      "snippet": "Stripe's first fundraising round was a $2M seed round in March 2011. The most recent completed round was a $6.5B Series I in March 2023. Stripe funding rounds.Read more",
+      "snippet_highlighted_words": [
+        "Stripe's",
+        "round",
+        "recent",
+        "Stripe funding rounds"
+      ],
+      "source": "Multiples.vc"
+    }
+  ],
+  "response_time": 3312,
+  "credits_used": 1,
+  "credits_remaining": 49
+}

@@ -154,6 +154,45 @@ async function searchWithTinyFish(query: string, apiKey: string): Promise<Search
     }));
 }
 
+// ── Provider: Scavio (Google Search) ─────────────────────────────────────────
+//
+// POST https://api.scavio.dev/api/v2/google  { query }
+// Returns the Google results page as JSON; organic results are in organic_results.
+//
+// Free: 50 credits on signup, 1 credit per search
+// Docs: https://scavio.dev/docs/search-api
+// Requires: SCAVIO_API_KEY in env
+//
+
+async function searchWithScavio(query: string, apiKey: string): Promise<SearchResult[]> {
+    const res = await fetch('https://api.scavio.dev/api/v2/google', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ query }),
+        signal: AbortSignal.timeout(20000),
+    });
+
+    if (res.status === 401) throw new Error('Scavio: 401 — API key invalid or expired');
+    if (res.status === 402) throw new Error('Scavio: 402 — credits exhausted');
+    if (res.status === 429) throw new Error('Scavio: 429 — rate limit exceeded');
+    if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Scavio error: ${res.status} ${res.statusText} - ${errorText}`);
+    }
+
+    const data = await res.json();
+    const organic: Array<Record<string, any>> = data?.organic_results ?? [];
+
+    return organic.slice(0, 5).map((r) => ({
+        title: r.title ?? '',
+        url: r.link ?? '',
+        snippet: r.snippet ? String(r.snippet).slice(0, 300) : '',
+    }));
+}
+
 // ── Provider: DuckDuckGo (HTML scrape, no key) ────────────────────────────────
 
 async function searchWithDuckDuckGo(query: string): Promise<SearchResult[]> {
@@ -226,6 +265,7 @@ export async function POST(request: NextRequest) {
         const tinyfishKey = process.env.TINYFISH_API_KEY;
         const exaKey = process.env.EXA_API_KEY;
         const tavilyKey = process.env.TAVILY_API_KEY;
+        const scavioKey = process.env.SCAVIO_API_KEY;
 
         // Try each provider in order
         const providers: Array<{ name: string; fn: () => Promise<SearchResult[]> }> = [];
@@ -241,6 +281,9 @@ export async function POST(request: NextRequest) {
         }
         if (tavilyKey) {
             providers.push({ name: 'tavily', fn: () => searchWithTavily(query, tavilyKey) });
+        }
+        if (scavioKey) {
+            providers.push({ name: 'scavio', fn: () => searchWithScavio(query, scavioKey) });
         }
         // DuckDuckGo is always available as final fallback
         providers.push({ name: 'duckduckgo', fn: () => searchWithDuckDuckGo(query) });

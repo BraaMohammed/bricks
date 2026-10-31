@@ -318,6 +318,40 @@ async function readWithScrapfly(url: string, apiKey: string): Promise<{ content:
     return { content: markdown, title: '' };
 }
 
+// ── Provider 8: Scavio Extract ────────────────────────────────────────────────
+//
+// POST https://api.scavio.dev/api/v1/extract  { url, format: "markdown", mode: "advanced" }
+// Returns Markdown natively in data.content. mode "advanced" renders JavaScript.
+// Only successful extractions are billed.
+//
+// Free: 50 credits on signup, 1 credit per page
+// Docs: https://scavio.dev/docs/extract
+
+async function readWithScavio(url: string, apiKey: string): Promise<{ content: string; title: string }> {
+    const res = await fetch('https://api.scavio.dev/api/v1/extract', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ url, format: 'markdown', mode: 'advanced' }),
+        signal: AbortSignal.timeout(45000),
+    });
+
+    if (res.status === 401) throw new Error('Scavio: 401 — API key invalid or expired');
+    if (res.status === 402) throw new Error('Scavio: 402 — credits exhausted');
+    if (res.status === 429) throw new Error('Scavio: 429 — rate limit exceeded');
+    if (!res.ok) throw new Error(`Scavio failed: ${res.status} ${res.statusText}`);
+
+    const data = await res.json();
+    const markdown: string = data?.data?.content ?? '';
+    if (!markdown.trim()) throw new Error('Scavio: empty markdown response');
+
+    // The markdown starts with a "- Title: ..." line when the page has a title
+    const title = markdown.match(/^- Title: (.+)$/m)?.[1]?.trim() ?? '';
+    return { content: markdown, title };
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
@@ -373,7 +407,7 @@ export async function POST(request: NextRequest) {
         // ── Stack 2: Paid waterfall ───────────────────────────────────────────
         // Order reflects reliability for JS-heavy sites like Wellfound:
         //   Firecrawl (best quality, native markdown) → scrape.do → ScraperAPI
-        //   → Diffbot → Tavily → Scrapfly
+        //   → Diffbot → Tavily → Scrapfly → Scavio
         // Services without a configured key are silently skipped.
 
         type ServiceDef = { name: string; credits: string; fn: () => Promise<{ content: string; title: string }> };
@@ -386,6 +420,7 @@ export async function POST(request: NextRequest) {
         const diffbotKey    = process.env.DIFFBOT_TOKEN;
         const tavilyKey     = process.env.TAVILY_API_KEY;
         const scrapflyKey   = process.env.SCRAPFLY_KEY;
+        const scavioKey     = process.env.SCAVIO_API_KEY;
 
         if (firecrawlKey)  services.push({ name: 'firecrawl',  credits: '500 total',    fn: () => readWithFirecrawl(url, firecrawlKey) });
         if (tinyfishKey)   services.push({ name: 'tinyfish',   credits: 'free tier',    fn: () => readWithTinyFish(url, tinyfishKey) });
@@ -394,6 +429,7 @@ export async function POST(request: NextRequest) {
         if (diffbotKey)    services.push({ name: 'diffbot',    credits: '10000/month',  fn: () => readWithDiffbot(url, diffbotKey) });
         if (tavilyKey)     services.push({ name: 'tavily',     credits: '1000/month',   fn: () => readWithTavily(url, tavilyKey) });
         if (scrapflyKey)   services.push({ name: 'scrapfly',   credits: '200/month',    fn: () => readWithScrapfly(url, scrapflyKey) });
+        if (scavioKey)     services.push({ name: 'scavio',     credits: '50 free',      fn: () => readWithScavio(url, scavioKey) });
 
         if (services.length === 0) {
             console.warn('  ⚠️ No paid fetch-page services configured');
