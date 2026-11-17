@@ -73,7 +73,7 @@ Bricks doesn't mark up API costs. You connect directly:
 
 ## Getting Started
 
-> **The frontend is already deployed** at **[https://use-bricks.netlify.app/](https://use-bricks.netlify.app/)** — you still need to clone the repo and run the backend API locally, but you do **not** need to run the Vite dev server for the frontend.
+> **The frontend is already deployed** at **[https://usebricks.xyz/](https://usebricks.xyz/)** — you still need to clone the repo and run the backend API locally, but you do **not** need to run the Vite dev server for the frontend.
 
 **Prerequisites:** Node.js 18+ and `npm`
 
@@ -100,7 +100,7 @@ npm run dev
 > **Optional — run the frontend locally:** If you want to develop or self-host the UI, run `npm install && npm run dev` from the repo root. The UI will be at `http://localhost:8080`.
 
 ### 3. Configure AI
-1. Open **[https://use-bricks.netlify.app/](https://use-bricks.netlify.app/)** (or `http://localhost:8080` if running locally)
+1. Open **[https://usebricks.xyz/](https://usebricks.xyz/)** (or `http://localhost:8080` if running locally)
 2. Click the **Settings gear**
 3. Add your API keys (OpenAI, Gemini, Groq) or set your local Ollama URL (`http://localhost:11434`)
 4. Upload a CSV and start enriching
@@ -109,7 +109,7 @@ npm run dev
 
 ## Required Browser Setup
 
-Because the UI is served from `https://use-bricks.netlify.app/` (a public HTTPS page) and the backend API runs on your local machine, Chromium-based browsers (Chrome, Edge, Brave) will block those requests by default. **This affects every feature** — web search, the reader, Puppeteer, the email finder, and Ollama.
+Because the UI is served from `https://usebricks.xyz` (a public HTTPS page) and the backend API runs on your local machine, Chromium-based browsers (Chrome, Edge, Brave) will block those requests by default. **This affects every feature** — web search, the reader, Puppeteer, the email finder, and Ollama.
 
 ### Step 1 — Bypass Chrome's Local Network Block *(required for everything)*
 
