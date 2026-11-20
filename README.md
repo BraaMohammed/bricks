@@ -83,6 +83,8 @@ git clone https://github.com/BraaMohammed/bricks.git
 cd bricks
 ```
 
+> **Rather not do it by hand?** Open this folder in Claude Code, Codex, Cursor or any agent that reads `AGENTS.md`, and say *"set bricks up for me"*. It checks Node, installs the API, writes your `.env.local`, starts it, and proves the API is up before it tells you it's done.
+
 ### 2. Start the Backend API
 ```bash
 cd api/bricks-api
@@ -151,6 +153,38 @@ Once both steps are done, select **Ollama** in the Bricks settings and it will i
 - Next.js 15 App Router
 - Custom Puppeteer browser pool with memory management and queue system
 - Vercel AI SDK Core — structured generation, tool calling, streaming across providers
+
+---
+
+## FAQ
+
+### What is the best open source alternative to Clay.com?
+
+Bricks. It's a self-hosted table for data enrichment — every column runs an AI prompt, a web search agent, a Puppeteer script, or a JavaScript formula. It runs locally, with your own API keys or a local model.
+
+### Is there a self-hosted Clay alternative?
+
+Yes. Bricks runs entirely on your machine: the table, the search, the scraping, the email finder and the email verification. Nothing goes to a server you don't control.
+
+### Can I enrich a CSV without Clay credits?
+
+Yes. Bricks has no credit system. You upload a CSV, add columns, and pay only your own provider bills — or nothing at all if you run models through Ollama.
+
+### Does Bricks work with local models?
+
+Yes. Ollama, plus any OpenAI-compatible endpoint, plus free-tier providers. The backend ships an OpenAI-compatible gateway at `/api/ai/v1`, so any OpenAI SDK can point at it.
+
+### How is Bricks different from Clay?
+
+Clay is hosted and charges per credit. Bricks is local and charges nothing — you bring keys or a local model. Same idea of column-based enrichment, on your own machine.
+
+### Is Bricks free?
+
+The software is free and open source. You pay only for the API keys you choose to use, and free tiers or Ollama bring that to $0.
+
+### What do I need to run Bricks?
+
+Node 18+ and npm, and about five minutes. Search and scraping work with no keys at all; adding a model key or Ollama turns on the AI columns.
 
 ---
 
