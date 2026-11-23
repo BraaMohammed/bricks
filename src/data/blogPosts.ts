@@ -22,6 +22,164 @@ export const AUTHORS: Record<string, Author> = {
 
 export const BLOG_POSTS: BlogPost[] = [
   {
+    slug: 'sales-has-no-compiler-ai-outreach-fails',
+    title: 'Sales Has No Compiler: Why AI Outreach Fails Before the First Message',
+    description:
+      'AI outbound tooling solved generation and left judgement unsolved. Sales has no compiler, so a bad message survives all the way to the send. Here is the feedback loop that replaces one.',
+    publishedAt: '2026-11-23',
+    updatedAt: '2026-11-23',
+    readTime: '7 min read',
+    category: 'Guides & Concepts',
+    tags: [
+      'AI Outreach',
+      'Outbound Sales',
+      'GTM Engineering',
+      'Vibe Sales',
+      'Open Source',
+    ],
+    author: AUTHORS.braa,
+    definitionBlock: {
+      term: 'Vibe sales',
+      definition:
+        'is the practice of pointing a model at an outbound process you have never run by hand, then treating generated messages as finished work instead of as drafts.',
+      whyItMatters:
+        'Code improves because a compiler rejects wrong work in seconds. Outbound has no compiler, so a message with no reason behind it survives all the way to the send and fails silently.',
+      contextDate: 'November 2026',
+    },
+    keyTakeaways: [
+      'AI made the sending step cheap and left the thinking step expensive, which is the reverse of the order outbound actually works in.',
+      'Sales has no compiler. Silence is the only feedback, and silence is indistinguishable from a bad list, bad copy, bad deliverability, or too little volume.',
+      'Four gates replace the missing compiler: evidence, specificity, an adversarial reviewer, and kill criteria written before the batch goes out.',
+      'Automating a process you already run by hand is not the same as vibing a process you never ran.',
+      'Running the loop on your own machine keeps the cost of thinking low enough that it happens before the send instead of after the quarter ends.',
+    ],
+    introduction: [
+      'Outbound teams in 2026 have a solved generation problem and an unsolved judgement problem. A model can produce five hundred personalised messages before lunch. Nothing on the market can tell you whether any of those five hundred had a reason to exist.',
+      'That gap explains most of the disappointment around AI outreach, and the cleanest way to talk about it is a comparison engineers already understand: code has a compiler, and sales does not.',
+      'This guide breaks down why the missing feedback loop matters, what it costs when nobody builds one, and the four checks that function as a substitute when the work happens before the send rather than after.',
+    ],
+    howToSteps: {
+      title: 'How to Build a Pre-Send Gate in Four Steps',
+      steps: [
+        {
+          stepNumber: 1,
+          verbTitle: 'Require one dated, public reason per row',
+          description:
+            'Every contact in the batch carries one verifiable public fact that justifies the message, with its source attached. A row without evidence is deleted, not scored lower.',
+        },
+        {
+          stepNumber: 2,
+          verbTitle: 'Strip the name and run the specificity test',
+          description:
+            'Remove the company and the first name from the draft. If the message still reads as true for any other company in the batch, it fails. Most generated copy fails here.',
+        },
+        {
+          stepNumber: 3,
+          verbTitle: 'Review as the recipient, not the writer',
+          description:
+            'A second pass plays the lead instead of a copy editor. Given the role, the company and a plausible week, it rejects anything a real person would archive on sight.',
+        },
+        {
+          stepNumber: 4,
+          verbTitle: 'Write the kill criteria before sending',
+          description:
+            'Decide in advance which number would prove the batch wrong. Twenty sends with no opens is a deliverability problem. Two hundred opens with no replies is a message problem.',
+        },
+      ],
+    },
+    contentSections: [
+      {
+        heading: 'Why Code Improves and Outbound Does Not',
+        paragraphs: [
+          'When you write code badly, something rejects it. A missing import, a wrong type, a null that should not be null - the compiler or the test suite reports it in seconds, in a specific place, with a specific reason. The loop is short, deterministic and impossible to ignore.',
+          'That is the entire mechanism behind AI-assisted coding working as well as it does. The model does not need to be right on the first attempt. It needs to be corrected cheaply, and code happens to be the domain where correction is cheapest.',
+          'Remove the compiler from the loop and the same model, in the same hands, produces confident output that survives for weeks. Nothing about the model changed. The only thing missing was the thing that used to say no.',
+        ],
+        callout: {
+          type: 'note',
+          title: 'The core distinction',
+          text: 'Code fails loudly and locally. Outbound fails quietly and globally, which is why the outbound failure gets diagnosed as a volume problem nine times out of ten.',
+        },
+      },
+      {
+        heading: 'Silence Is the Most Ambiguous Signal in Business',
+        paragraphs: [
+          'Ask a model to get you ten meetings and it will do exactly what you asked at the level it can see. It writes the sequence, personalises the first line from a scraped value, and sends five hundred of them.',
+          'Nothing rejects that work. There is no type error for a message that had no reason to be sent. The only feedback is silence, and silence means at least six different things: the list was wrong, the offer was wrong, the timing was wrong, the sender was unknown, the copy was weak, or the volume was too low for a signal to exist.',
+          'Because all six look identical, the default human reading is the cheapest one to act on - send more. That is how teams end up with a polished pipeline, a green dashboard and no meetings.',
+          'A compiler tells you a line number. Silence tells you nothing, and then charges you for the guess.',
+        ],
+      },
+      {
+        heading: 'The One Question Nobody Asks Before the Send',
+        paragraphs: [
+          'Every message that gets a reply answers a question the sender never wrote down: why would this person care about this, this week?',
+          'That question cannot be answered from a CSV row, because the answer is not in the row. It lives in a funding round, a job posting, a product launch, a compliance deadline, a competitor price change or a public complaint - something that changed recently and created a reason to act now.',
+          'A row gives you a name, a company, a title and a domain. A reason to act is a separate research step, and it is the step that gets skipped because it does not scale, it does not demo well, and it makes the pipeline slower.',
+          'Skipping it is why the copy reads fine and the reply rate sits at zero. The copy was never the constraint.',
+        ],
+      },
+      {
+        heading: 'Automating a Process Is Not Vibing a Prompt',
+        paragraphs: [
+          'The distinction that separates the teams getting replies from the teams generating volume is boring: automating a process means you already ran it by hand, you know where it breaks, and you are removing the manual part. Vibing one means you point a model at a process you have never run and hope the output counts as work.',
+          'The first produces a pipeline with fewer human steps and the same judgement. The second produces a pipeline with no judgement at all, and no way to tell the difference until the quarter is over.',
+          'Iteration is the part people misread as volume. It is not send more. It is asking whether this is the right person, whether you would reply if you were them, and whether they even have the problem you are solving - then rewriting until all three answers are yes.',
+        ],
+      },
+      {
+        heading: 'Four Gates That Replace the Compiler',
+        paragraphs: [
+          'You cannot make sales deterministic, but you can make it falsifiable. Four checks, each one cheap, each one capable of rejecting a message before it is sent, give outbound something close to an error message.',
+          'The evidence gate keeps unverifiable rows out. The specificity test kills copy that is a template with a variable in it. The adversarial reviewer catches messages built on a true but irrelevant fact. Kill criteria turn a campaign into a hypothesis instead of a hope.',
+          'Run the four steps above in order and most batches shrink by half before a single message leaves. That shrink is the point. It is the compiler talking.',
+        ],
+      },
+      {
+        heading: 'Why the Loop Belongs on Your Machine',
+        paragraphs: [
+          'Every gate above increases the cost per row. Evidence gathering means real web research. The adversarial pass means at least two model calls per message instead of one. Kill criteria mean keeping your own numbers instead of renting them from a dashboard.',
+          'Credit-based platforms bill per credit, which makes the thinking step the expensive part and pushes teams toward the cheapest version of it: one model call, one template, maximum volume. That pricing structure rewards skipping exactly the work that makes outbound function.',
+          'A local, bring-your-own-key setup inverts the incentive. Research runs against your own API keys at wholesale prices, or against a local model for nothing, and the list never leaves the machine. When an extra pass costs seconds instead of credits, you run it before the send rather than after the quarter.',
+          'That is the architecture Bricks is built on: programmable columns, a research agent per cell, and a writer and prospect pair that pressure-tests copy before it reaches a clipboard. The tool does not decide anything for you, and it does not enforce a style. It just makes the deciding cheap enough to do in the right order.',
+        ],
+      },
+      {
+        heading: 'What to Measure When the Compiler Is Missing',
+        paragraphs: [
+          'Reply rate alone hides the failure. Track the share of rows that fail the evidence gate and the share that fail the specificity test, because those two numbers tell you whether the pipeline is producing messages or just output.',
+          'A healthy batch loses rows. If nothing is being rejected before the send, the gates are not running and the rejections are simply arriving later, as silence.',
+        ],
+      },
+    ],
+    faqs: [
+      {
+        id: 'what-does-sales-has-no-compiler-mean',
+        question: 'What does "sales has no compiler" mean?',
+        answer:
+          'It means outbound has no automatic check that rejects a bad message before it goes out. Code fails in seconds with a specific error. A sales message fails days later as silence, which is why teams misread it as a volume problem and send more.',
+      },
+      {
+        id: 'why-ai-outreach-zero-replies',
+        question: 'Why does AI outreach produce zero replies even when the copy is good?',
+        answer:
+          'Because copy quality is rarely the constraint. If the batch was built from a CSV row instead of a recent, verifiable reason to reach out, the message has nothing to say that the recipient did not already know about themselves.',
+      },
+      {
+        id: 'can-ai-replace-sdrs',
+        question: 'Can AI replace SDRs in 2026?',
+        answer:
+          'It replaces the sending. It does not replace the decision about who is worth contacting and why now. Teams that hand over both steps get volume without judgement, and the silence that follows looks like every other problem at once.',
+      },
+      {
+        id: 'does-bricks-automate-this',
+        question: 'Does Bricks automate the thinking for me?',
+        answer:
+          'No, and that is deliberate. Bricks runs research, prompts and review loops locally at wholesale token cost, so the thinking is cheap enough to do before the send. The judgement about what deserves to be sent stays with the person using it.',
+      },
+    ],
+  },
+  {
     slug: 'bricks-vs-clay-free-open-source-alternative',
     title: 'Bricks vs Clay: Why Open-Source Data Enrichment Eliminates $350/Month Credit Traps in 2026',
     description: 'A deep architectural and economic breakdown comparing Bricks (free, open-source, local) against Clay (credit-based SaaS) using modern open-weight LLMs like DeepSeek V4, GLM 5.3, and Kimi k3.',
