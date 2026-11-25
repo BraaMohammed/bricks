@@ -147,6 +147,47 @@ const DeepResearch = () => {
                   )}
                 </div>
 
+                {phase === 'results_review' && (
+                  <div className="brick-animate-in mt-4 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-primary/30 bg-primary/[0.04] px-5 py-4">
+                    <div>
+                      <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-primary">
+                        {doneCount} Record{doneCount === 1 ? '' : 's'} collected
+                      </p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Review the table, then push it into the grid to enrich it.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        size="lg"
+                        disabled={records.length === 0}
+                        onClick={handlePushToEnrichment}
+                        className="h-11 gap-2 rounded-md border border-primary bg-primary font-mono text-[11px] uppercase tracking-[0.16em] text-primary-foreground hover:border-primary-glow hover:bg-primary-glow"
+                      >
+                        <ArrowRight className="text-[15px]" />
+                        Push to enrichment
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        onClick={continueChatting}
+                        className="h-11 gap-2 rounded-md border-border font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground hover:border-primary/60 hover:text-foreground"
+                      >
+                        <ChatLines className="text-[15px]" />
+                        Continue chatting
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={resetRun}
+                        className="h-9 rounded-md font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
+                      >
+                        Start over
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="brick-animate-in mt-4 grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
                   <AgentTranscript />
 
@@ -186,47 +227,6 @@ const DeepResearch = () => {
                       >
                         <Refresh className="text-[14px]" />
                         Retry run
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={resetRun}
-                        className="h-9 rounded-md font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
-                      >
-                        Start over
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {phase === 'results_review' && (
-                  <div className="brick-animate-in mt-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-primary/30 bg-primary/[0.04] px-5 py-4">
-                    <div>
-                      <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-primary">
-                        {doneCount} Record{doneCount === 1 ? '' : 's'} collected
-                      </p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Review the table, then push it into the grid to enrich it.
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button
-                        size="lg"
-                        disabled={records.length === 0}
-                        onClick={handlePushToEnrichment}
-                        className="h-11 gap-2 rounded-md border border-primary bg-primary font-mono text-[11px] uppercase tracking-[0.16em] text-primary-foreground hover:border-primary-glow hover:bg-primary-glow"
-                      >
-                        <ArrowRight className="text-[15px]" />
-                        Push to enrichment
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="lg"
-                        onClick={continueChatting}
-                        className="h-11 gap-2 rounded-md border-border font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground hover:border-primary/60 hover:text-foreground"
-                      >
-                        <ChatLines className="text-[15px]" />
-                        Continue chatting
                       </Button>
                       <Button
                         variant="ghost"
