@@ -82,6 +82,12 @@ export const ResearchModelSelector = ({ variant = 'card' }: ResearchModelSelecto
   const missingFree = missingSelected && !isOpenCodeGoModel(missingSelected.id) ? missingSelected : null;
   const missingGo = missingSelected && isOpenCodeGoModel(missingSelected.id) ? missingSelected : null;
 
+  const selectedName =
+    freeModels.find((entry) => entry.id === model)?.name ??
+    goModels.find((entry) => entry.id === model)?.name ??
+    missingSelected?.name ??
+    model;
+
   const selectContent = (
     <SelectContent>
       <SelectGroup>
@@ -123,21 +129,23 @@ export const ResearchModelSelector = ({ variant = 'card' }: ResearchModelSelecto
 
   if (variant === 'composer') {
     return (
-      <div className="flex shrink-0 self-center">
+      <div className="flex min-w-0 flex-col gap-1">
         <Select value={model} onValueChange={setModel}>
           <SelectTrigger
             id="research-model"
             aria-label="Research model"
             className="h-9 w-56 rounded-md border-border bg-background font-mono text-[11px]"
           >
-            <SelectValue placeholder="Select a research model" />
+            <SelectValue placeholder="Select a research model">
+              <span className="block truncate">{selectedName}</span>
+            </SelectValue>
           </SelectTrigger>
           {selectContent}
         </Select>
         {configured === false && !goLoading && (
-          <p className="mt-1 w-56 font-mono text-[9px] leading-snug text-muted-foreground/70">
-            Set <code className="font-mono">OPENCODE_GO_API_KEY</code> on the backend to enable paid
-            models
+          <p className="w-56 font-mono text-[9px] leading-snug text-muted-foreground/70">
+            Set <code className="font-mono">OPENCODE_GO_API_KEY</code> on the backend to enable
+            paid models
           </p>
         )}
       </div>
@@ -161,7 +169,9 @@ export const ResearchModelSelector = ({ variant = 'card' }: ResearchModelSelecto
             id="research-model"
             className="h-9 w-full rounded-md border-border bg-background font-mono text-[11px] sm:w-[320px]"
           >
-            <SelectValue placeholder="Select a research model" />
+            <SelectValue placeholder="Select a research model">
+              <span className="block truncate">{selectedName}</span>
+            </SelectValue>
           </SelectTrigger>
           {selectContent}
         </Select>
