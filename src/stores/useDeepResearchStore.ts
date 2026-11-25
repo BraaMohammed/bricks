@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import { useDataStore, type DataRow } from '@/stores/useDataStore';
 import { deepResearchUrl } from '@/lib/deepResearch/backendUrl';
+import { consumeSseStream } from '@/lib/deepResearch/sse';
 import type {
   ChatMessage,
-  ChatResponseBody,
+  DeepResearchChatReply,
   CoverageReviewState,
   DeepResearchEvent,
   OutputSchema,
@@ -247,6 +248,45 @@ export const useDeepResearchStore = create<DeepResearchState & DeepResearchActio
         phase: phase === 'idle' ? 'clarifying' : phase,
       });
 
+      let streamingText = '';
+      let completed: { runId?: string; reply: DeepResearchChatReply } | null = null;
+      let streamError: string | null = null;
+
+      const showStreamingBubble = () => {
+        set({
+          messages: [...nextMessages, { role: 'assistant', content: streamingText }],
+        });
+      };
+
+      const handleChatEvent = (payload: string) => {
+        let event: DeepResearchEvent;
+        try {
+          event = JSON.parse(payload) as DeepResearchEvent;
+        } catch {
+          return;
+        }
+
+        switch (event.event) {
+          case 'clarifier_token_delta': {
+            if (event.text) {
+              streamingText += event.text;
+              showStreamingBubble();
+            }
+            break;
+          }
+          case 'chat_done': {
+            completed = { runId: event.runId, reply: event.reply };
+            break;
+          }
+          case 'chat_failed': {
+            streamError = event.error || 'The Orchestrator chat failed.';
+            break;
+          }
+          default:
+            break;
+        }
+      };
+
       try {
         const response = await fetch(deepResearchUrl('/chat'), {
           method: 'POST',
@@ -256,23 +296,30 @@ export const useDeepResearchStore = create<DeepResearchState & DeepResearchActio
         if (!response.ok) {
           throw new Error(`The Orchestrator chat request failed (${response.status}).`);
         }
-        const data = (await response.json()) as ChatResponseBody;
-        if (!data || !data.reply) {
-          throw new Error('The Orchestrator returned an empty reply.');
+        if (!response.body) {
+          throw new Error('The Orchestrator chat response has no stream body.');
         }
 
-        const nextRunId = data.runId ?? runId;
-        const replyText = data.reply.text ?? '';
-        const assistantMessage: ChatMessage = { role: 'assistant', content: replyText };
+        await consumeSseStream(response.body, handleChatEvent);
+
+        if (!completed) {
+          throw new Error(
+            streamError ?? 'The Orchestrator chat stream ended without a reply.',
+          );
+        }
+
+        const { reply } = completed;
+        const nextRunId = completed.runId ?? runId;
+        const finalText = reply.text?.trim() ? reply.text : streamingText;
         const nextState: Partial<DeepResearchState> = {
           runId: nextRunId,
-          messages: [...nextMessages, assistantMessage],
+          messages: [...nextMessages, { role: 'assistant', content: finalText }],
           isSendingChat: false,
           error: null,
         };
 
-        if (data.reply.kind === 'output_schema_proposal' && data.reply.outputSchema) {
-          nextState.outputSchema = normalizeOutputSchema(data.reply.outputSchema);
+        if (reply.kind === 'output_schema_proposal' && reply.outputSchema) {
+          nextState.outputSchema = normalizeOutputSchema(reply.outputSchema);
           nextState.phase = 'schema_review';
         } else {
           nextState.phase = get().outputSchema ? 'schema_review' : 'clarifying';

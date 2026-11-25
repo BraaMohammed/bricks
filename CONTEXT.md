@@ -37,7 +37,7 @@ The per-run, user-approved definition of the table's fields. It is fully custom 
 _Avoid_: Columns, headers
 
 **Identity Columns**:
-The Output Schema fields the Orchestrator designates as identifying a record; the Table Builder deduplicates on them.
+The Output Schema fields the Orchestrator designates as identifying a record; the Table Builder deduplicates on them. Multiple fields may be ticked to form a composite key. Shown to users in the UI as "unique key".
 _Avoid_: Primary key, dedup key
 
 **Record**:

@@ -47,7 +47,10 @@ export type DeepResearchEvent =
   | { event: 'coverage_review_completed'; decision: string; reason: string; reSpinNumber: number }
   | { event: 'table_records_ready'; records: DataRow[] }
   | { event: 'deep_research_completed'; totalRecords: number }
-  | { event: 'deep_research_failed'; error: string };
+  | { event: 'deep_research_failed'; error: string }
+  | { event: 'clarifier_token_delta'; text: string }
+  | { event: 'chat_done'; runId: string; reply: DeepResearchChatReply }
+  | { event: 'chat_failed'; error: string };
 
 export interface DeepResearchRun {
   id: string;

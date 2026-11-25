@@ -1,18 +1,25 @@
 /**
  * POST /api/deep-research/chat
  *
- * The Clarify step of a Deep Research Run. The Orchestrator either asks one
- * clarifying question or proposes the Output Schema (with 3 fake sample rows
- * and Identity Columns) for the user to approve.
+ * The Clarify step of a Deep Research Run, streamed as SSE. The Orchestrator
+ * either asks one clarifying question or proposes the Output Schema (with 3
+ * fake sample rows and Identity Columns) for the user to approve. Visible text
+ * arrives token-by-token as `clarifier_token_delta` events, then one terminal
+ * `chat_done` (or `chat_failed`) event closes the stream.
  *
- * Body: { runId?: string|null, messages: {role:'user'|'assistant',content:string}[] }
- * Res:  { runId, reply: {kind:'clarification',text} |
- *                        {kind:'output_schema_proposal',text,outputSchema} }
+ * Body: { runId?: string|null, messages: {role:'user'|'assistant',content:string}[], model? }
+ * Out:  data: {"event":"clarifier_token_delta","text":"..."}*
+ *       data: {"event":"chat_done","runId":"...","reply":{kind:'clarification',text} |
+ *                                            {kind:'output_schema_proposal',text,outputSchema}}
+ *       data: {"event":"chat_failed","error":"..."}
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { proposeOrClarify, type ChatTurn } from '../../../../lib/deep-research/orchestrator';
+import {
+  streamProposeOrClarify,
+  type ChatTurn,
+} from '../../../../lib/deep-research/orchestrator';
 import {
   appendRunMessage,
   createRun,
@@ -22,7 +29,7 @@ import {
 } from '../../../../lib/deep-research/repository';
 
 export const runtime = 'nodejs';
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -86,24 +93,65 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     await replaceRunMessages(run.id, turns);
 
-    const result = await proposeOrClarify(turns, model);
+    const encoder = new TextEncoder();
 
-    await updateRun(run.id, {
-      status: result.proposed ? 'schema_proposed' : 'clarifying',
-      ...(result.reply.kind === 'output_schema_proposal'
-        ? { outputSchema: result.reply.outputSchema }
-        : {}),
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        const send = (event: unknown) => {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
+          );
+        };
+
+        try {
+          const result = await streamProposeOrClarify(turns, model, (text) => {
+            send({ event: 'clarifier_token_delta', text });
+          });
+
+          await updateRun(run.id, {
+            status: result.proposed ? 'schema_proposed' : 'clarifying',
+            ...(result.reply.kind === 'output_schema_proposal'
+              ? { outputSchema: result.reply.outputSchema }
+              : {}),
+          });
+
+          await appendRunMessage(run.id, {
+            role: 'assistant',
+            content: result.reply.text,
+          });
+
+          send({ event: 'chat_done', runId: run.id, reply: result.reply });
+        } catch (err) {
+          console.error('💥 [deep-research] chat failed:', err);
+          send({
+            event: 'chat_failed',
+            error: err instanceof Error ? err.message : String(err),
+          });
+        } finally {
+          try {
+            controller.close();
+          } catch {
+            // Already closed/cancelled by the client.
+          }
+        }
+      },
+
+      cancel() {
+        // The Orchestrator turn finishes server-side even if the client goes
+        // away; nothing to unregister here (no event bus listener attached).
+      },
     });
 
-    await appendRunMessage(run.id, {
-      role: 'assistant',
-      content: result.reply.text,
+    return new Response(stream, {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+        'X-Accel-Buffering': 'no',
+      },
     });
-
-    return NextResponse.json(
-      { runId: run.id, reply: result.reply },
-      { headers: corsHeaders },
-    );
   } catch (err) {
     console.error('💥 [deep-research] chat failed:', err);
     return NextResponse.json(

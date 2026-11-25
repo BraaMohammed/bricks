@@ -97,7 +97,7 @@ export const RecordsTable = () => {
             <span className="hidden sm:inline">
               deduplicated on{' '}
               {identityColumns.size > 0
-                ? `${identityColumns.size} Identity Column${identityColumns.size === 1 ? '' : 's'}`
+                ? `${identityColumns.size} unique key field${identityColumns.size === 1 ? '' : 's'}`
                 : 'full records'}
             </span>
           </div>

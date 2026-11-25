@@ -1,46 +1,11 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { deepResearchUrl } from '@/lib/deepResearch/backendUrl';
+import { consumeSseStream } from '@/lib/deepResearch/sse';
 import type { DeepResearchEvent } from '@/lib/deepResearch/types';
 import {
   setDeepResearchAbortController,
   useDeepResearchStore,
 } from '@/stores/useDeepResearchStore';
-
-interface ParsedSseBuffer {
-  rest: string;
-  payloads: string[];
-}
-
-const parseSseBuffer = (buffer: string): ParsedSseBuffer => {
-  const normalized = buffer.replace(/\r\n/g, '\n');
-  const payloads: string[] = [];
-  let rest = normalized;
-  let boundary = rest.indexOf('\n\n');
-
-  while (boundary !== -1) {
-    const block = rest.slice(0, boundary);
-    rest = rest.slice(boundary + 2);
-    const dataLines = block
-      .split('\n')
-      .filter((line) => line.startsWith('data:'))
-      .map((line) => line.slice(5).replace(/^ /, ''));
-    if (dataLines.length > 0) {
-      payloads.push(dataLines.join('\n'));
-    }
-    boundary = rest.indexOf('\n\n');
-  }
-
-  return { rest, payloads };
-};
-
-const parseSseBlock = (block: string): string | null => {
-  const dataLines = block
-    .replace(/\r\n/g, '\n')
-    .split('\n')
-    .filter((line) => line.startsWith('data:'))
-    .map((line) => line.slice(5).replace(/^ /, ''));
-  return dataLines.length > 0 ? dataLines.join('\n') : null;
-};
 
 const dispatchPayload = (payload: string) => {
   try {
@@ -83,24 +48,7 @@ export function useDeepResearchSSE() {
         throw new Error('The Deep Research Run response has no stream body.');
       }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const { rest, payloads } = parseSseBuffer(buffer);
-        buffer = rest;
-        for (const payload of payloads) {
-          dispatchPayload(payload);
-        }
-      }
-
-      buffer += decoder.decode();
-      const tail = parseSseBlock(buffer);
-      if (tail) dispatchPayload(tail);
+      await consumeSseStream(response.body, dispatchPayload);
     } catch (err) {
       if (!controller.signal.aborted) {
         const message =

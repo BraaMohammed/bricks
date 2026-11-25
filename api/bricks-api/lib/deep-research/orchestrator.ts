@@ -11,8 +11,13 @@ import {
   sourceCatalogForPrompt,
   type ResearchSourceAssignment,
 } from './sources';
-import { extractJsonValue, streamCompletion, waterfallJson } from './llm';
-import { getDeepResearchCaps } from './env';
+import {
+  extractJsonValue,
+  streamChat,
+  streamCompletion,
+  waterfallJson,
+} from './llm';
+import { getDeepResearchCaps, getDeepResearchModelCandidates } from './env';
 import {
   outputSchemaForPrompt,
   parseOutputSchema,
@@ -55,6 +60,44 @@ Return ONLY valid JSON, no markdown fences, in one of these shapes:
 
 const REPAIR_SYSTEM = `You repair JSON for Bricks' AI Deep Researcher.
 Return ONLY the corrected JSON value, with no prose and no markdown fences.`;
+
+/**
+ * Streaming variant of ORCHESTRATOR_SYSTEM: the user-facing text comes first so
+ * it can be streamed token-by-token. A proposal only appends one fenced JSON
+ * block at the very end; clarifications are pure prose.
+ */
+const STREAM_ORCHESTRATOR_SYSTEM = `You are the Orchestrator of Bricks' AI Deep Researcher.
+You turn a free-text research goal into a table of records.
+Your reply streams to the user as it is written, so the visible text must come first.
+
+Decide one of two outcomes from the conversation:
+1. "clarification" — only when a genuinely essential detail is missing (for
+   example the entity type or the geography is ambiguous). Ask one short,
+   specific question. Do not ask for permission or make small talk.
+2. "output_schema_proposal" — when the goal is clear enough to research. Propose
+   the Output Schema for the resulting table.
+
+Output Schema rules:
+- 3 to 8 fields. Every field has a stable machine key (lower_snake_case) and a
+  one-line description.
+- Fields must be exactly what the user needs in the final table; do not add
+  filler fields.
+- identityColumns is a subset of field names that identifies a record (usually
+  the name or the official website). It may be an empty array.
+- sampleRows contains EXACTLY 3 clearly fake sample rows. Every row must contain
+  every field key, with short obviously-fake values (e.g. "Example Roastery 1").
+- The schema must fit the goal, not a fixed template.
+
+Reply shape:
+- Write the user-facing text FIRST, as plain prose. No markdown headings, no
+  bullet lists, no small talk.
+- For a clarification, the reply is ONLY the prose question — no JSON at all.
+- For an output_schema_proposal, after the prose append EXACTLY ONE fenced
+  block as the very last thing in the reply, and nothing may follow it:
+
+\`\`\`proposal
+{"kind":"output_schema_proposal","outputSchema":{"fields":[{"name":"...","description":"..."}],"identityColumns":["..."],"sampleRows":[{},{},{}]}}
+\`\`\``;
 
 function conversationText(messages: ChatTurn[]): string {
   return messages
@@ -153,6 +196,141 @@ export async function proposeOrClarify(
   return {
     reply,
     proposed: reply.kind === 'output_schema_proposal',
+  };
+}
+
+/**
+ * Parses a prose-first Orchestrator reply: visible text up front, an optional
+ * fenced proposal block at the very end. Strips the fenced tail from the
+ * visible text and parses it into kind/outputSchema via normalizeReply.
+ */
+export function parseProseFirstReply(
+  text: string,
+): DeepResearchChatReply | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+
+  const fenceMatch = trimmed.match(/```[a-zA-Z]*\s*([\s\S]*?)```/);
+  const prose = fenceMatch
+    ? trimmed.slice(0, trimmed.indexOf(fenceMatch[0])).trim()
+    : trimmed;
+
+  if (fenceMatch) {
+    const parsed =
+      extractJsonValue(fenceMatch[1]) ?? extractJsonValue(trimmed);
+    const reply = normalizeReply(parsed);
+    if (reply) {
+      if (reply.kind === 'output_schema_proposal' && prose) {
+        return { ...reply, text: prose };
+      }
+      return reply;
+    }
+  }
+
+  // No usable fence: the model may still have emitted legacy inline JSON.
+  const inline = extractJsonValue(trimmed);
+  if (inline !== undefined) {
+    const reply = normalizeReply(inline);
+    if (reply) return reply;
+  }
+
+  // Pure prose — a clarification is exactly the user-facing text.
+  if (prose) {
+    return { kind: 'clarification', text: prose };
+  }
+
+  return null;
+}
+
+export interface StreamProposeOrClarifyResult extends ProposeOrClarifyResult {
+  /** True when the reply was produced by the streaming attempt (deltas emitted). */
+  streamed: boolean;
+}
+
+/**
+ * Streaming Clarify step for the chat route. Streams the Orchestrator's visible
+ * text through `onTextDelta` as it arrives, then settles the structured reply.
+ * Retries other configured models only until the first text delta reaches the
+ * caller; after that it falls back to the non-streaming repair waterfall.
+ */
+export async function streamProposeOrClarify(
+  messages: ChatTurn[],
+  model: string | undefined,
+  onTextDelta: (text: string) => void,
+): Promise<StreamProposeOrClarifyResult> {
+  const history = conversationText(messages);
+  const prompt = `Conversation so far:\n\n${history}\n\nWrite the next Orchestrator turn.`;
+
+  let text = '';
+  let sawDelta = false;
+
+  for (const candidate of getDeepResearchModelCandidates(model)) {
+    text = '';
+    try {
+      await streamChat({
+        messages: [
+          { role: 'system', content: STREAM_ORCHESTRATOR_SYSTEM },
+          { role: 'user', content: prompt },
+        ],
+        onTextDelta: (delta) => {
+          text += delta;
+          sawDelta = true;
+          onTextDelta(delta);
+        },
+        temperature: 0.2,
+        maxTokens: 1_600,
+        model: candidate,
+      });
+    } catch (err) {
+      console.warn(
+        `  ⚠️ [deep-research] streaming clarify via ${candidate} failed: ${String(err)}`,
+      );
+    }
+
+    const reply = parseProseFirstReply(text);
+    if (reply) {
+      return {
+        reply,
+        proposed: reply.kind === 'output_schema_proposal',
+        streamed: true,
+      };
+    }
+
+    // Deltas already reached the user for this turn: no silent failover past
+    // the first visible token, mirroring waterfallJson's parity rule.
+    if (sawDelta) break;
+  }
+
+  // No valid reply emerged: invisible non-streaming repair pass, no deltas.
+  const parsed = text.trim() ? extractJsonValue(text) : null;
+  let reply = normalizeReply(parsed);
+
+  if (!reply && parsed !== null && parsed !== undefined) {
+    const repaired = await waterfallJson({
+      system: REPAIR_SYSTEM,
+      prompt: `The previous answer was invalid for this schema. Re-emit a valid JSON reply in the required shape.\n\nPrevious answer:\n${JSON.stringify(parsed)}`,
+      temperature: 0,
+      maxTokens: 1_600,
+      model,
+    });
+    reply = normalizeReply(repaired);
+  }
+
+  if (!reply) {
+    return {
+      reply: {
+        kind: 'clarification',
+        text: 'I could not pin down the table yet. What exactly should one row represent, and which fields do you need?',
+      },
+      proposed: false,
+      streamed: false,
+    };
+  }
+
+  return {
+    reply,
+    proposed: reply.kind === 'output_schema_proposal',
+    streamed: false,
   };
 }
 

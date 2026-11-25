@@ -47,7 +47,11 @@ const GoLabels = ({ labels }: { labels?: string[] }) => {
   );
 };
 
-export const ResearchModelSelector = () => {
+interface ResearchModelSelectorProps {
+  variant?: 'card' | 'composer';
+}
+
+export const ResearchModelSelector = ({ variant = 'card' }: ResearchModelSelectorProps) => {
   const model = useDeepResearchStore((s) => s.model);
   const setModel = useDeepResearchStore((s) => s.setModel);
   const { models: backendModels } = useBackendStatus();
@@ -78,6 +82,68 @@ export const ResearchModelSelector = () => {
   const missingFree = missingSelected && !isOpenCodeGoModel(missingSelected.id) ? missingSelected : null;
   const missingGo = missingSelected && isOpenCodeGoModel(missingSelected.id) ? missingSelected : null;
 
+  const selectContent = (
+    <SelectContent>
+      <SelectGroup>
+        <SelectLabel className="pl-2 font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+          Free — Bricks Gateway
+        </SelectLabel>
+        {missingFree && (
+          <SelectItem value={missingFree.id}>
+            <span className="flex items-center gap-1.5">{missingFree.name}</span>
+          </SelectItem>
+        )}
+        {freeModels.map((entry) => (
+          <SelectItem key={entry.id} value={entry.id}>
+            <span className="flex items-center gap-1.5">{entry.name}</span>
+          </SelectItem>
+        ))}
+      </SelectGroup>
+      <SelectSeparator />
+      <SelectGroup>
+        <SelectLabel className="pl-2 font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+          OpenCode Go — Paid
+        </SelectLabel>
+        {missingGo && (
+          <SelectItem value={missingGo.id}>
+            <span className="flex flex-wrap items-center gap-1.5">{missingGo.name}</span>
+          </SelectItem>
+        )}
+        {goModels.map((entry) => (
+          <SelectItem key={entry.id} value={entry.id} disabled={configured === false}>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span>{entry.name}</span>
+              <GoLabels labels={entry.labels} />
+            </div>
+          </SelectItem>
+        ))}
+      </SelectGroup>
+    </SelectContent>
+  );
+
+  if (variant === 'composer') {
+    return (
+      <div className="flex shrink-0 self-center">
+        <Select value={model} onValueChange={setModel}>
+          <SelectTrigger
+            id="research-model"
+            aria-label="Research model"
+            className="h-9 w-56 rounded-md border-border bg-background font-mono text-[11px]"
+          >
+            <SelectValue placeholder="Select a research model" />
+          </SelectTrigger>
+          {selectContent}
+        </Select>
+        {configured === false && !goLoading && (
+          <p className="mt-1 w-56 font-mono text-[9px] leading-snug text-muted-foreground/70">
+            Set <code className="font-mono">OPENCODE_GO_API_KEY</code> on the backend to enable paid
+            models
+          </p>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-xl border border-border bg-card/60 p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -97,42 +163,7 @@ export const ResearchModelSelector = () => {
           >
             <SelectValue placeholder="Select a research model" />
           </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectLabel className="pl-2 font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
-                Free — Bricks Gateway
-              </SelectLabel>
-              {missingFree && (
-                <SelectItem value={missingFree.id}>
-                  <span className="flex items-center gap-1.5">{missingFree.name}</span>
-                </SelectItem>
-              )}
-              {freeModels.map((entry) => (
-                <SelectItem key={entry.id} value={entry.id}>
-                  <span className="flex items-center gap-1.5">{entry.name}</span>
-                </SelectItem>
-              ))}
-            </SelectGroup>
-            <SelectSeparator />
-            <SelectGroup>
-              <SelectLabel className="pl-2 font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
-                OpenCode Go — Paid
-              </SelectLabel>
-              {missingGo && (
-                <SelectItem value={missingGo.id}>
-                  <span className="flex flex-wrap items-center gap-1.5">{missingGo.name}</span>
-                </SelectItem>
-              )}
-              {goModels.map((entry) => (
-                <SelectItem key={entry.id} value={entry.id} disabled={configured === false}>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span>{entry.name}</span>
-                    <GoLabels labels={entry.labels} />
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
+          {selectContent}
         </Select>
       </div>
 

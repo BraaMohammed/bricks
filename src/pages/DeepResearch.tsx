@@ -11,11 +11,9 @@ import {
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
 import { ClarifyChat } from '@/components/deepResearch/ClarifyChat';
-import { ResearchModelSelector } from '@/components/deepResearch/ResearchModelSelector';
 import { AgentTranscript } from '@/components/deepResearch/AgentTranscript';
 import { SourceStatusCards } from '@/components/deepResearch/SourceStatusCards';
 import { RecordsTable } from '@/components/deepResearch/RecordsTable';
-import { OutputSchemaEditor } from '@/components/deepResearch/OutputSchemaEditor';
 import { useDeepResearchSSE } from '@/hooks/useDeepResearchSSE';
 import { useDeepResearchStore } from '@/stores/useDeepResearchStore';
 import { useDataStore } from '@/stores/useDataStore';
@@ -69,96 +67,71 @@ const DeepResearch = () => {
         <main className="relative">
           <div className="brick-grid-bg pointer-events-none absolute inset-0" />
 
-          <div className="relative mx-auto max-w-[1600px] px-6 pb-20">
+          <div className="relative mx-auto max-w-[1600px]">
             {showClarify ? (
-              <>
-                <div className="mx-auto max-w-4xl pt-14">
-                  <div className="brick-animate-in flex items-start justify-between gap-4">
-                    <div>
-                      <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-primary">
-                        {'// ai deep researcher'}
-                      </p>
-                      <h1 className="mt-4 font-display text-[clamp(2.4rem,5vw,4rem)] font-black uppercase leading-[0.94] tracking-tight">
-                        Research <span className="text-primary">anything</span>.
-                        <br />
-                        Get a table.
-                      </h1>
-                      <p className="mt-5 max-w-2xl text-lg leading-relaxed text-muted-foreground">
-                        Find companies, people, job posts — whatever you describe. The
-                        Orchestrator clarifies the goal, proposes an editable Output Schema,
-                        then Search Sub-Agents research the web and fill your grid.
-                      </p>
-                    </div>
+              <div className="mx-auto flex h-[calc(100vh-4rem)] w-full max-w-5xl flex-col px-6 pb-4">
+                <div className="brick-animate-in flex flex-wrap items-center justify-between gap-x-3 gap-y-1 pt-3">
+                  <div className="flex flex-wrap items-baseline gap-x-3">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-primary">
+                      {'// ai deep researcher'}
+                    </p>
+                    <h1 className="font-display text-2xl font-black uppercase tracking-tight">
+                      Research <span className="text-primary">anything</span>. Get a table.
+                    </h1>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {records.length > 0 && outputSchema && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={reviewResults}
+                        className="rounded-md font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground"
+                      >
+                        Back to results
+                      </Button>
+                    )}
                     {messages.length > 0 && (
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={resetRun}
                         disabled={isSendingChat}
-                        className="mt-1 shrink-0 rounded-md font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground hover:text-destructive"
+                        className="rounded-md font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground hover:text-destructive"
                       >
                         Start over
                       </Button>
                     )}
                   </div>
-
-                  {gridHeaders.length > 0 && (
-                    <p className="mt-5 rounded-lg border border-warning/30 bg-warning/[0.06] px-3 py-2 font-mono text-[10px] uppercase leading-relaxed tracking-[0.14em] text-muted-foreground">
-                      heads up — pushing research results replaces the {gridHeaders.length}-field
-                      grid currently loaded in this browser
-                    </p>
-                  )}
-
-                  {records.length > 0 && outputSchema && (
-                    <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3">
-                      <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                        {doneCount} Record{doneCount === 1 ? '' : 's'}{' '}
-                        {doneCount === 1 ? 'is' : 'are'} waiting from this Deep Research Run
-                      </p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={reviewResults}
-                        className="h-8 gap-2 rounded-md border-border font-mono text-[10px] uppercase tracking-[0.14em]"
-                      >
-                        Back to results
-                        <ArrowRight className="text-[13px]" />
-                      </Button>
-                    </div>
-                  )}
-
-                  <div className="mt-8">
-                    <ResearchModelSelector />
-                  </div>
                 </div>
 
-                <ClarifyChat />
-
-                {outputSchema && (
-                  <div className="mx-auto max-w-4xl">
-                    <OutputSchemaEditor onApproveAndStart={handleApproveAndStart} />
-                  </div>
+                {gridHeaders.length > 0 && (
+                  <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground/70">
+                    heads up — pushing research results replaces the {gridHeaders.length}-field grid
+                    loaded in this browser
+                  </p>
                 )}
-              </>
+
+                <ClarifyChat onApproveAndStart={handleApproveAndStart} />
+              </div>
             ) : (
-              <div className="pt-8">
-                <div className="brick-animate-in flex items-end justify-between gap-4">
-                  <div>
-                    <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-primary">
+              <div className="px-6 pb-20 pt-6">
+                <div className="brick-animate-in flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-baseline gap-x-3">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-primary">
                       {'// deep research run'}
                     </p>
-                    <h2 className="mt-2 font-display text-3xl font-black uppercase tracking-tight">
+                    <h2 className="font-display text-xl font-black uppercase tracking-tight">
                       {phase === 'researching'
                         ? 'Researching…'
                         : phase === 'failed'
                         ? 'Run failed'
                         : 'Results'}
-                      {runId && (
-                        <span className="ml-3 align-middle font-mono text-[11px] font-normal tracking-[0.14em] text-muted-foreground">
-                          run {runId.slice(0, 8)}
-                        </span>
-                      )}
                     </h2>
+                    {runId && (
+                      <span className="font-mono text-[10px] tracking-[0.14em] text-muted-foreground">
+                        run {runId.slice(0, 8)}
+                      </span>
+                    )}
                   </div>
 
                   {phase === 'researching' && (
@@ -166,7 +139,7 @@ const DeepResearch = () => {
                       variant="outline"
                       size="sm"
                       onClick={stopRun}
-                      className="h-9 gap-2 rounded-md border-border font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground hover:border-destructive hover:bg-transparent hover:text-destructive"
+                      className="h-8 gap-2 rounded-md border-border font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground hover:border-destructive hover:bg-transparent hover:text-destructive"
                     >
                       <Xmark className="text-[14px]" />
                       Stop
@@ -174,7 +147,7 @@ const DeepResearch = () => {
                   )}
                 </div>
 
-                <div className="brick-animate-in mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+                <div className="brick-animate-in mt-4 grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
                   <AgentTranscript />
 
                   <div className="space-y-6">
