@@ -36,6 +36,9 @@ const runBodySchema = z.object({
   outputSchema: z.unknown(),
   targetCount: z.number().int().positive().optional(),
   model: z.string().min(1).max(200).optional(),
+  searchProvider: z.enum(['bricks', 'exa', 'firecrawl', 'parallel']).optional(),
+  maxSearches: z.number().int().optional(),
+  providerLevel: z.string().min(1).max(64).optional(),
 });
 
 export async function POST(request: NextRequest): Promise<Response> {
@@ -83,12 +86,18 @@ export async function POST(request: NextRequest): Promise<Response> {
     parsed.data.targetCount ?? getDefaultTargetCount(caps.maxRecords),
   );
 
+  const searchProvider = parsed.data.searchProvider ?? 'bricks';
+  const maxSearches = searchProvider === 'bricks'
+    ? undefined
+    : Math.min(8, Math.max(1, Math.floor(parsed.data.maxSearches ?? 3)));
+
   await updateRun(runId, {
     outputSchema,
     status: 'researching',
   });
 
   const encoder = new TextEncoder();
+  const abortController = new AbortController();
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
@@ -106,6 +115,10 @@ export async function POST(request: NextRequest): Promise<Response> {
         outputSchema,
         targetCount,
         model: parsed.data.model,
+        searchProvider,
+        maxSearches,
+        providerLevel: parsed.data.providerLevel,
+        signal: abortController.signal,
       }).finally(() => {
         unregisterRunListener(runId);
         try {
@@ -118,6 +131,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     cancel() {
       unregisterRunListener(runId);
+      abortController.abort();
     },
   });
 

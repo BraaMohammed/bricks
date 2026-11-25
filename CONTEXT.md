@@ -32,6 +32,10 @@ _Avoid_: Writer, compiler, normaliser
 A website or API that a Search Sub-Agent searches.
 _Avoid_: Provider, source site, target
 
+**Search Provider**:
+The agentic search services (Exa Agent, Parallel Task API, Firecrawl Agent) the Orchestrator prompts directly in provider modes; each Orchestrator tool call is one agentic run.
+_Avoid_: hosted engine, agentic provider, plain search
+
 **Output Schema**:
 The per-run, user-approved definition of the table's fields. It is fully custom to each run; nothing about it is hardcoded.
 _Avoid_: Columns, headers

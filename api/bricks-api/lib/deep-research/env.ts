@@ -34,6 +34,8 @@ export interface DeepResearchCaps {
   maxRecords: number;
   maxRespins: number;
   maxWallClockMs: number;
+  /** Hard wall-clock cap for a single Search Provider call (provider modes). */
+  hostedMaxCallMs: number;
 }
 
 export function getDeepResearchCaps(): DeepResearchCaps {
@@ -49,6 +51,7 @@ export function getDeepResearchCaps(): DeepResearchCaps {
       'DEEP_RESEARCH_MAX_WALL_CLOCK_MS',
       900_000,
     ),
+    hostedMaxCallMs: positiveInt('DEEP_RESEARCH_HOSTED_MAX_MS', 300_000),
   };
 }
 

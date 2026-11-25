@@ -25,9 +25,28 @@ export function useDeepResearchSSE() {
     if (abortRef.current) return;
 
     const store = useDeepResearchStore.getState();
-    const { runId, outputSchema, model } = store;
+    const {
+      runId,
+      outputSchema,
+      model,
+      searchProvider,
+      maxSearches,
+      providerLevel,
+    } = store;
     if (!runId || !outputSchema) return;
     if (!store.startRun()) return;
+
+    const runBody: Record<string, unknown> = {
+      runId,
+      outputSchema,
+      model,
+      searchProvider,
+      maxSearches,
+    };
+    if (searchProvider !== 'bricks') {
+      const level = providerLevel[searchProvider];
+      if (level) runBody.providerLevel = level;
+    }
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -38,7 +57,7 @@ export function useDeepResearchSSE() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
-        body: JSON.stringify({ runId, outputSchema, model }),
+        body: JSON.stringify(runBody),
       });
 
       if (!response.ok) {

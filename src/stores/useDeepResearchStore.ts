@@ -37,12 +37,85 @@ export const ORCHESTRATOR_AGENT_ID = 'orchestrator';
 export const DEEP_RESEARCH_MODEL_STORAGE_KEY = 'deep_research_model';
 export const DEFAULT_DEEP_RESEARCH_MODEL = 'deepseek-v4.1-flash';
 
+export type DeepResearchSearchProvider = 'bricks' | 'exa' | 'firecrawl' | 'parallel';
+
+export const DEEP_RESEARCH_SEARCH_PROVIDER_STORAGE_KEY = 'deep_research_search_provider';
+export const DEEP_RESEARCH_MAX_SEARCHES_STORAGE_KEY = 'deep_research_max_searches';
+export const DEEP_RESEARCH_PROVIDER_LEVELS_STORAGE_KEY = 'deep_research_provider_levels';
+
+const DEFAULT_SEARCH_PROVIDER: DeepResearchSearchProvider = 'bricks';
+const DEFAULT_MAX_SEARCHES = 3;
+const MIN_MAX_SEARCHES = 1;
+const MAX_MAX_SEARCHES = 8;
+
+const SEARCH_PROVIDER_IDS: DeepResearchSearchProvider[] = [
+  'bricks',
+  'exa',
+  'firecrawl',
+  'parallel',
+];
+
 const readStoredModel = (): string => {
   try {
     const stored = localStorage.getItem(DEEP_RESEARCH_MODEL_STORAGE_KEY);
     return stored && stored.trim() ? stored.trim() : DEFAULT_DEEP_RESEARCH_MODEL;
   } catch {
     return DEFAULT_DEEP_RESEARCH_MODEL;
+  }
+};
+
+const readStoredSearchProvider = (): DeepResearchSearchProvider => {
+  try {
+    const stored = localStorage.getItem(DEEP_RESEARCH_SEARCH_PROVIDER_STORAGE_KEY);
+    if (stored && SEARCH_PROVIDER_IDS.includes(stored as DeepResearchSearchProvider)) {
+      return stored as DeepResearchSearchProvider;
+    }
+  } catch {
+    return DEFAULT_SEARCH_PROVIDER;
+  }
+  return DEFAULT_SEARCH_PROVIDER;
+};
+
+const readStoredMaxSearches = (): number => {
+  try {
+    const stored = localStorage.getItem(DEEP_RESEARCH_MAX_SEARCHES_STORAGE_KEY);
+    const parsed = stored ? Number.parseInt(stored, 10) : Number.NaN;
+    if (
+      Number.isInteger(parsed) &&
+      parsed >= MIN_MAX_SEARCHES &&
+      parsed <= MAX_MAX_SEARCHES
+    ) {
+      return parsed;
+    }
+  } catch {
+    return DEFAULT_MAX_SEARCHES;
+  }
+  return DEFAULT_MAX_SEARCHES;
+};
+
+const readStoredProviderLevels = (): Record<string, string> => {
+  try {
+    const stored = localStorage.getItem(DEEP_RESEARCH_PROVIDER_LEVELS_STORAGE_KEY);
+    if (!stored) return {};
+    const parsed = JSON.parse(stored) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const levels: Record<string, string> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (typeof value === 'string' && value.trim()) {
+        levels[key] = value.trim();
+      }
+    }
+    return levels;
+  } catch {
+    return {};
+  }
+};
+
+const writeLocalStorage = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    return;
   }
 };
 
@@ -59,10 +132,16 @@ export interface DeepResearchState {
   error: string | null;
   isSendingChat: boolean;
   model: string;
+  searchProvider: DeepResearchSearchProvider;
+  maxSearches: number;
+  providerLevel: Record<string, string>;
 }
 
 export interface DeepResearchActions {
   setModel: (model: string) => void;
+  setSearchProvider: (searchProvider: DeepResearchSearchProvider) => void;
+  setMaxSearches: (maxSearches: number) => void;
+  setProviderLevel: (providerId: string, levelId: string) => void;
   sendClarificationMessage: (content: string) => Promise<void>;
   approveOutputSchema: () => boolean;
   editOutputSchema: (updater: (schema: OutputSchema) => OutputSchema) => void;
@@ -99,6 +178,9 @@ const initialState: DeepResearchState = {
   error: null,
   isSendingChat: false,
   model: readStoredModel(),
+  searchProvider: readStoredSearchProvider(),
+  maxSearches: readStoredMaxSearches(),
+  providerLevel: readStoredProviderLevels(),
 };
 
 const normalizeOutputSchema = (schema: OutputSchema | null | undefined): OutputSchema => {
@@ -227,11 +309,28 @@ export const useDeepResearchStore = create<DeepResearchState & DeepResearchActio
 
     setModel: (model) => {
       set({ model });
-      try {
-        localStorage.setItem(DEEP_RESEARCH_MODEL_STORAGE_KEY, model);
-      } catch {
-        return;
-      }
+      writeLocalStorage(DEEP_RESEARCH_MODEL_STORAGE_KEY, model);
+    },
+
+    setSearchProvider: (searchProvider) => {
+      set({ searchProvider });
+      writeLocalStorage(DEEP_RESEARCH_SEARCH_PROVIDER_STORAGE_KEY, searchProvider);
+    },
+
+    setMaxSearches: (maxSearches) => {
+      const clamped = Math.min(
+        MAX_MAX_SEARCHES,
+        Math.max(MIN_MAX_SEARCHES, Math.round(maxSearches))
+      );
+      set({ maxSearches: clamped });
+      writeLocalStorage(DEEP_RESEARCH_MAX_SEARCHES_STORAGE_KEY, String(clamped));
+    },
+
+    setProviderLevel: (providerId, levelId) => {
+      if (!providerId || !levelId) return;
+      const next = { ...get().providerLevel, [providerId]: levelId };
+      set({ providerLevel: next });
+      writeLocalStorage(DEEP_RESEARCH_PROVIDER_LEVELS_STORAGE_KEY, JSON.stringify(next));
     },
 
     sendClarificationMessage: async (content) => {
@@ -470,7 +569,13 @@ export const useDeepResearchStore = create<DeepResearchState & DeepResearchActio
       const controller = activeAbortController;
       activeAbortController = null;
       if (controller) controller.abort();
-      set({ ...initialState, model: get().model });
+      set({
+        ...initialState,
+        model: get().model,
+        searchProvider: get().searchProvider,
+        maxSearches: get().maxSearches,
+        providerLevel: get().providerLevel,
+      });
     },
 
     continueChatting: () => {

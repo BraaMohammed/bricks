@@ -52,6 +52,22 @@ export type DeepResearchEvent =
   | { event: 'chat_done'; runId: string; reply: DeepResearchChatReply }
   | { event: 'chat_failed'; error: string };
 
+export type SearchProviderId = 'exa' | 'firecrawl' | 'parallel';
+
+export interface SearchProviderLevel {
+  id: string;
+  label: string;
+  priceLabel: string;
+  timeLabel: string;
+}
+
+export interface SearchProviderStatus {
+  id: SearchProviderId;
+  label: string;
+  configured: boolean;
+  levels: SearchProviderLevel[];
+}
+
 export interface DeepResearchRun {
   id: string;
   goal: string;

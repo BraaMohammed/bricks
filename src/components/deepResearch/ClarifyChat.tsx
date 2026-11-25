@@ -3,6 +3,8 @@ import { Send, WarningCircle } from 'iconoir-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ResearchModelSelector } from '@/components/deepResearch/ResearchModelSelector';
+import { SearchProviderSelector } from '@/components/deepResearch/SearchProviderSelector';
+import { MaxSearchesSelector } from '@/components/deepResearch/MaxSearchesSelector';
 import { OutputSchemaEditor } from '@/components/deepResearch/OutputSchemaEditor';
 import { useDeepResearchStore } from '@/stores/useDeepResearchStore';
 import type { ChatMessage } from '@/lib/deepResearch/types';
@@ -51,6 +53,7 @@ export const ClarifyChat = ({ onApproveAndStart }: ClarifyChatProps) => {
   const isSendingChat = useDeepResearchStore((s) => s.isSendingChat);
   const error = useDeepResearchStore((s) => s.error);
   const outputSchema = useDeepResearchStore((s) => s.outputSchema);
+  const searchProvider = useDeepResearchStore((s) => s.searchProvider);
   const sendClarificationMessage = useDeepResearchStore((s) => s.sendClarificationMessage);
   const [draft, setDraft] = useState('');
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -148,12 +151,14 @@ export const ClarifyChat = ({ onApproveAndStart }: ClarifyChatProps) => {
           disabled={isSendingChat}
           className="min-h-0 w-full resize-none border-0 bg-transparent px-2 py-1.5 text-sm focus-visible:ring-0 focus-visible:ring-offset-0"
         />
-        <div className="mt-1 flex items-center justify-between gap-2">
+        <div className="mt-1 flex flex-wrap items-center gap-2">
           <ResearchModelSelector variant="composer" />
+          <SearchProviderSelector />
+          {searchProvider !== 'bricks' && <MaxSearchesSelector />}
           <Button
             onClick={() => void send()}
             disabled={isSendingChat || !draft.trim()}
-            className="h-9 shrink-0 gap-2 rounded-md border border-primary bg-primary font-mono text-[10px] uppercase tracking-[0.14em] text-primary-foreground hover:border-primary-glow hover:bg-primary-glow"
+            className="ml-auto h-9 shrink-0 gap-2 rounded-md border border-primary bg-primary font-mono text-[10px] uppercase tracking-[0.14em] text-primary-foreground hover:border-primary-glow hover:bg-primary-glow"
           >
             <Send className="text-[14px]" />
             Send
