@@ -24,6 +24,20 @@ const LOCAL_SOCKET_DATABASE = process.env.PGLITE_SOCKET_DATABASE ?? 'postgres';
 
 let localSocket: PGLiteSocketServer | undefined;
 
+/**
+ * Survives Next.js dev HMR: Turbopack resets module state on hot reload, so a
+ * module-scoped `let` forgets the running socket while it is still listening,
+ * and the next Deep Research Run hits EADDRINUSE against itself. The global
+ * singleton mirrors the PGlite client singleton in lib/db/client.ts.
+ */
+const globalForSocket = globalThis as unknown as {
+  __bricksPgliteSocket?: PGLiteSocketServer;
+};
+
+function isEaddrinuse(error: unknown): boolean {
+  return (error as { code?: string } | null)?.code === 'EADDRINUSE';
+}
+
 /** Returns the production connection string, if one is configured. */
 export function remoteDatabaseUrl(): string | undefined {
   const url = process.env.DATABASE_URL?.trim();
@@ -41,6 +55,7 @@ function localConnectionString(): string {
  * connection string Mastra should use.
  */
 export async function startLocalPgliteSocket(): Promise<string> {
+  localSocket = globalForSocket.__bricksPgliteSocket;
   if (localSocket) return localConnectionString();
 
   const { pglite } = await getDbClient();
@@ -50,9 +65,20 @@ export async function startLocalPgliteSocket(): Promise<string> {
     port: LOCAL_SOCKET_PORT,
     maxConnections: 5,
   });
-  await server.start();
-  localSocket = server;
 
+  try {
+    await server.start();
+  } catch (error) {
+    if (!isEaddrinuse(error)) throw error;
+    // Something is already listening on the socket port. In dev this is an
+    // earlier module copy of this same server exposing the same shared PGlite
+    // instance (file-backed at .pglite-data/), so connecting to it is safe.
+    // Return the connection string pointing at the existing listener.
+    return localConnectionString();
+  }
+
+  localSocket = server;
+  globalForSocket.__bricksPgliteSocket = server;
   return localConnectionString();
 }
 
