@@ -5,6 +5,8 @@
  * (OpenAI, Ollama, Gemini, Groq) in a unified way.
  */
 
+import { getOpenCodeGoBaseUrl, getOpenCodeGoHeaders } from './opencodeGo';
+
 /**
  * Detects if a model name belongs to Ollama
  * @param modelName - The name of the model to check
@@ -48,6 +50,8 @@ export const getAPIEndpoint = (
   baseUrl?: string
 ): string => {
   switch (provider) {
+    case 'opencode-go':
+      return `${getOpenCodeGoBaseUrl()}/chat/completions`;
     case 'waterfall': {
       const backendBase = baseUrl || (typeof localStorage !== 'undefined' ? localStorage.getItem('backend_api_url') : null) || 'http://localhost:3000';
       return `${backendBase.replace(/\/+$/, '')}/api/ai/v1/chat/completions`;
@@ -213,6 +217,9 @@ export const getAuthHeader = (
   };
 
   switch (provider) {
+    case 'opencode-go':
+      return getOpenCodeGoHeaders();
+
     case 'waterfall':
     case 'ollama':
       // Waterfall and Ollama do not require client API keys

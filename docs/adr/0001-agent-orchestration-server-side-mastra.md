@@ -1,0 +1,3 @@
+# Agent orchestration runs server-side with Mastra
+
+The AI Deep Researcher's agent loop runs in the backend (`api/bricks-api`), not the browser, because it needs server-side provider keys, must survive a browser refresh during a 10-minute run, and must persist results server-side. Orchestration uses Mastra (a TypeScript workflow engine with parallel steps, suspend/resume, and a pluggable Postgres storage adapter) instead of hand-rolled code. Considered and rejected: client-side agents reusing `src/lib/agents` (browser-bound, needs keys in the browser); a hand-rolled TS loop over the Vercel AI SDK (reimplements orchestration, persistence, and streaming); LangGraph/LangChain (Python-first, brings its own model abstraction).

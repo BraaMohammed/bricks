@@ -156,7 +156,7 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
             const result = await runSearchAgent({
               instruction: agentConfig.instruction,
               rowData: row as Record<string, string>,
-              provider: agentConfig.provider as 'openai' | 'gemini' | 'groq' | 'ollama',
+              provider: agentConfig.provider as 'openai' | 'gemini' | 'groq' | 'ollama' | 'opencode-go',
               model: agentConfig.model,
               maxSteps: agentConfig.maxSteps,
               temperature: agentConfig.temperature,
@@ -227,7 +227,7 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
 
             const result = await runEmailFinderAgent({
               context: interpolatedContext,
-              provider: emailConfig.provider as 'openai' | 'gemini' | 'groq' | 'ollama',
+              provider: emailConfig.provider as 'openai' | 'gemini' | 'groq' | 'ollama' | 'opencode-go',
               model: emailConfig.model,
               maxSteps: emailConfig.maxSteps,
               temperature: emailConfig.temperature,
@@ -368,7 +368,7 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
         const result = await runSearchAgent({
           instruction: agentConfig.instruction,
           rowData: row as Record<string, string>,
-          provider: agentConfig.provider as 'openai' | 'gemini' | 'groq' | 'ollama',
+          provider: agentConfig.provider as 'openai' | 'gemini' | 'groq' | 'ollama' | 'opencode-go',
           model: agentConfig.model,
           maxSteps: agentConfig.maxSteps,
           temperature: agentConfig.temperature,
@@ -402,7 +402,7 @@ export const useFormulaExecution = (): UseFormulaExecutionReturn => {
 
         const result = await runEmailFinderAgent({
           context: interpolatedContext,
-          provider: emailConfig.provider as 'openai' | 'gemini' | 'groq' | 'ollama',
+          provider: emailConfig.provider as 'openai' | 'gemini' | 'groq' | 'ollama' | 'opencode-go',
           model: emailConfig.model,
           maxSteps: emailConfig.maxSteps,
           temperature: emailConfig.temperature,

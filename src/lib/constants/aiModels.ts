@@ -24,6 +24,7 @@ export interface ModelDefinition {
   name: string;
   supportsThinking: boolean;
   cost: string;
+  labels?: string[];
 }
 
 /**
@@ -49,6 +50,13 @@ export const PROVIDERS = [
     icon: Flash,
     requiresApiKey: false,
     supportsLocalModels: true,
+  },
+  {
+    id: 'opencode-go',
+    name: 'OpenCode Go (Cloud)',
+    icon: Key,
+    requiresApiKey: false,
+    supportsLocalModels: false,
   },
   {
     id: 'openai',
@@ -157,7 +165,50 @@ export const groqModels: ModelDefinition[] = [
   },
 ];
 
+/**
+ * Available OpenCode Go models with metadata
+ * IDs are namespaced with the opencode-go/ prefix; the backend proxy strips it.
+ */
+export const openCodeGoModels: ModelDefinition[] = [
+  { id: 'opencode-go/deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash', supportsThinking: detectThinkingSupport('deepseek-v4.1-flash'), cost: 'Go plan' },
+  { id: 'opencode-go/deepseek-v4-pro', name: 'DeepSeek V4 Pro', supportsThinking: detectThinkingSupport('deepseek-v4-pro'), cost: 'Go plan' },
+  { id: 'opencode-go/glm-5.2', name: 'GLM-5.2', supportsThinking: false, cost: 'Go plan' },
+  { id: 'opencode-go/glm-5.3', name: 'GLM-5.3', supportsThinking: false, cost: 'Go plan' },
+  { id: 'opencode-go/glm-5.3-flash', name: 'GLM-5.3 Flash', supportsThinking: false, cost: 'Go plan' },
+  { id: 'opencode-go/grok-4.7', name: 'Grok 4.7', supportsThinking: false, cost: 'Go plan' },
+  { id: 'opencode-go/gpt-5.6-luna', name: 'GPT-5.6 Luna', supportsThinking: false, cost: 'Go plan' },
+  { id: 'opencode-go/gpt-6-luna', name: 'GPT-6 Luna', supportsThinking: false, cost: 'Go plan' },
+  { id: 'opencode-go/claude-haiku-5-5', name: 'Claude Haiku 5.5', supportsThinking: false, cost: 'Go plan' },
+  { id: 'opencode-go/hy3', name: 'HY3', supportsThinking: false, cost: 'Go plan' },
+  { id: 'opencode-go/hy4-preview', name: 'HY4 Preview', supportsThinking: false, cost: 'Go plan', labels: ['preview'] },
+  { id: 'opencode-go/kimi-k2.7-code', name: 'Kimi K2.7 Code', supportsThinking: false, cost: 'Go plan' },
+  { id: 'opencode-go/kimi-k3', name: 'Kimi K3', supportsThinking: false, cost: 'Go plan' },
+  { id: 'opencode-go/kimi-k3.1-pro', name: 'Kimi K3.1 Pro', supportsThinking: false, cost: 'Go plan' },
+  { id: 'opencode-go/mimo-v2.6-flash', name: 'MiMo V2.6 Flash', supportsThinking: false, cost: 'Go plan' },
+  { id: 'opencode-go/mimo-v2.6-pro', name: 'MiMo V2.6 Pro', supportsThinking: false, cost: 'Go plan' },
+  { id: 'opencode-go/mimo-v2.5', name: 'MiMo V2.5', supportsThinking: false, cost: 'Go plan' },
+  { id: 'opencode-go/mimo-v2.5-pro', name: 'MiMo V2.5 Pro', supportsThinking: false, cost: 'Go plan' },
+  { id: 'opencode-go/minimax-m3', name: 'MiniMax M3', supportsThinking: false, cost: 'Go plan' },
+  { id: 'opencode-go/minimax-m3.1-flash', name: 'MiniMax M3.1 Flash', supportsThinking: false, cost: 'Go plan' },
+  { id: 'opencode-go/longcat-2.0', name: 'LongCat 2.0', supportsThinking: false, cost: 'Go plan' },
+  { id: 'opencode-go/step-5-preview', name: 'Step-5 Preview', supportsThinking: false, cost: 'Go plan', labels: ['preview'] },
+  { id: 'opencode-go/beam-free', name: 'Beam Free', supportsThinking: false, cost: 'Free (limited time)', labels: ['free', 'region-limited'] },
+  { id: 'opencode-go/qwen3.8-max', name: 'Qwen 3.8 Max', supportsThinking: detectThinkingSupport('qwen3.8-max'), cost: 'Go plan' },
+  { id: 'opencode-go/qwen3.8-flash', name: 'Qwen 3.8 Flash', supportsThinking: detectThinkingSupport('qwen3.8-flash'), cost: 'Go plan' },
+  { id: 'opencode-go/qwen3.7-plus', name: 'Qwen 3.7 Plus', supportsThinking: detectThinkingSupport('qwen3.7-plus'), cost: 'Go plan' },
+  { id: 'opencode-go/iceman-contributor-free', name: 'Iceman Contributor Free', supportsThinking: false, cost: 'Free (limited time)', labels: ['contributor', 'free'] },
+  { id: 'opencode-go/gemini-4-argon', name: 'Gemini 4 Argon', supportsThinking: false, cost: 'Go plan' },
+  { id: 'opencode-go/muse-spark-1.2-contributor', name: 'Muse Spark 1.2 Contributor', supportsThinking: false, cost: 'Go plan', labels: ['contributor', 'region-limited'] },
+  { id: 'opencode-go/muse-spark-1.3-contributor', name: 'Muse Spark 1.3 Contributor', supportsThinking: false, cost: 'Go plan', labels: ['contributor', 'region-limited'] },
+];
+
 export const waterfallModels: ModelDefinition[] = [
+  {
+    id: 'deepseek-v4.1-flash',
+    name: 'DeepSeek V4.1 Flash (Fast & Cheap)',
+    supportsThinking: true,
+    cost: 'Free Tier Cascade',
+  },
   {
     id: 'deepseek-v4-flash',
     name: 'DeepSeek V4 Flash (Fast & Cheap)',
@@ -238,6 +289,8 @@ export function getProviderModels(
   switch (provider) {
     case 'waterfall':
       return dynamicWaterfallModels.length > 0 ? dynamicWaterfallModels : waterfallModels;
+    case 'opencode-go':
+      return openCodeGoModels;
     case 'openai':
       return openAIModels;
     case 'gemini':
@@ -277,6 +330,11 @@ function detectThinkingSupport(modelName: string): boolean {
  * Default OpenAI model to use when none is selected
  */
 export const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini' as const;
+
+/**
+ * Default OpenCode Go model to use when none is selected
+ */
+export const DEFAULT_OPENCODE_GO_MODEL = 'opencode-go/deepseek-v4.1-flash' as const;
 
 /**
  * Default Ollama server base URL

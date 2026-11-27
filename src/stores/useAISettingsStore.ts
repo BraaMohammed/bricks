@@ -4,10 +4,12 @@ import {
   STORAGE_KEYS,
   AIProvider,
   DEFAULT_OPENAI_MODEL,
+  DEFAULT_OPENCODE_GO_MODEL,
   ModelDefinition,
   openAIModels,
   geminiModels,
   groqModels,
+  openCodeGoModels,
   waterfallModels,
   CustomProvider
 } from '@/lib/constants/aiModels';
@@ -56,8 +58,10 @@ export const useAISettingsStore = create<AISettingsState>((set, get) => ({
     set({ aiProvider: provider });
     if (provider === 'openai') {
       set({ model: DEFAULT_OPENAI_MODEL });
+    } else if (provider === 'opencode-go') {
+      set({ model: DEFAULT_OPENCODE_GO_MODEL });
     } else if (provider === 'waterfall') {
-      set({ model: 'deepseek-v4-flash' });
+      set({ model: 'deepseek-v4.1-flash' });
     } else {
       set({ model: '' });
     }
@@ -156,6 +160,8 @@ export const getAvailableModels = (
 ): ModelDefinition[] => {
   if (aiProvider === 'waterfall') {
     return dynamicWaterfallModels.length > 0 ? dynamicWaterfallModels : waterfallModels;
+  } else if (aiProvider === 'opencode-go') {
+    return openCodeGoModels;
   } else if (aiProvider === 'openai') {
     return openAIModels;
   } else if (aiProvider === 'gemini') {

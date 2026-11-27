@@ -1,5 +1,11 @@
 import { isGeminiModel, sendGeminiChatRequest } from './gemini';
 import { isGroqModel, sendGroqChatRequest } from './groq';
+import {
+  getOpenCodeGoBaseUrl,
+  getOpenCodeGoHeaders,
+  isOpenCodeGoModel,
+  stripOpenCodeGoPrefix,
+} from './providers/opencodeGo';
 import type { AIProvider } from './constants/aiModels';
 
 interface AgentConfig {
@@ -16,6 +22,10 @@ interface AgentConfig {
 
 // Helper function to detect if a model is from Ollama
 function isOllamaModel(modelName: string): boolean {
+  if (isOpenCodeGoModel(modelName)) {
+    return false;
+  }
+
   // Check if model name matches typical Ollama patterns
   const ollamaPatterns = [
     'llama', 'mistral', 'codellama', 'vicuna', 'alpaca', 'orca', 
@@ -52,6 +62,13 @@ function getApiConfig(modelName: string, provider: AIProvider) {
       },
       requiresApiKey: false,
       provider: 'waterfall' as const,
+    };
+  } else if (provider === 'opencode-go') {
+    return {
+      endpoint: `${getOpenCodeGoBaseUrl()}/chat/completions`,
+      headers: getOpenCodeGoHeaders(),
+      requiresApiKey: false,
+      provider: 'opencode-go' as const,
     };
   } else if (provider === 'gemini') {
     const apiKey = localStorage.getItem('gemini_api_key');
@@ -271,6 +288,10 @@ GUIDELINES:
     .replace('{previousFeedback}', previousFeedbackStr)
     .replace('{customInstructions}', resolvedCreatorInstructions);
 
+  const creatorModelId = apiConfig.provider === 'opencode-go'
+    ? stripOpenCodeGoPrefix(config.messageCreatorModel)
+    : config.messageCreatorModel;
+
   const creatorRequestBody = {
     model: config.messageCreatorModel,
     messages: [{
@@ -279,7 +300,7 @@ GUIDELINES:
     }],
     response_format: { type: "json_object" as const },
     // GPT-5 and reasoning models need much higher token limits (reasoning + output)
-    ...(config.messageCreatorModel.startsWith('gpt-5') || config.messageCreatorModel.startsWith('o3') || config.messageCreatorModel.startsWith('o4')) 
+    ...(creatorModelId.startsWith('gpt-5') || creatorModelId.startsWith('o3') || creatorModelId.startsWith('o4'))
       ? { max_completion_tokens: 25000 } 
       : { max_tokens: 500 }
   };
@@ -402,6 +423,10 @@ Consider: relevance, personalization, offer appeal, professionalism, likelihood 
     .replace('{message}', currentMessage)
     .replace('{customInstructions}', resolvedRoleplayInstructions);
 
+  const roleplayModelId = apiConfig.provider === 'opencode-go'
+    ? stripOpenCodeGoPrefix(config.leadRoleplayModel)
+    : config.leadRoleplayModel;
+
   const roleplayRequestBody = {
     model: config.leadRoleplayModel,
     messages: [{
@@ -410,7 +435,7 @@ Consider: relevance, personalization, offer appeal, professionalism, likelihood 
     }],
     response_format: { type: "json_object" as const },
     // GPT-5 and reasoning models need much higher token limits (reasoning + output)
-    ...(config.leadRoleplayModel.startsWith('gpt-5') || config.leadRoleplayModel.startsWith('o3') || config.leadRoleplayModel.startsWith('o4')) 
+    ...(roleplayModelId.startsWith('gpt-5') || roleplayModelId.startsWith('o3') || roleplayModelId.startsWith('o4'))
       ? { max_completion_tokens: 25000 } 
       : { max_tokens: 500 }
   };

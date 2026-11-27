@@ -25,7 +25,7 @@ export interface AgentRunOptions {
   /** Row data – used to interpolate {ColumnName} placeholders. */
   rowData: Record<string, string>;
   /** AI provider to use. */
-  provider: 'openai' | 'gemini' | 'groq' | 'ollama';
+  provider: 'openai' | 'gemini' | 'groq' | 'ollama' | 'opencode-go';
   /** Model ID. */
   model: string;
   /** Maximum agentic iterations (tool call rounds). Default: 5. */

@@ -5,14 +5,57 @@
  */
 
 import { useState } from 'react';
-import { Sparks, Globe, Refresh, Flash } from 'iconoir-react';
+import { Sparks, Globe, Refresh, Flash, Code } from 'iconoir-react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AIProvider, GEMINI_MODELS, GEMINI_MODEL_INFO, groqModels, CustomProvider, ModelDefinition } from '@/lib/constants/aiModels';
+import { useOpenCodeGoModels } from '@/hooks/useOpenCodeGoModels';
 import { toast } from '@/hooks/use-toast';
+
+const MODEL_LABEL_STYLES: Record<string, { label: string; className: string }> = {
+  contributor: {
+    label: 'Trains on data',
+    className: 'border-destructive/50 bg-destructive/15 text-destructive font-semibold',
+  },
+  free: {
+    label: 'Free',
+    className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+  },
+  'region-limited': {
+    label: 'Region-limited',
+    className: 'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400',
+  },
+  preview: {
+    label: 'Preview',
+    className: 'border-border bg-muted text-muted-foreground',
+  },
+};
+
+const ModelLabels = ({ labels }: { labels?: string[] }) => {
+  if (!labels || labels.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {labels.map((label) => {
+        const style = MODEL_LABEL_STYLES[label];
+        if (!style) return null;
+        return (
+          <Badge
+            key={label}
+            variant="outline"
+            className={`h-4 rounded px-1.5 py-0 font-mono text-[9px] leading-none tracking-wide ${style.className}`}
+          >
+            {style.label}
+          </Badge>
+        );
+      })}
+    </div>
+  );
+};
 
 export interface ModelSelectorProps {
   provider: AIProvider;
@@ -36,6 +79,7 @@ export const ModelSelector = ({
 }: ModelSelectorProps) => {
   const [fetchingModels, setFetchingModels] = useState(false);
   const [customModels, setCustomModels] = useState<string[]>([]);
+  const openCodeGo = useOpenCodeGoModels();
   const isCustomProvider = provider.startsWith('custom:') && !!customProvider;
 
   // Get description text based on provider and state
@@ -44,6 +88,12 @@ export const ModelSelector = ({
       return ollamaStatus?.connected
         ? `Connected to backend gateway. ${availableModels.length} models available across configured free providers.`
         : 'Connect backend dev server to discover live active models and provider fallbacks.';
+    }
+
+    if (provider === 'opencode-go') {
+      return openCodeGo.loading
+        ? 'Fetching live OpenCode Go models from the backend proxy...'
+        : `OpenCode Go is a paid provider configured on the backend. ${openCodeGo.models.length} models fetched live from the Go proxy.`;
     }
 
     if (isCustomProvider) {
@@ -73,6 +123,10 @@ export const ModelSelector = ({
   const getPlaceholderText = () => {
     if (provider === 'waterfall') {
       return ollamaStatus?.connected ? 'Select a waterfall model' : 'Backend offline (using defaults)';
+    }
+
+    if (provider === 'opencode-go') {
+      return openCodeGo.loading ? 'Loading OpenCode Go models...' : 'Select an OpenCode Go model';
     }
 
     if (isCustomProvider) {
@@ -153,13 +207,29 @@ export const ModelSelector = ({
             ? 'Choose which Google Gemini model to use for AI operations.'
             : provider === 'groq'
             ? 'Choose which Groq model to use for AI operations.'
+            : provider === 'opencode-go'
+            ? 'Choose which OpenCode Go cloud model to use for AI operations.'
             : 'Choose which local Ollama model to use for AI operations.'
           }
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
-          <Label htmlFor="model-select">Model</Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="model-select">Model</Label>
+            {provider === 'opencode-go' && (
+              <button
+                type="button"
+                onClick={() => void openCodeGo.refresh()}
+                disabled={openCodeGo.loading}
+                title="Refresh OpenCode Go models"
+                className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
+              >
+                <Refresh className={`h-3 w-3 ${openCodeGo.loading ? 'animate-spin' : ''}`} />
+                {openCodeGo.loading ? 'Loading' : `${openCodeGo.models.length} models`}
+              </button>
+            )}
+          </div>
           
           {isCustomProvider ? (
             <div className="space-y-3">
@@ -255,6 +325,23 @@ export const ModelSelector = ({
                       <div className="flex items-center justify-between w-full">
                         <span>{modelDef.name}</span>
                         <span className="text-xs text-muted-foreground ml-2">
+                          {modelDef.cost}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))
+                ) : provider === 'opencode-go' ? (
+                  openCodeGo.models.map((modelDef) => (
+                    <SelectItem key={modelDef.id} value={modelDef.id}>
+                      <div className="flex items-center justify-between w-full gap-3">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <Code className="h-3.5 w-3.5 shrink-0 text-primary" />
+                          <div className="min-w-0 space-y-0.5">
+                            <div className="truncate font-medium">{modelDef.name}</div>
+                            <ModelLabels labels={modelDef.labels} />
+                          </div>
+                        </div>
+                        <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
                           {modelDef.cost}
                         </span>
                       </div>

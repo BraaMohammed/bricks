@@ -1,0 +1,2 @@
+ALTER TABLE "deep_research_records" ADD CONSTRAINT "deep_research_records_run_id_deep_research_runs_id_fk" FOREIGN KEY ("run_id") REFERENCES "public"."deep_research_runs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "deep_research_run_messages" ADD CONSTRAINT "deep_research_run_messages_run_id_deep_research_runs_id_fk" FOREIGN KEY ("run_id") REFERENCES "public"."deep_research_runs"("id") ON DELETE cascade ON UPDATE no action;

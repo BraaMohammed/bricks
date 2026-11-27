@@ -8,23 +8,34 @@
     "start": "next start"
   },
   "dependencies": {
+    "@ai-sdk/openai-compatible": "3.0.57",
+    "@electric-sql/pglite": "0.5.8",
+    "@electric-sql/pglite-socket": "0.2.11",
+    "@mastra/core": "1.71.0",
+    "@mastra/pg": "1.27.1",
     "@mozilla/readability": "^0.6.0",
     "@types/cheerio": "^0.22.35",
     "@types/jsdom": "^28.0.0",
     "@types/turndown": "^5.0.6",
+    "ai": "6.0.293",
     "cheerio": "^1.2.0",
     "dotenv": "^17.4.2",
+    "drizzle-orm": "0.45.3",
     "jsdom": "^28.1.0",
     "next": "15.5.4",
     "node-fetch": "^3.3.2",
+    "postgres": "3.4.9",
     "puppeteer": "^22.0.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "turndown": "^7.2.4"
+    "turndown": "^7.2.4",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^19",
+    "drizzle-kit": "0.31.11",
+    "tsx": "4.23.15",
     "typescript": "^5"
   }
 }

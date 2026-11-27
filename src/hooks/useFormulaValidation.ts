@@ -19,7 +19,7 @@ export interface FormulaValidationParams {
   formula?: string;
   headers?: string[];
   aiPrompt?: string;
-  aiProvider?: 'openai' | 'ollama' | 'gemini' | 'groq';
+  aiProvider?: 'openai' | 'ollama' | 'gemini' | 'groq' | 'opencode-go';
   ollamaConnected?: boolean;
   ollamaModels?: string[];
   firecrawlUrl?: string;
@@ -91,6 +91,8 @@ export const useFormulaValidation = (): FormulaValidationHook => {
           if (!hasGroqKey) {
             errors.push('Please set your Groq API key in AI Settings.');
           }
+        } else if (aiProvider === 'opencode-go') {
+          // No client-side API key required; the backend proxy handles auth.
         } else if (aiProvider === 'ollama') {
           if (!ollamaConnected) {
             errors.push('Ollama is not running. Please start Ollama and refresh connection.');

@@ -1,0 +1,3 @@
+# Streaming is a sibling of the AI waterfall, not a change to it
+
+Token streaming is required for the live agent transcript, but `runWaterfall` deliberately strips `stream: true` because streaming through the shared waterfall was unstable. Rather than re-enable it there, a separate `runWaterfallStream` reuses the same provider configuration and health tracking while speaking SSE, leaving `runWaterfall` untouched so existing features cannot regress. It streams only OpenAI-compatible providers (Cloudflare is excluded) and falls back to another provider only if the stream fails before the first token.

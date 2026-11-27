@@ -149,6 +149,16 @@ export function getRateLimitConfig(provider: string, model?: string): {
       return config;
     }
 
+    case 'opencode-go': {
+      const config = {
+        maxConcurrent: 10,
+        delayMs: 200,
+        description: 'OpenCode Go (backend proxy)'
+      };
+      console.log('✅ OpenCode Go config selected:', config);
+      return config;
+    }
+
     case 'openai': {
       const config = {
         maxConcurrent: 50,
