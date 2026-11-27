@@ -420,6 +420,8 @@ export const useDeepResearchStore = create<DeepResearchState & DeepResearchActio
         if (reply.kind === 'output_schema_proposal' && reply.outputSchema) {
           nextState.outputSchema = normalizeOutputSchema(reply.outputSchema);
           nextState.phase = 'schema_review';
+          nextState.records = [];
+          nextState.totalRecords = null;
         } else {
           nextState.phase = get().outputSchema ? 'schema_review' : 'clarifying';
         }

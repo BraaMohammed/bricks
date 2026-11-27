@@ -84,7 +84,9 @@ Rules:
 - Author a fresh JSON Schema every call: a top-level object with a required
   "records" array whose items are objects whose string properties are exactly
   the field names above. Bound the number of Records with maxItems in the
-  description.
+  description. The schema must be VALID JSON Schema — every property is an
+  object like {"type":"string"}, never the bare string "string". Example:
+  {"type":"object","properties":{"records":{"type":"array","maxItems":10,"items":{"type":"object","properties":{"<field>":{"type":"string"}},"required":["<field>"]}}},"required":["records"]}
 - Judge each result against the goal before your next step.
 - When the goal is satisfied, or you judge the quality sufficient, write a
   short plain-text wrap-up and stop calling the tool.
@@ -453,7 +455,17 @@ async function runOneProviderSearch(
     };
     return payload;
   } catch (err) {
-    const error = err instanceof Error ? err.message : String(err);
+    // undici's fetch throws `TypeError: fetch failed` and hides the real
+    // reason (ENOTFOUND, ECONNREFUSED, TLS…) in `err.cause` — surface it.
+    const base = err instanceof Error ? err.message : String(err);
+    const cause = (err as { cause?: unknown })?.cause;
+    const causeText =
+      cause instanceof Error
+        ? cause.message
+        : typeof cause === 'string'
+          ? cause
+          : '';
+    const error = causeText ? `${base} (${causeText})` : base;
 
     emitRunEvent(input.runId, {
       event: 'search_sub_agent_failed',

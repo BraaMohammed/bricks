@@ -53,6 +53,8 @@ export const ClarifyChat = ({ onApproveAndStart }: ClarifyChatProps) => {
   const isSendingChat = useDeepResearchStore((s) => s.isSendingChat);
   const error = useDeepResearchStore((s) => s.error);
   const outputSchema = useDeepResearchStore((s) => s.outputSchema);
+  const records = useDeepResearchStore((s) => s.records);
+  const reviewResults = useDeepResearchStore((s) => s.reviewResults);
   const searchProvider = useDeepResearchStore((s) => s.searchProvider);
   const sendClarificationMessage = useDeepResearchStore((s) => s.sendClarificationMessage);
   const [draft, setDraft] = useState('');
@@ -116,9 +118,25 @@ export const ClarifyChat = ({ onApproveAndStart }: ClarifyChatProps) => {
           </div>
         )}
 
-        {outputSchema && (
+        {outputSchema && records.length === 0 && (
           <div className="mt-4">
             <OutputSchemaEditor onApproveAndStart={onApproveAndStart} />
+          </div>
+        )}
+
+        {outputSchema && records.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/25 bg-card px-3 py-2">
+            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-primary">
+              {records.length} record{records.length === 1 ? '' : 's'} collected with this schema
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={reviewResults}
+              className="h-8 rounded-md border-border font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground hover:border-primary/60 hover:text-foreground"
+            >
+              Back to results
+            </Button>
           </div>
         )}
 
